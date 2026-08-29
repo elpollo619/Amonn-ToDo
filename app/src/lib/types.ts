@@ -1,0 +1,34 @@
+export type TaskStatus = 'open' | 'in_progress' | 'done'
+export type TaskPriority = 'low' | 'medium' | 'high'
+
+export interface Profile {
+  id: string
+  full_name: string | null
+  phone: string | null
+  avatar_color: string
+  created_at: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  description: string | null
+  status: TaskStatus
+  priority: TaskPriority
+  assignee_id: string | null
+  created_by: string | null
+  due_date: string | null // YYYY-MM-DD
+  completed_at: string | null
+  last_reminder_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskInput {
+  title: string
+  description?: string | null
+  status?: TaskStatus
+  priority?: TaskPriority
+  assignee_id?: string | null
+  due_date?: string | null
+}

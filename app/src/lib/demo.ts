@@ -1,0 +1,146 @@
+import type { Profile, Task } from './types'
+
+/**
+ * Modo demo: guarda todo en el navegador (localStorage) con datos de ejemplo.
+ * Sirve para probar la app antes de conectar Supabase. Los datos NO se
+ * comparten entre personas ni dispositivos hasta que configures la nube.
+ */
+
+const PROFILES_KEY = 'amonn.demo.profiles'
+const TASKS_KEY = 'amonn.demo.tasks'
+const SESSION_KEY = 'amonn.demo.session'
+
+function uid(): string {
+  return crypto.randomUUID()
+}
+
+function today(offsetDays = 0): string {
+  const d = new Date()
+  d.setDate(d.getDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
+
+const seedProfiles: Profile[] = [
+  {
+    id: 'demo-ana',
+    full_name: 'Ana García',
+    phone: '+34600111222',
+    avatar_color: '#6366f1',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-luis',
+    full_name: 'Luis Pérez',
+    phone: '+34600333444',
+    avatar_color: '#10b981',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-marta',
+    full_name: 'Marta Ruiz',
+    phone: '+34600555666',
+    avatar_color: '#f59e0b',
+    created_at: new Date().toISOString(),
+  },
+]
+
+function seedTasks(): Task[] {
+  const now = new Date().toISOString()
+  const base = {
+    completed_at: null,
+    last_reminder_at: null,
+    created_at: now,
+    updated_at: now,
+  }
+  return [
+    {
+      ...base,
+      id: uid(),
+      title: 'Revisar instalación eléctrica nave 3',
+      description: 'Comprobar cuadro y tomas de corriente antes de la entrega.',
+      status: 'open',
+      priority: 'high',
+      assignee_id: 'demo-luis',
+      created_by: 'demo-ana',
+      due_date: today(1),
+    },
+    {
+      ...base,
+      id: uid(),
+      title: 'Llamar al proveedor de material',
+      description: 'Confirmar pedido de tubería y fecha de entrega.',
+      status: 'in_progress',
+      priority: 'medium',
+      assignee_id: 'demo-ana',
+      created_by: 'demo-ana',
+      due_date: today(0),
+    },
+    {
+      ...base,
+      id: uid(),
+      title: 'Preparar presupuesto cliente Gómez',
+      description: null,
+      status: 'open',
+      priority: 'medium',
+      assignee_id: 'demo-marta',
+      created_by: 'demo-luis',
+      due_date: today(3),
+    },
+    {
+      ...base,
+      id: uid(),
+      title: 'Enviar factura del mes',
+      description: 'Facturación de agosto a administración.',
+      status: 'done',
+      priority: 'low',
+      assignee_id: 'demo-marta',
+      created_by: 'demo-ana',
+      due_date: today(-2),
+      completed_at: now,
+    },
+  ]
+}
+
+function read<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function write<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* almacenamiento no disponible */
+  }
+}
+
+export function ensureSeed(): void {
+  if (!localStorage.getItem(PROFILES_KEY)) write(PROFILES_KEY, seedProfiles)
+  if (!localStorage.getItem(TASKS_KEY)) write(TASKS_KEY, seedTasks())
+}
+
+export const demoStore = {
+  getProfiles(): Profile[] {
+    return read<Profile[]>(PROFILES_KEY, seedProfiles)
+  },
+  saveProfiles(list: Profile[]): void {
+    write(PROFILES_KEY, list)
+  },
+  getTasks(): Task[] {
+    return read<Task[]>(TASKS_KEY, [])
+  },
+  saveTasks(list: Task[]): void {
+    write(TASKS_KEY, list)
+  },
+  getSession(): string | null {
+    return read<string | null>(SESSION_KEY, null)
+  },
+  setSession(id: string | null): void {
+    write(SESSION_KEY, id)
+  },
+  uid,
+}
