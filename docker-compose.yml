@@ -1,0 +1,69 @@
+# ============================================================
+# Amonn — Todo el stack corriendo en tu NAS (Ugreen / Docker)
+#
+#   db          → base de datos Postgres (aquí viven las tareas)
+#   server      → API + app web (lo que abres en el navegador)
+#   waautomate  → agente de WhatsApp (OpenWA) con tu número
+#
+# Los datos se guardan en la carpeta ./data del NAS y nunca salen de casa.
+# Arranca con:  docker compose up -d
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: amonn
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: amonn
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U amonn']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://amonn:${DB_PASSWORD}@db:5432/amonn
+      JWT_SECRET: ${JWT_SECRET}
+      WA_API_URL: http://waautomate:8080
+      WA_API_KEY: ${WA_API_KEY}
+      WA_ENABLED: ${WA_ENABLED:-true}
+      REMINDER_CRON: ${REMINDER_CRON:-0 9 * * 1-5}
+      REMINDER_COOLDOWN_HOURS: ${REMINDER_COOLDOWN_HOURS:-20}
+      TZ: ${TZ:-Europe/Madrid}
+    ports:
+      # Abre la app en http://IP-DEL-NAS:${APP_PORT}
+      - '${APP_PORT:-8080}:4000'
+
+  waautomate:
+    image: openwa/wa-automate:latest
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - server
+    # Chromium necesita memoria compartida para no fallar.
+    shm_size: '1gb'
+    environment:
+      # Dónde guarda OpenWA la sesión (para no reescanear el QR en cada reinicio)
+      WA_SESSION_DATA_PATH: /session
+      TZ: ${TZ:-Europe/Madrid}
+    command:
+      - '-s'
+      - 'amonn'
+      - '-w'
+      - 'http://server:4000/api/whatsapp/webhook'
+      - '-k'
+      - '${WA_API_KEY}'
+      - '-p'
+      - '8080'
+    volumes:
+      - ./data/wa-session:/session

@@ -5,9 +5,8 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { apiFetch, getToken, setToken, isDemo } from '../lib/apiClient'
 import { demoStore, ensureSeed } from '../lib/demo'
-import { AVATAR_COLORS } from '../lib/constants'
 import type { Profile } from '../lib/types'
 
 interface AuthState {
@@ -21,54 +20,32 @@ interface AuthState {
   refresh: () => Promise<void>
 }
 
+interface AuthResponse {
+  token: string
+  user: Profile
+}
+
 const AuthContext = createContext<AuthState | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadSupabaseProfile(userId: string, email?: string | null) {
-    if (!supabase) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-    if (data) {
-      setUser(data as Profile)
-      return
-    }
-    // Crea el perfil si aún no existe (primer inicio de sesión).
-    const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
-    const { data: created } = await supabase
-      .from('profiles')
-      .insert({ id: userId, full_name: email?.split('@')[0] ?? 'Usuario', avatar_color: color })
-      .select('*')
-      .single()
-    setUser((created as Profile) ?? null)
-  }
-
   useEffect(() => {
     let active = true
     async function init() {
-      if (isSupabaseConfigured && supabase) {
-        const { data } = await supabase.auth.getSession()
-        if (data.session?.user) {
-          await loadSupabaseProfile(data.session.user.id, data.session.user.email)
-        }
-        supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
-            loadSupabaseProfile(session.user.id, session.user.email)
-          } else {
-            setUser(null)
-          }
-        })
-      } else {
+      if (isDemo) {
         ensureSeed()
         const id = demoStore.getSession()
         if (id) {
-          const p = demoStore.getProfiles().find((x) => x.id === id) ?? null
-          setUser(p)
+          setUser(demoStore.getProfiles().find((x) => x.id === id) ?? null)
+        }
+      } else if (getToken()) {
+        try {
+          const { user } = await apiFetch<{ user: Profile }>('/auth/me')
+          if (active) setUser(user)
+        } catch {
+          setToken(null)
         }
       }
       if (active) setLoading(false)
@@ -82,45 +59,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     user,
     loading,
-    demoMode: !isSupabaseConfigured,
+    demoMode: isDemo,
     async signIn(email, password) {
-      if (!supabase) throw new Error('Supabase no configurado')
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
+      const res = await apiFetch<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+      setToken(res.token)
+      setUser(res.user)
     },
     async signUp(email, password, name) {
-      if (!supabase) throw new Error('Supabase no configurado')
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) throw error
-      if (data.user) {
-        const color =
-          AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]
-        await supabase
-          .from('profiles')
-          .upsert({ id: data.user.id, full_name: name, avatar_color: color })
-        await loadSupabaseProfile(data.user.id, email)
-      }
+      const res = await apiFetch<AuthResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, full_name: name }),
+      })
+      setToken(res.token)
+      setUser(res.user)
     },
     signInDemo(profileId) {
       demoStore.setSession(profileId)
-      const p = demoStore.getProfiles().find((x) => x.id === profileId) ?? null
-      setUser(p)
+      setUser(demoStore.getProfiles().find((x) => x.id === profileId) ?? null)
     },
     async signOut() {
-      if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signOut()
-      } else {
+      if (isDemo) {
         demoStore.setSession(null)
+      } else {
+        setToken(null)
       }
       setUser(null)
     },
     async refresh() {
-      if (isSupabaseConfigured && supabase && user) {
-        await loadSupabaseProfile(user.id)
-      } else if (user) {
-        const p = demoStore.getProfiles().find((x) => x.id === user.id) ?? null
-        setUser(p)
+      if (isDemo) {
+        if (user) {
+          setUser(demoStore.getProfiles().find((x) => x.id === user.id) ?? null)
+        }
+        return
       }
+      const { user: fresh } = await apiFetch<{ user: Profile }>('/auth/me')
+      setUser(fresh)
     },
   }
 

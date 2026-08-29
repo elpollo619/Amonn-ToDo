@@ -26,7 +26,6 @@ export function Login() {
         await signIn(email, password)
       } else {
         await signUp(email, password, name.trim() || email.split('@')[0])
-        setInfo('Cuenta creada. Si se pide confirmar el email, revisa tu bandeja.')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de autenticación')
