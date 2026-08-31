@@ -90,18 +90,19 @@ async function start() {
   }
 }
 
-// Detecta la sesión y registra el webhook en el Gateway. Reintenta un par de
-// veces por si el Gateway aún está arrancando.
+// Detecta la sesión y registra el webhook en el Gateway. Reintenta de forma
+// indefinida (con espera creciente, tope 60s) por si el Gateway aún está
+// arrancando o se reinicia: así WhatsApp se reconecta solo, sin rendirse nunca.
 async function setupWhatsApp(attempt = 1) {
   try {
     await resolveSession()
   } catch (err) {
-    console.error(`[wa] no pude conectar con el Gateway (intento ${attempt}): ${err.message}`)
-    if (attempt < 5) {
-      setTimeout(() => setupWhatsApp(attempt + 1), 10_000)
-    } else {
-      console.error('[wa] me rindo; revisa WA_API_URL / WA_API_KEY')
-    }
+    const delay = Math.min(60_000, 5_000 * attempt)
+    console.error(
+      `[wa] no pude conectar con el Gateway (intento ${attempt}): ${err.message}. ` +
+        `Reintento en ${Math.round(delay / 1000)}s`,
+    )
+    setTimeout(() => setupWhatsApp(attempt + 1), delay)
     return
   }
   // Tiempo real (recomendado): recibe los mensajes por Socket.IO.
@@ -114,6 +115,15 @@ async function setupWhatsApp(attempt = 1) {
     )
   }
 }
+
+// Red de seguridad: un fallo suelto (p. ej. en la conexión con el Gateway de
+// WhatsApp) NUNCA debe tumbar el servidor web. Lo registramos y seguimos.
+process.on('unhandledRejection', (reason) => {
+  console.error('[amonn] promesa no gestionada (ignorada para no tumbar el servidor):', reason)
+})
+process.on('uncaughtException', (err) => {
+  console.error('[amonn] excepción no capturada (ignorada para no tumbar el servidor):', err)
+})
 
 start().catch((err) => {
   console.error('[amonn] error al arrancar:', err)
