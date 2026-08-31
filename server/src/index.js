@@ -12,6 +12,7 @@ import { tasksRouter } from './routes/tasks.js'
 import { profilesRouter } from './routes/profiles.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
+import { resolveSession, ensureWebhookRegistered } from './whatsapp.js'
 import { errorHandler } from './util.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -82,6 +83,26 @@ async function start() {
     console.log(`[amonn] servidor escuchando en el puerto ${config.port}`)
     console.log(`[amonn] WhatsApp ${config.whatsapp.enabled ? 'activado' : 'desactivado'}`)
   })
+  // Configuración automática de WhatsApp (best-effort: no debe tumbar el arranque).
+  if (config.whatsapp.enabled) {
+    setupWhatsApp()
+  }
+}
+
+// Detecta la sesión y registra el webhook en el Gateway. Reintenta un par de
+// veces por si el Gateway aún está arrancando.
+async function setupWhatsApp(attempt = 1) {
+  try {
+    await resolveSession()
+    await ensureWebhookRegistered()
+  } catch (err) {
+    console.error(`[wa] configuración automática falló (intento ${attempt}): ${err.message}`)
+    if (attempt < 5) {
+      setTimeout(() => setupWhatsApp(attempt + 1), 10_000)
+    } else {
+      console.error('[wa] me rindo con la config automática; revisa WA_* o registra el webhook a mano')
+    }
+  }
 }
 
 start().catch((err) => {

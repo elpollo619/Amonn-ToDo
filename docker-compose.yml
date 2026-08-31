@@ -41,7 +41,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       WA_API_URL: ${WA_API_URL}
       WA_API_KEY: ${WA_API_KEY}
-      WA_SESSION_ID: ${WA_SESSION_ID:-default}
+      WA_SESSION_ID: ${WA_SESSION_ID:-auto}
+      WA_WEBHOOK_URL: ${WA_WEBHOOK_URL:-}
       WA_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:-}
       WA_ENABLED: ${WA_ENABLED:-true}
       REMINDER_CRON: ${REMINDER_CRON:-0 9 * * 1-5}

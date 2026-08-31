@@ -22,8 +22,13 @@ export const config = {
     apiUrl: process.env.WA_API_URL ?? 'http://localhost:2785',
     // Clave del Gateway (cabecera X-API-Key). La ves en su panel o en data/.api-key.
     apiKey: process.env.WA_API_KEY ?? '',
-    // Id de la sesión de WhatsApp dentro del Gateway (GET /api/sessions).
-    sessionId: process.env.WA_SESSION_ID ?? 'default',
+    // Id de la sesión de WhatsApp dentro del Gateway. Si es "auto" (o vacío),
+    // Amonn la detecta sola preguntando al Gateway (GET /api/sessions).
+    sessionId: process.env.WA_SESSION_ID ?? 'auto',
+    // URL a la que el Gateway debe enviar los mensajes entrantes (webhook).
+    // Si se pone, Amonn registra el webhook solo al arrancar. En docker suele
+    // ser el nombre del contenedor: http://amonn-server:4000/api/whatsapp/webhook
+    webhookUrl: process.env.WA_WEBHOOK_URL ?? '',
     // Secreto del webhook (para verificar la firma HMAC de los mensajes que
     // entran). Debe coincidir con el "secret" que pongas al crear el webhook.
     // Si se deja vacío, no se verifica la firma.

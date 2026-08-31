@@ -25,7 +25,8 @@ registra en el log), útil para desarrollar sin el teléfono.
 | `JWT_SECRET` | *(cámbialo)* | Secreto para firmar las sesiones |
 | `WA_API_URL` | `http://localhost:2785` | URL del OpenWA Gateway |
 | `WA_API_KEY` | *(vacío)* | Clave del Gateway (cabecera `X-API-Key`) |
-| `WA_SESSION_ID` | `default` | Id de la sesión de WhatsApp en el Gateway |
+| `WA_SESSION_ID` | `auto` | Id de la sesión; `auto` = la detecta sola |
+| `WA_WEBHOOK_URL` | *(vacío)* | Si se pone, Amonn registra el webhook solo al arrancar |
 | `WA_WEBHOOK_SECRET` | *(vacío)* | Secreto HMAC del webhook (si se pone, se verifica la firma) |
 | `WA_ENABLED` | `true` | `false` desactiva el envío de WhatsApp |
 | `REMINDER_CRON` | `0 9 * * 1-5` | Cuándo enviar recordatorios |
