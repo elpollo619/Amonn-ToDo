@@ -10,9 +10,36 @@
       content="Amonn — gestión de tareas del equipo, calendario y avisos por WhatsApp."
     />
     <title>Amonn · Tareas del equipo</title>
+    <script>
+      // Red de seguridad: si el JavaScript no arranca o lanza un error, en vez
+      // de una pantalla en blanco mostramos el error en pantalla (útil para
+      // diagnosticar desde el móvil, donde no hay consola a mano).
+      ;(function () {
+        function show(title, detail) {
+          var r = document.getElementById('root')
+          if (!r) return
+          r.innerHTML =
+            '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:40px auto;padding:24px;color:#7f1d1d;background:#fef2f2;border:1px solid #fecaca;border-radius:12px">' +
+            '<b>⚠️ ' + title + '</b><br><br>' +
+            '<code style="white-space:pre-wrap;word-break:break-word">' + detail + '</code>' +
+            '</div>'
+        }
+        window.addEventListener('error', function (e) {
+          show('Error al cargar la app', (e && (e.message || e.error)) + '\n' + (e.filename || '') + ':' + (e.lineno || ''))
+        })
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason
+          show('Error al cargar la app (promesa)', (r && (r.message || r)) || 'desconocido')
+        })
+      })()
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="font-family:system-ui,-apple-system,sans-serif;color:#6b7280;padding:40px;text-align:center">
+        Cargando Amonn…
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
