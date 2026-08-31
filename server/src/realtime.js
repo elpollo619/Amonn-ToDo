@@ -58,6 +58,14 @@ export function connectRealtime() {
   })
   socket.on('disconnect', (reason) => {
     console.log(`[wa] tiempo real desconectado (${reason}); reintentando…`)
+    // Cuando es el SERVIDOR (el Gateway) quien cierra la conexión
+    // ("io server disconnect"), socket.io-client NO reconecta solo: hay que
+    // volver a conectar nosotros. Lo hacemos con una pequeña espera.
+    if (reason === 'io server disconnect') {
+      setTimeout(() => {
+        if (socket && !socket.connected) socket.connect()
+      }, 5000)
+    }
   })
 
   return socket
