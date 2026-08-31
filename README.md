@@ -15,31 +15,36 @@ salen de casa.**
   responsable, prioridad, fecha, buscador y filtro por persona.
 - **📅 Calendario** mensual con las tareas por fecha.
 - **👥 Equipo** y **⚙️ Perfil** (con el teléfono de WhatsApp de cada uno).
-- **🤖 Agente de WhatsApp (OpenWA)**: recordatorios automáticos ("¿Has
-  completado la tarea X?") y respuestas SÍ/NO que actualizan la tarea desde el
-  chat, usando **tu propio número** (sin costes ni verificación de Meta).
+- **🤖 Agente de WhatsApp**: recordatorios automáticos ("¿Has completado la
+  tarea X?") y respuestas SÍ/NO que actualizan la tarea desde el chat. Se conecta
+  a un **OpenWA Gateway** (open-wa.org) que ya tengas, usando **tu propio número**.
 - **⚡ Tiempo real**: los cambios aparecen al instante en todos los navegadores.
 
-## 🏗️ Arquitectura (3 contenedores en el NAS)
+## 🏗️ Arquitectura (2 contenedores + tu OpenWA Gateway)
 
 ```
-┌─────────────┐     ┌──────────────────────┐     ┌──────────────────┐
-│  Postgres   │◄────│  Servidor (API+web)  │◄────│  OpenWA (WhatsApp)│
-│  (db)       │     │  Node + Express      │     │  tu número (QR)   │
-│  tareas     │     │  sirve la app web    │     │                   │
-└─────────────┘     └──────────────────────┘     └──────────────────┘
-        └───────── datos guardados en ./data del NAS ─────────┘
+┌─────────────┐     ┌──────────────────────┐     ┌────────────────────────┐
+│  Postgres   │◄────│  Servidor (API+web)  │◄───►│  OpenWA Gateway         │
+│  (db)       │     │  Node + Express      │ API │  (open-wa.org, ya tuyo) │
+│  tareas     │     │  sirve la app web    │ HTTP│  vinculado a tu número  │
+└─────────────┘     └──────────────────────┘     └────────────────────────┘
+        └──── datos en ./data del NAS ────┘         (webhook message.received)
 ```
+
+Amonn no incluye su propio WhatsApp: **reutiliza un OpenWA Gateway existente**
+vía su API HTTP (envío) y un webhook (respuestas). Así no hay que escanear un QR
+nuevo si tu Gateway ya está vinculado.
 
 ## 🗂️ Estructura del proyecto
 
 ```
 app/        Aplicación web (React + Vite + TypeScript)
-server/     Backend: API de tareas + agente de WhatsApp (Node)
+server/     Backend: API de tareas + integración con el OpenWA Gateway (Node)
 deploy/     Guía de instalación en el NAS
-Dockerfile          Imagen de la app+servidor
-docker-compose.yml  Los 3 contenedores juntos
-.env.example        Configuración (contraseñas, puerto…)
+Dockerfile              Imagen de la app+servidor
+docker-compose.nas.yml  Para pegar en la GUI del NAS (usa la imagen publicada)
+docker-compose.yml      Versión que compila desde el código (db + server)
+.env.example            Configuración (contraseñas, datos del Gateway…)
 ```
 
 ## 🚀 Instalar en tu NAS Ugreen
@@ -48,9 +53,9 @@ Sigue la guía paso a paso: **[deploy/README-NAS.md](deploy/README-NAS.md)**.
 
 Resumen:
 ```bash
-cp .env.example .env      # pon tus contraseñas
-docker compose up -d      # arranca todo
-# abre http://IP-DEL-NAS:8080  y escanea el QR de WhatsApp (ver la guía)
+cp .env.example .env      # pon tus contraseñas y los datos de tu OpenWA Gateway
+docker compose up -d      # arranca db + server
+# abre http://IP-DEL-NAS:8080  y añade el webhook en el panel del Gateway (ver guía)
 ```
 
 ## 🧪 Probar en tu ordenador (modo demo, sin backend)
@@ -79,9 +84,11 @@ cd app && npm install && npm run dev
 
 ## 🔒 Sobre WhatsApp
 
-OpenWA es una integración **no oficial** (automatiza WhatsApp Web) — gratis y
-con tu número, pero con un pequeño riesgo de bloqueo del número. Detalles y
-alternativa oficial en la [guía del NAS](deploy/README-NAS.md#️-aviso-sobre-whatsapp-openwa).
+Amonn se conecta a un **OpenWA Gateway** (open-wa.org), que es una integración
+**no oficial** de WhatsApp (motor Baileys) — gratis y con tu número, pero con un
+pequeño riesgo de bloqueo del número. Configura `WA_API_URL`, `WA_API_KEY`,
+`WA_SESSION_ID` y `WA_WEBHOOK_SECRET` (ver `.env.example`). Detalles en la
+[guía del NAS](deploy/README-NAS.md#️-aviso-sobre-whatsapp-openwa-gateway).
 
 ## 📌 Estado
 

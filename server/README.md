@@ -1,8 +1,9 @@
 # Amonn — Servidor (backend)
 
 Node + Express (JavaScript, ESM). Expone la API de tareas, gestiona el login del
-equipo, sirve la app web compilada y contiene el **agente de WhatsApp** (OpenWA):
-recordatorios programados y webhook de respuestas.
+equipo, sirve la app web compilada y contiene el **agente de WhatsApp**:
+recordatorios programados y webhook de respuestas. Para WhatsApp se conecta a un
+**OpenWA Gateway** (open-wa.org) ya existente — no incluye su propio WhatsApp.
 
 ## Ejecutar en local
 
@@ -22,8 +23,10 @@ registra en el log), útil para desarrollar sin el teléfono.
 | `PORT` | `4000` | Puerto del servidor |
 | `DATABASE_URL` | `postgres://amonn:amonn@localhost:5432/amonn` | Conexión a Postgres |
 | `JWT_SECRET` | *(cámbialo)* | Secreto para firmar las sesiones |
-| `WA_API_URL` | `http://localhost:8080` | URL de OpenWA (EASY API) |
-| `WA_API_KEY` | *(vacío)* | Clave de OpenWA (flag `-k`) |
+| `WA_API_URL` | `http://localhost:2785` | URL del OpenWA Gateway |
+| `WA_API_KEY` | *(vacío)* | Clave del Gateway (cabecera `X-API-Key`) |
+| `WA_SESSION_ID` | `default` | Id de la sesión de WhatsApp en el Gateway |
+| `WA_WEBHOOK_SECRET` | *(vacío)* | Secreto HMAC del webhook (si se pone, se verifica la firma) |
 | `WA_ENABLED` | `true` | `false` desactiva el envío de WhatsApp |
 | `REMINDER_CRON` | `0 9 * * 1-5` | Cuándo enviar recordatorios |
 | `REMINDER_COOLDOWN_HOURS` | `20` | Horas mínimas entre avisos de una tarea |

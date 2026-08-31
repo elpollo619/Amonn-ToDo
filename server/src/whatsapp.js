@@ -1,7 +1,8 @@
 // ============================================================
-// Integración con OpenWA (open-wa/wa-automate) corriendo en el NAS.
-// - Enviamos mensajes llamando a su API HTTP (EASY API): POST /sendText
-// - Recibimos las respuestas del equipo por webhook (ver routes/webhook.js)
+// Integración con el OpenWA - WhatsApp API Gateway (open-wa.org).
+// - Enviamos: POST /api/sessions/{sessionId}/messages/send-text (X-API-Key).
+// - Recibimos las respuestas por webhook, evento "message.received"
+//   (ver routes/webhook.js).
 // ============================================================
 import { config } from './config.js'
 
@@ -17,24 +18,26 @@ export function chatIdToPhone(chatId) {
   return `+${digits}`
 }
 
-/** Envía un mensaje de texto por WhatsApp a través de OpenWA. */
+/** Envía un mensaje de texto por WhatsApp a través del OpenWA Gateway. */
 export async function sendWhatsApp(phone, content) {
   if (!config.whatsapp.enabled) {
     console.log(`[wa] (desactivado) mensaje a ${phone}: ${content}`)
     return
   }
-  const res = await fetch(`${config.whatsapp.apiUrl}/sendText`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(config.whatsapp.apiKey ? { api_key: config.whatsapp.apiKey } : {}),
+  const { apiUrl, apiKey, sessionId } = config.whatsapp
+  const res = await fetch(
+    `${apiUrl}/api/sessions/${encodeURIComponent(sessionId)}/messages/send-text`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'X-API-Key': apiKey } : {}),
+      },
+      body: JSON.stringify({ chatId: phoneToChatId(phone), text: content }),
     },
-    body: JSON.stringify({
-      args: { to: phoneToChatId(phone), content },
-    }),
-  })
+  )
   if (!res.ok) {
-    throw new Error(`OpenWA respondió ${res.status}: ${await res.text()}`)
+    throw new Error(`OpenWA Gateway respondió ${res.status}: ${await res.text()}`)
   }
 }
 

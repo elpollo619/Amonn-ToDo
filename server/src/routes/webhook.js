@@ -1,14 +1,19 @@
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Router } from 'express'
 import { query } from '../db.js'
+import { config } from '../config.js'
 import { broadcast } from '../events.js'
 import { sendWhatsApp, chatIdToPhone, interpretReply } from '../whatsapp.js'
 
 export const webhookRouter = Router()
 
-// OpenWA (flag -w) hace POST aquí en cada evento. Aceptamos varias formas de
-// payload porque cambian entre versiones.
+// El OpenWA Gateway hace POST aquí en cada evento (message.received).
 webhookRouter.post('/', async (req, res) => {
-  // Respondemos rápido para no bloquear a OpenWA; procesamos aparte.
+  // Si hay secreto configurado, verificamos la firma HMAC del Gateway.
+  if (!verifySignature(req)) {
+    return res.status(401).json({ error: 'Firma no válida' })
+  }
+  // Respondemos rápido para no bloquear al Gateway; procesamos aparte.
   res.json({ ok: true })
   try {
     await handleEvent(req.body)
@@ -17,17 +22,34 @@ webhookRouter.post('/', async (req, res) => {
   }
 })
 
+// Verifica la cabecera X-OpenWA-Signature (formato "sha256=<hex>") sobre el
+// cuerpo crudo con el secreto del webhook. Si no hay secreto, no se verifica.
+function verifySignature(req) {
+  const secret = config.whatsapp.webhookSecret
+  if (!secret) return true
+  const header = req.get('x-openwa-signature') ?? ''
+  const expected =
+    'sha256=' + createHmac('sha256', secret).update(req.rawBody ?? Buffer.from('')).digest('hex')
+  try {
+    const a = Buffer.from(header)
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
 async function handleEvent(body) {
   if (!body || typeof body !== 'object') return
   const event = body.event ?? body.eventName ?? body.ev ?? ''
   const msg = body.data ?? body.message ?? body
 
-  // Solo nos interesan mensajes entrantes de texto.
+  // Solo nos interesan mensajes entrantes de texto (evento message.received).
   if (event && !String(event).toLowerCase().includes('message')) return
   if (!msg || typeof msg !== 'object') return
   if (msg.fromMe) return
   const from = msg.from ?? ''
-  if (!from || String(from).endsWith('@g.us')) return // ignora grupos
+  if (!from || msg.isGroup || String(from).endsWith('@g.us')) return // ignora grupos
   const text = msg.body ?? msg.content ?? ''
   if (!text) return
 

@@ -18,7 +18,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 
 app.use(cors())
-app.use(express.json({ limit: '1mb' }))
+// Guardamos el cuerpo crudo para poder verificar la firma HMAC del webhook.
+app.use(
+  express.json({
+    limit: '1mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf
+    },
+  }),
+)
 
 // ─── API ──────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }))

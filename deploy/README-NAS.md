@@ -36,12 +36,21 @@ descargarla sin contraseña, hazla pública una vez:
 4. Cuando pida el contenido del `docker-compose`, elige la opción de
    **pegar / crear texto** y pega **todo** el contenido del archivo
    [`docker-compose.nas.yml`](../docker-compose.nas.yml) de este proyecto.
-5. **Cambia las 4 líneas marcadas con 🔴** (invéntate contraseñas largas):
-   - la contraseña de la base de datos (aparece **dos veces**, debe coincidir),
-   - el secreto `JWT_SECRET`,
-   - la clave de WhatsApp `WA_API_KEY` (aparece **dos veces**, debe coincidir).
+5. **Cambia las líneas marcadas con 🔴** (contraseñas inventadas + datos de tu
+   OpenWA Gateway):
+   - `DB_PASSWORD` / `DATABASE_URL`: la contraseña de la base de datos (aparece
+     **dos veces**, debe coincidir),
+   - `JWT_SECRET`: una frase larga y aleatoria,
+   - `WA_API_URL`: `http://IP-DE-TU-NAS:2785` (la IP de tu NAS + el puerto del
+     Gateway),
+   - `WA_API_KEY`: la clave de tu Gateway (la ves en su panel, puerto 2785, o en
+     `data/.api-key`),
+   - `WA_SESSION_ID`: el id de tu sesión de WhatsApp en el Gateway (lo ves en su
+     panel, o en `GET /api/sessions`),
+   - `WA_WEBHOOK_SECRET`: un texto secreto que inventes (lo usarás también en el
+     Paso 4).
 6. Dale a **Crear / Arrancar**. La primera vez tarda un par de minutos en
-   descargar. Cuando termine verás 3 contenedores: `db`, `server`, `waautomate`.
+   descargar. Cuando termine verás 2 contenedores: `db` y `server`.
 
 ## Paso 3 — Abrir la app
 
@@ -53,18 +62,30 @@ http://IP-DE-TU-NAS:8080
 
 Regístrate con tu email, crea tu equipo y empieza a añadir tareas. 🎉
 
-## Paso 4 — Conectar WhatsApp (escanear el QR)
+## Paso 4 — Conectar tu OpenWA Gateway (webhook para las respuestas)
 
-1. En la app **Docker** → **Container** → abre el contenedor **waautomate** →
-   **Protokolle / Logs**.
-2. Verás un **código QR** dibujado. En el **teléfono que no usas**:
-   **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo**, y
-   escanea el QR.
-3. La sesión queda guardada en `data/wa-session`; **no tendrás que repetirlo**
-   aunque reinicies el NAS.
+Amonn **reutiliza tu OpenWA Gateway** que ya está vinculado a WhatsApp, así que
+**no hay que escanear ningún QR**. Solo falta decirle al Gateway que envíe las
+respuestas entrantes a Amonn:
+
+1. Abre el **panel de tu OpenWA Gateway** (`http://IP-DE-TU-NAS:2785`).
+2. Ve a **Webhooks** (o *Sessions → tu sesión → Webhooks*) y **añade uno nuevo**:
+   - **URL:** `http://IP-DE-TU-NAS:8080/api/whatsapp/webhook`
+   - **Evento:** `message.received`
+   - **Secret:** el mismo texto que pusiste en `WA_WEBHOOK_SECRET`.
+3. Guarda. Puedes usar el botón **Test** del webhook para comprobar que llega.
+
+Ahora el flujo está completo: Amonn envía los recordatorios por tu Gateway, y
+cuando alguien responde **SÍ/NO**, el Gateway se lo reenvía a Amonn y la tarea se
+actualiza sola. ✅
 
 > 💡 Cada persona del equipo debe poner su teléfono (con prefijo, p. ej.
 > `+34600111222`) en **Mi perfil** dentro de la app, para recibir los avisos.
+
+> 🔌 **Sobre la conexión entre contenedores:** el ejemplo usa la IP de tu NAS
+> (`http://IP-DE-TU-NAS:2785`), lo más sencillo. Si prefieres que se comuniquen
+> por nombre de contenedor (`http://openwa-api:2785`), añade el proyecto de
+> Amonn a la misma red docker que tu Gateway.
 
 ---
 
@@ -76,12 +97,12 @@ cd /volume1/docker            # o tu carpeta compartida
 git clone https://github.com/elpollo619/Amonn-ToDo.git
 cd Amonn-ToDo
 cp .env.example .env
-nano .env                     # cambia contraseñas
-docker compose up -d          # construye y arranca (db + server + waautomate)
+nano .env                     # contraseñas + datos de tu OpenWA Gateway
+docker compose up -d          # construye y arranca (db + server)
 ```
 
-Luego abre `http://IP-DEL-NAS:8080` y escanea el QR con
-`docker compose logs -f waautomate`.
+Luego abre `http://IP-DEL-NAS:8080` y añade el webhook en el panel del Gateway
+(Paso 4).
 
 ---
 
@@ -97,17 +118,18 @@ Luego abre `http://IP-DEL-NAS:8080` y escanea el QR con
 
 ---
 
-## ⚠️ Aviso sobre WhatsApp (OpenWA)
+## ⚠️ Aviso sobre WhatsApp (OpenWA Gateway)
 
-OpenWA usa WhatsApp de forma **no oficial** (automatiza WhatsApp Web). Para una
-herramienta interna con pocos mensajes suele funcionar bien, pero WhatsApp
-**podría bloquear el número** si detecta uso automatizado. Por eso usamos el
-número del teléfono que no te importa. Recomendaciones:
+El OpenWA Gateway usa WhatsApp de forma **no oficial** (motor Baileys, como
+WhatsApp Web). Para una herramienta interna con pocos mensajes suele funcionar
+bien, pero WhatsApp **podría bloquear el número** si detecta uso automatizado.
+Por eso conviene usar el número de un teléfono que no te importe. Recomendaciones:
 
 - No enviar mensajes masivos ni a desconocidos.
 - Mantener un volumen bajo y "humano" de mensajes.
-- Si algún día quieres la vía 100% oficial (sin riesgo), se puede cambiar a la
-  API oficial de Meta/Twilio; el código está preparado para ello.
+- Como Amonn habla con el Gateway por HTTP estándar, si algún día pasas a otro
+  proveedor (incluida la API oficial de Meta) solo habría que adaptar el módulo
+  `server/src/whatsapp.js`.
 
 ---
 
@@ -115,12 +137,16 @@ número del teléfono que no te importa. Recomendaciones:
 
 - **No carga la app** → mira los logs del contenedor `server` y comprueba que
   `db` arrancó.
-- **El QR no aparece** → abre los logs de `waautomate` y espera; si falla por
-  memoria, asegúrate de que el NAS tiene RAM libre (WhatsApp usa ~1 GB).
 - **"manifest unknown" o no descarga la imagen** → repite el Paso 1 (la imagen
   debe estar en **Public**), o revisa que el nombre sea
   `ghcr.io/elpollo619/amonn-todo:latest`.
-- **La sesión de WhatsApp se pierde al reiniciar** → comprueba que existe la
-  carpeta `data/wa-session` y no está vacía.
-- **No llegan los recordatorios** → confirma que las personas tienen su teléfono
-  en el perfil (con prefijo) y que `WA_ENABLED` es `true`.
+- **No salen los recordatorios** → revisa en los logs de `server` si hay error
+  al llamar al Gateway. Comprueba `WA_API_URL` (IP + puerto 2785 correctos),
+  `WA_API_KEY`, `WA_SESSION_ID`, que `WA_ENABLED` es `true`, y que las personas
+  tienen su teléfono (con prefijo) en **Mi perfil**.
+- **No se marcan las tareas al responder SÍ/NO** → el webhook del Gateway no
+  está llegando. Revisa en el panel del Gateway que la URL del webhook es
+  `http://IP-DE-TU-NAS:8080/api/whatsapp/webhook`, el evento `message.received`,
+  y que el **secret** coincide con `WA_WEBHOOK_SECRET`. Usa el botón **Test**.
+- **Respuestas rechazadas (401 en los logs)** → el `secret` del webhook y
+  `WA_WEBHOOK_SECRET` no coinciden.

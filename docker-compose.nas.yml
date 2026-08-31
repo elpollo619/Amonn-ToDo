@@ -1,10 +1,11 @@
 # ============================================================
 # Amonn — para PEGAR en tu NAS Ugreen (Docker → Projekt → Crear)
 #
-# Usa una imagen ya construida (no compila en el NAS).
-# Cambia SOLO las 4 líneas marcadas con 🔴 (inventa contraseñas largas).
-# La misma contraseña de la BD debe ir en DB_PASSWORD y en DATABASE_URL.
-# La misma clave de WhatsApp debe ir en los dos sitios con WA_API_KEY.
+# Reutiliza tu OpenWA Gateway existente (NO crea uno nuevo, no hay QR).
+# Solo 2 contenedores: base de datos (db) + app (server).
+#
+# Cambia las líneas marcadas con 🔴 (contraseñas inventadas + datos de tu
+# Gateway). La misma contraseña de la BD va en DB_PASSWORD y en DATABASE_URL.
 # ============================================================
 
 services:
@@ -32,32 +33,19 @@ services:
     environment:
       DATABASE_URL: postgres://amonn:CAMBIA_ESTA_CONTRASENA@db:5432/amonn   # 🔴 (1) MISMA contraseña que arriba
       JWT_SECRET: CAMBIA_ESTA_FRASE_MUY_LARGA_Y_ALEATORIA                   # 🔴 (2) secreto de sesiones
-      WA_API_URL: http://waautomate:8080
-      WA_API_KEY: CAMBIA_ESTA_CLAVE_DE_WHATSAPP                             # 🔴 (3) clave de WhatsApp
+
+      # ─── Conexión con tu OpenWA Gateway (el que ya tienes) ───
+      WA_API_URL: http://IP-DEL-NAS:2785            # 🔴 (3) IP de tu NAS + puerto del Gateway (2785)
+      WA_API_KEY: TU_API_KEY_DEL_GATEWAY            # 🔴 (4) la clave del Gateway (X-API-Key)
+      WA_SESSION_ID: default                        # 🔴 (5) el id de tu sesión de WhatsApp en el Gateway
+      WA_WEBHOOK_SECRET: UN_SECRETO_PARA_EL_WEBHOOK # 🔴 (6) el mismo "secret" que pondrás en el webhook
       WA_ENABLED: 'true'
+
       REMINDER_CRON: '0 9 * * 1-5'    # recordatorios: L-V a las 9:00
       TZ: Europe/Madrid
     ports:
       - '8080:4000'                   # abre la app en http://IP-DEL-NAS:8080
 
-  waautomate:
-    image: openwa/wa-automate:latest
-    init: true
-    restart: unless-stopped
-    depends_on:
-      - server
-    shm_size: '1gb'
-    environment:
-      WA_SESSION_DATA_PATH: /session
-      TZ: Europe/Madrid
-    command:
-      - '-s'
-      - 'amonn'
-      - '-w'
-      - 'http://server:4000/api/whatsapp/webhook'
-      - '-k'
-      - 'CAMBIA_ESTA_CLAVE_DE_WHATSAPP'   # 🔴 (3) MISMA clave de WhatsApp que arriba
-      - '-p'
-      - '8080'
-    volumes:
-      - ./data/wa-session:/session
+# Después de arrancar, en el panel de tu OpenWA Gateway (puerto 2785) añade un
+# webhook apuntando a:  http://IP-DEL-NAS:8080/api/whatsapp/webhook
+# con el evento "message.received" y el mismo secreto de WA_WEBHOOK_SECRET.

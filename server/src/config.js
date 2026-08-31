@@ -13,15 +13,23 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET ?? 'cambia-esto-en-produccion',
   jwtExpiresIn: '30d',
 
-  // ─── WhatsApp / OpenWA ───────────────────────────────────
+  // ─── WhatsApp: OpenWA Gateway (open-wa.org) ──────────────
+  // Amonn se conecta a un OpenWA - WhatsApp API Gateway ya existente
+  // (self-hosted). No incluye su propio WhatsApp: reutiliza tu Gateway.
   whatsapp: {
-    // URL interna del contenedor de OpenWA (EASY API). En docker-compose el
-    // host es el nombre del servicio: "waautomate".
-    apiUrl: process.env.WA_API_URL ?? 'http://localhost:8080',
-    // Debe coincidir con la clave con la que arranca OpenWA (flag -k).
+    // URL base del Gateway. Ej: http://IP-DEL-NAS:2785  (o el nombre del
+    // contenedor si comparten red docker, ej: http://openwa-api:2785).
+    apiUrl: process.env.WA_API_URL ?? 'http://localhost:2785',
+    // Clave del Gateway (cabecera X-API-Key). La ves en su panel o en data/.api-key.
     apiKey: process.env.WA_API_KEY ?? '',
+    // Id de la sesión de WhatsApp dentro del Gateway (GET /api/sessions).
+    sessionId: process.env.WA_SESSION_ID ?? 'default',
+    // Secreto del webhook (para verificar la firma HMAC de los mensajes que
+    // entran). Debe coincidir con el "secret" que pongas al crear el webhook.
+    // Si se deja vacío, no se verifica la firma.
+    webhookSecret: process.env.WA_WEBHOOK_SECRET ?? '',
     // Si es false, el agente de WhatsApp queda desactivado (útil para probar
-    // solo la app web sin conectar el teléfono todavía).
+    // solo la app web sin conectar WhatsApp todavía).
     enabled: process.env.WA_ENABLED !== 'false',
   },
 
