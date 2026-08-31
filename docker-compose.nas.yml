@@ -41,8 +41,8 @@ services:
       WA_API_URL: http://openwa-api:2785          # nombre del contenedor del Gateway (no tocar)
       WA_API_KEY: TU_API_KEY_DEL_GATEWAY          # 🔴 (3) la API Key de tu Gateway
       WA_SESSION_ID: auto                         # Amonn detecta la sesión sola
-      WA_WEBHOOK_URL: http://amonn-server:4000/api/whatsapp/webhook  # Amonn registra el webhook solo
-      WA_WEBHOOK_SECRET: UN_SECRETO_PARA_EL_WEBHOOK   # 🔴 (4) un texto secreto que inventes
+      # Las respuestas SÍ/NO llegan en tiempo real por Socket.IO (no hace falta
+      # webhook ni abrir puertos, y esquiva la protección SSRF del Gateway).
       WA_ENABLED: 'true'
 
       REMINDER_CRON: '0 9 * * 1-5'    # recordatorios: L-V a las 9:00

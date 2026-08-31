@@ -28,7 +28,11 @@ export const config = {
     // URL a la que el Gateway debe enviar los mensajes entrantes (webhook).
     // Si se pone, Amonn registra el webhook solo al arrancar. En docker suele
     // ser el nombre del contenedor: http://amonn-server:4000/api/whatsapp/webhook
+    // (Alternativa al tiempo real; normalmente se deja vacío y se usa realtime.)
     webhookUrl: process.env.WA_WEBHOOK_URL ?? '',
+    // Recibir mensajes en tiempo real por Socket.IO (namespace /events). Es la
+    // vía recomendada: no necesita webhook ni abrir puertos. true por defecto.
+    realtime: process.env.WA_REALTIME !== 'false',
     // Secreto del webhook (para verificar la firma HMAC de los mensajes que
     // entran). Debe coincidir con el "secret" que pongas al crear el webhook.
     // Si se deja vacío, no se verifica la firma.

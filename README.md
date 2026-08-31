@@ -28,12 +28,13 @@ salen de casa.**
 │  (db)       │     │  Node + Express      │ API │  (open-wa.org, ya tuyo) │
 │  tareas     │     │  sirve la app web    │ HTTP│  vinculado a tu número  │
 └─────────────┘     └──────────────────────┘     └────────────────────────┘
-        └──── datos en ./data del NAS ────┘         (webhook message.received)
+        └──── datos en ./data del NAS ────┘         (Socket.IO en tiempo real)
 ```
 
 Amonn no incluye su propio WhatsApp: **reutiliza un OpenWA Gateway existente**
-vía su API HTTP (envío) y un webhook (respuestas). Así no hay que escanear un QR
-nuevo si tu Gateway ya está vinculado.
+vía su API HTTP (envío de recordatorios) y **Socket.IO en tiempo real** (las
+respuestas SÍ/NO). Así no hay que escanear un QR nuevo si tu Gateway ya está
+vinculado, ni abrir puertos ni configurar webhooks.
 
 ## 🗂️ Estructura del proyecto
 
@@ -55,7 +56,7 @@ Resumen:
 ```bash
 cp .env.example .env      # pon tus contraseñas y los datos de tu OpenWA Gateway
 docker compose up -d      # arranca db + server
-# abre http://IP-DEL-NAS:8080  y añade el webhook en el panel del Gateway (ver guía)
+# abre http://IP-DEL-NAS:8080  y regístrate (WhatsApp se conecta solo, ver guía)
 ```
 
 ## 🧪 Probar en tu ordenador (modo demo, sin backend)
@@ -86,8 +87,8 @@ cd app && npm install && npm run dev
 
 Amonn se conecta a un **OpenWA Gateway** (open-wa.org), que es una integración
 **no oficial** de WhatsApp (motor Baileys) — gratis y con tu número, pero con un
-pequeño riesgo de bloqueo del número. Configura `WA_API_URL`, `WA_API_KEY`,
-`WA_SESSION_ID` y `WA_WEBHOOK_SECRET` (ver `.env.example`). Detalles en la
+pequeño riesgo de bloqueo del número. Configura `WA_API_URL` y `WA_API_KEY`
+(la sesión se detecta sola; ver `.env.example`). Detalles en la
 [guía del NAS](deploy/README-NAS.md#️-aviso-sobre-whatsapp-openwa-gateway).
 
 ## 📌 Estado

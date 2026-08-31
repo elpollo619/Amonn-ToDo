@@ -36,19 +36,16 @@ descargarla sin contraseña, hazla pública una vez:
 4. Cuando pida el contenido del `docker-compose`, elige la opción de
    **pegar / crear texto** y pega **todo** el contenido del archivo
    [`docker-compose.nas.yml`](../docker-compose.nas.yml) de este proyecto.
-5. **Cambia las líneas marcadas con 🔴** (contraseñas inventadas + datos de tu
-   OpenWA Gateway):
-   - `DB_PASSWORD` / `DATABASE_URL`: la contraseña de la base de datos (aparece
-     **dos veces**, debe coincidir),
+5. **Cambia solo las 3 líneas marcadas con 🔴** (contraseñas inventadas + la
+   clave de tu Gateway):
+   - `POSTGRES_PASSWORD` / `DATABASE_URL`: la contraseña de la base de datos
+     (aparece **dos veces**, debe ser **idéntica** y sin símbolos raros),
    - `JWT_SECRET`: una frase larga y aleatoria,
-   - `WA_API_URL`: `http://IP-DE-TU-NAS:2785` (la IP de tu NAS + el puerto del
-     Gateway),
-   - `WA_API_KEY`: la clave de tu Gateway (la ves en su panel, puerto 2785, o en
-     `data/.api-key`),
-   - `WA_SESSION_ID`: el id de tu sesión de WhatsApp en el Gateway (lo ves en su
-     panel, o en `GET /api/sessions`),
-   - `WA_WEBHOOK_SECRET`: un texto secreto que inventes (lo usarás también en el
-     Paso 4).
+   - `WA_API_KEY`: la clave de tu Gateway (en `data/.api-key`, con `cat
+     data/.api-key` desde la Terminal del contenedor del Gateway).
+
+   El resto (`WA_API_URL`, la sesión, el tiempo real) ya viene puesto: Amonn
+   habla con tu Gateway por la red interna y **detecta la sesión solo**.
 6. Dale a **Crear / Arrancar**. La primera vez tarda un par de minutos en
    descargar. Cuando termine verás 2 contenedores: `db` y `server`.
 
@@ -62,30 +59,31 @@ http://IP-DE-TU-NAS:8080
 
 Regístrate con tu email, crea tu equipo y empieza a añadir tareas. 🎉
 
-## Paso 4 — Conectar tu OpenWA Gateway (webhook para las respuestas)
+## Paso 4 — WhatsApp (se conecta solo)
 
-Amonn **reutiliza tu OpenWA Gateway** que ya está vinculado a WhatsApp, así que
-**no hay que escanear ningún QR**. Solo falta decirle al Gateway que envíe las
-respuestas entrantes a Amonn:
+**No hay que hacer nada más.** Amonn **reutiliza tu OpenWA Gateway** (ya
+vinculado a WhatsApp, sin QR nuevo) y al arrancar:
 
-1. Abre el **panel de tu OpenWA Gateway** (`http://IP-DE-TU-NAS:2785`).
-2. Ve a **Webhooks** (o *Sessions → tu sesión → Webhooks*) y **añade uno nuevo**:
-   - **URL:** `http://IP-DE-TU-NAS:8080/api/whatsapp/webhook`
-   - **Evento:** `message.received`
-   - **Secret:** el mismo texto que pusiste en `WA_WEBHOOK_SECRET`.
-3. Guarda. Puedes usar el botón **Test** del webhook para comprobar que llega.
+- **detecta la sesión** de WhatsApp automáticamente, y
+- se **suscribe a los mensajes en tiempo real** (Socket.IO, `/events`).
 
-Ahora el flujo está completo: Amonn envía los recordatorios por tu Gateway, y
-cuando alguien responde **SÍ/NO**, el Gateway se lo reenvía a Amonn y la tarea se
-actualiza sola. ✅
+Así, los recordatorios salen por tu Gateway y, cuando alguien responde
+**SÍ/NO**, Amonn lo recibe al instante y actualiza la tarea. ✅ No necesita
+webhook, ni abrir puertos, ni tocar la seguridad del Gateway.
+
+Para comprobarlo, mira el **Protokoll** de `amonn-server`; verás:
+```
+[wa] sesión seleccionada: ...
+[wa] tiempo real conectado; suscribiendo a la sesión
+```
 
 > 💡 Cada persona del equipo debe poner su teléfono (con prefijo, p. ej.
 > `+34600111222`) en **Mi perfil** dentro de la app, para recibir los avisos.
 
-> 🔌 **Sobre la conexión entre contenedores:** el ejemplo usa la IP de tu NAS
-> (`http://IP-DE-TU-NAS:2785`), lo más sencillo. Si prefieres que se comuniquen
-> por nombre de contenedor (`http://openwa-api:2785`), añade el proyecto de
-> Amonn a la misma red docker que tu Gateway.
+> 🔌 **Requisito de red:** el compose conecta Amonn a la red docker de tu
+> Gateway (`openwa-network`) y le habla por el nombre del contenedor
+> (`http://openwa-api:2785`). Si tu Gateway usa otra red, ajústalo en la
+> sección `networks:` del compose.
 
 ---
 
@@ -144,9 +142,8 @@ Por eso conviene usar el número de un teléfono que no te importe. Recomendacio
   al llamar al Gateway. Comprueba `WA_API_URL` (IP + puerto 2785 correctos),
   `WA_API_KEY`, `WA_SESSION_ID`, que `WA_ENABLED` es `true`, y que las personas
   tienen su teléfono (con prefijo) en **Mi perfil**.
-- **No se marcan las tareas al responder SÍ/NO** → el webhook del Gateway no
-  está llegando. Revisa en el panel del Gateway que la URL del webhook es
-  `http://IP-DE-TU-NAS:8080/api/whatsapp/webhook`, el evento `message.received`,
-  y que el **secret** coincide con `WA_WEBHOOK_SECRET`. Usa el botón **Test**.
-- **Respuestas rechazadas (401 en los logs)** → el `secret` del webhook y
-  `WA_WEBHOOK_SECRET` no coinciden.
+- **No se marcan las tareas al responder SÍ/NO** → mira el `Protokoll` de
+  `amonn-server`. Debe poner `[wa] tiempo real conectado`. Si no, revisa que
+  Amonn esté en la misma red que el Gateway (`openwa-network`) y que `WA_API_KEY`
+  sea correcta. También que la persona tenga su teléfono (con prefijo) en su
+  perfil.

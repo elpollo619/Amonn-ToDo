@@ -13,6 +13,7 @@ import { profilesRouter } from './routes/profiles.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
 import { resolveSession, ensureWebhookRegistered } from './whatsapp.js'
+import { connectRealtime } from './realtime.js'
 import { errorHandler } from './util.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -94,14 +95,23 @@ async function start() {
 async function setupWhatsApp(attempt = 1) {
   try {
     await resolveSession()
-    await ensureWebhookRegistered()
   } catch (err) {
-    console.error(`[wa] configuración automática falló (intento ${attempt}): ${err.message}`)
+    console.error(`[wa] no pude conectar con el Gateway (intento ${attempt}): ${err.message}`)
     if (attempt < 5) {
       setTimeout(() => setupWhatsApp(attempt + 1), 10_000)
     } else {
-      console.error('[wa] me rindo con la config automática; revisa WA_* o registra el webhook a mano')
+      console.error('[wa] me rindo; revisa WA_API_URL / WA_API_KEY')
     }
+    return
+  }
+  // Tiempo real (recomendado): recibe los mensajes por Socket.IO.
+  connectRealtime()
+  // Webhook (opcional y alternativo): solo si se configura una URL de destino.
+  // Su fallo no afecta al tiempo real.
+  if (config.whatsapp.webhookUrl) {
+    ensureWebhookRegistered().catch((err) =>
+      console.error(`[wa] no pude registrar el webhook (opcional): ${err.message}`),
+    )
   }
 }
 

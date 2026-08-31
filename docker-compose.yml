@@ -42,6 +42,7 @@ services:
       WA_API_URL: ${WA_API_URL}
       WA_API_KEY: ${WA_API_KEY}
       WA_SESSION_ID: ${WA_SESSION_ID:-auto}
+      WA_REALTIME: ${WA_REALTIME:-true}
       WA_WEBHOOK_URL: ${WA_WEBHOOK_URL:-}
       WA_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:-}
       WA_ENABLED: ${WA_ENABLED:-true}
