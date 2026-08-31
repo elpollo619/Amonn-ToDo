@@ -4,139 +4,96 @@ Guía para dejar **todo** funcionando en tu **Ugreen NASync DH4300 Plus**
 (UGOS Pro): la app, la base de datos y el agente de WhatsApp. Los datos se
 guardan en la carpeta `data/` del NAS y **nunca salen de tu casa**.
 
-> ⏱️ Tiempo estimado: 20–30 min. No necesitas ser programador; solo copiar,
-> pegar y escanear un QR.
+Hay dos caminos. El **método gráfico** (recomendado) no necesita comandos ni
+copiar código. Más abajo está el método por SSH por si lo prefieres.
 
 ---
 
-## 0. Antes de empezar
+# ✅ Método gráfico (recomendado, sin comandos)
 
-Necesitas:
-- Tu **NAS Ugreen** encendido y en tu red.
-- El **teléfono que no usas** con su número activo (para WhatsApp).
-- 10 minutos de paciencia 🙂
+Usa la app **Docker** de tu NAS y una imagen ya construida (se compila sola en
+GitHub, tú no compilas nada).
 
----
+## Paso 1 — Hacer pública la imagen (un solo clic, una vez)
 
-## 1. Activar Docker y SSH en el NAS
+La imagen se publica automáticamente en GitHub. Para que el NAS pueda
+descargarla sin contraseña, hazla pública una vez:
 
-1. Abre **UGOS Pro** en el navegador (la interfaz de tu NAS).
-2. En el **App Center**, instala **Docker** (a veces llamado "Contenedores").
-3. Ve a **Panel de control → Terminal / SSH** y **activa SSH**.
+1. Entra en `https://github.com/elpollo619/Amonn-ToDo` → pestaña **Packages**
+   (o `https://github.com/users/elpollo619/packages`).
+2. Abre el paquete **amonn-todo** → **Package settings** → sección **Danger
+   Zone** → **Change visibility** → **Public**.
 
----
+> Si prefieres mantenerla privada, se puede, pero entonces hay que hacer
+> `docker login ghcr.io` en el NAS. Público es lo más simple.
 
-## 2. Copiar Amonn al NAS
+## Paso 2 — Crear el Proyecto en Docker
 
-Tienes dos opciones:
+1. Abre la app **Docker** en UGOS → pestaña **Projekt / Proyectos** → **Crear**.
+2. Ponle un nombre: `amonn`.
+3. Elige (o crea) una carpeta para el proyecto, por ejemplo `docker/amonn`.
+   Ahí se guardará la subcarpeta `data/` con tu base de datos.
+4. Cuando pida el contenido del `docker-compose`, elige la opción de
+   **pegar / crear texto** y pega **todo** el contenido del archivo
+   [`docker-compose.nas.yml`](../docker-compose.nas.yml) de este proyecto.
+5. **Cambia las 4 líneas marcadas con 🔴** (invéntate contraseñas largas):
+   - la contraseña de la base de datos (aparece **dos veces**, debe coincidir),
+   - el secreto `JWT_SECRET`,
+   - la clave de WhatsApp `WA_API_KEY` (aparece **dos veces**, debe coincidir).
+6. Dale a **Crear / Arrancar**. La primera vez tarda un par de minutos en
+   descargar. Cuando termine verás 3 contenedores: `db`, `server`, `waautomate`.
 
-**Opción A — con Git (recomendada):** conéctate por SSH al NAS y clona el
-proyecto:
+## Paso 3 — Abrir la app
 
-```bash
-ssh tu-usuario@IP-DEL-NAS
-cd /volume1/docker          # o la carpeta compartida que uses
-git clone https://github.com/elpollo619/Amonn-ToDo.git
-cd Amonn-ToDo
-```
-
-**Opción B — sin Git:** descarga el proyecto como ZIP desde GitHub, descomprímelo
-y cópialo a una carpeta del NAS (p. ej. `docker/Amonn-ToDo`) con el explorador
-de archivos de UGOS.
-
----
-
-## 3. Configurar tus contraseñas
-
-Copia el archivo de ejemplo y edítalo con tus valores:
-
-```bash
-cp .env.example .env
-nano .env      # (o edítalo con el editor de texto de UGOS)
-```
-
-Cambia al menos estos valores por otros tuyos (inventados, largos):
+En el navegador:
 
 ```
-DB_PASSWORD=...            # contraseña de la base de datos
-JWT_SECRET=...             # una frase larga y aleatoria
-WA_API_KEY=...             # una clave secreta para WhatsApp
-APP_PORT=8080             # el puerto donde verás la app
+http://IP-DE-TU-NAS:8080
 ```
 
-Guarda y cierra.
+Regístrate con tu email, crea tu equipo y empieza a añadir tareas. 🎉
 
----
+## Paso 4 — Conectar WhatsApp (escanear el QR)
 
-## 4. Arrancar todo
+1. En la app **Docker** → **Container** → abre el contenedor **waautomate** →
+   **Protokolle / Logs**.
+2. Verás un **código QR** dibujado. En el **teléfono que no usas**:
+   **WhatsApp → Ajustes → Dispositivos vinculados → Vincular un dispositivo**, y
+   escanea el QR.
+3. La sesión queda guardada en `data/wa-session`; **no tendrás que repetirlo**
+   aunque reinicies el NAS.
 
-Desde la carpeta del proyecto:
-
-```bash
-docker compose up -d
-```
-
-La primera vez tarda unos minutos (descarga y construye las imágenes). Cuando
-termine, tendrás 3 contenedores en marcha: `db`, `server` y `waautomate`.
-
-Abre la app en el navegador:
-
-```
-http://IP-DEL-NAS:8080
-```
-
-🎉 Regístrate con tu email, crea tu equipo y empieza a añadir tareas.
-
----
-
-## 5. Conectar WhatsApp (escanear el QR)
-
-El contenedor `waautomate` es el agente de WhatsApp. Para vincular tu número,
-mira su registro (log) para ver el **código QR**:
-
-```bash
-docker compose logs -f waautomate
-```
-
-Verás un QR dibujado en la terminal. En el **teléfono que no usas**:
-
-1. Abre **WhatsApp → Ajustes → Dispositivos vinculados**.
-2. **Vincular un dispositivo** y escanea el QR de la terminal.
-
-Cuando se vincule, el log dirá que la sesión está lista. La sesión queda
-guardada en `data/wa-session`, así que **no tendrás que repetir esto** aunque
-reinicies el NAS.
-
-> 💡 Cada persona del equipo debe poner su número (con prefijo, p. ej.
+> 💡 Cada persona del equipo debe poner su teléfono (con prefijo, p. ej.
 > `+34600111222`) en **Mi perfil** dentro de la app, para recibir los avisos.
 
 ---
 
-## 6. Probar el agente
+# 🧑‍💻 Método por SSH (alternativa para expertos)
 
-- En la app, crea una tarea con **fecha de hoy** y asígnala a alguien que tenga
-  su teléfono puesto en el perfil.
-- Fuerza un recordatorio de prueba (sin esperar a las 9:00). Desde SSH, entra en
-  la app, copia tu token o simplemente espera al cron; o pide a un compañero que
-  te escriba al número del bot: responderá según el estado de tus tareas.
-- Cuando llegue el recordatorio *"¿Has completado la tarea X?"*, responde **SÍ**
-  o **NO** por WhatsApp: la tarea se actualiza sola en la app. ✅
+```bash
+ssh tu-usuario@IP-DEL-NAS
+cd /volume1/docker            # o tu carpeta compartida
+git clone https://github.com/elpollo619/Amonn-ToDo.git
+cd Amonn-ToDo
+cp .env.example .env
+nano .env                     # cambia contraseñas
+docker compose up -d          # construye y arranca (db + server + waautomate)
+```
 
-Los recordatorios automáticos salen de lunes a viernes a las 9:00 (lo cambias
-en `.env` con `REMINDER_CRON`).
+Luego abre `http://IP-DEL-NAS:8080` y escanea el QR con
+`docker compose logs -f waautomate`.
 
 ---
 
 ## Mantenimiento
 
-| Acción | Comando |
-|---|---|
-| Ver estado | `docker compose ps` |
-| Ver logs | `docker compose logs -f server` |
-| Parar todo | `docker compose down` |
-| Arrancar de nuevo | `docker compose up -d` |
-| Actualizar a la última versión | `git pull && docker compose up -d --build` |
-| Copia de seguridad | copia la carpeta `data/` (contiene la base de datos y la sesión de WhatsApp) |
+| Acción | Método gráfico | Por SSH |
+|---|---|---|
+| Ver estado | Docker → Container | `docker compose ps` |
+| Ver logs | Container → Protokolle | `docker compose logs -f server` |
+| Parar | Projekt → Detener | `docker compose down` |
+| Actualizar | Projekt → recrear (baja la imagen `:latest` nueva) | `git pull && docker compose up -d --build` |
+| Copia de seguridad | copia la carpeta `data/` | copia la carpeta `data/` |
 
 ---
 
@@ -145,23 +102,25 @@ en `.env` con `REMINDER_CRON`).
 OpenWA usa WhatsApp de forma **no oficial** (automatiza WhatsApp Web). Para una
 herramienta interna con pocos mensajes suele funcionar bien, pero WhatsApp
 **podría bloquear el número** si detecta uso automatizado. Por eso usamos el
-número del teléfono que no te importa. Recomendaciones para reducir el riesgo:
+número del teléfono que no te importa. Recomendaciones:
 
 - No enviar mensajes masivos ni a desconocidos.
 - Mantener un volumen bajo y "humano" de mensajes.
-- Si algún día quieres la vía 100% oficial (sin riesgo de bloqueo), se puede
-  cambiar a la API oficial de Meta/Twilio; el código está preparado para ello.
+- Si algún día quieres la vía 100% oficial (sin riesgo), se puede cambiar a la
+  API oficial de Meta/Twilio; el código está preparado para ello.
 
 ---
 
 ## Problemas frecuentes
 
-- **No carga la app** → revisa `docker compose logs server`. ¿La base de datos
-  arrancó? (`docker compose ps`).
-- **El QR no aparece** → `docker compose logs -f waautomate` y espera; si falla
-  por memoria, asegúrate de que el NAS tiene RAM libre (el navegador interno de
-  WhatsApp consume ~1 GB).
+- **No carga la app** → mira los logs del contenedor `server` y comprueba que
+  `db` arrancó.
+- **El QR no aparece** → abre los logs de `waautomate` y espera; si falla por
+  memoria, asegúrate de que el NAS tiene RAM libre (WhatsApp usa ~1 GB).
+- **"manifest unknown" o no descarga la imagen** → repite el Paso 1 (la imagen
+  debe estar en **Public**), o revisa que el nombre sea
+  `ghcr.io/elpollo619/amonn-todo:latest`.
 - **La sesión de WhatsApp se pierde al reiniciar** → comprueba que existe la
-  carpeta `data/wa-session` y que no está vacía.
+  carpeta `data/wa-session` y no está vacía.
 - **No llegan los recordatorios** → confirma que las personas tienen su teléfono
-  en el perfil (con prefijo internacional) y que `WA_ENABLED=true`.
+  en el perfil (con prefijo) y que `WA_ENABLED` es `true`.

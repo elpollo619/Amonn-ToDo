@@ -1,0 +1,63 @@
+# ============================================================
+# Amonn — para PEGAR en tu NAS Ugreen (Docker → Projekt → Crear)
+#
+# Usa una imagen ya construida (no compila en el NAS).
+# Cambia SOLO las 4 líneas marcadas con 🔴 (inventa contraseñas largas).
+# La misma contraseña de la BD debe ir en DB_PASSWORD y en DATABASE_URL.
+# La misma clave de WhatsApp debe ir en los dos sitios con WA_API_KEY.
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: amonn
+      POSTGRES_PASSWORD: CAMBIA_ESTA_CONTRASENA          # 🔴 (1) contraseña de la base de datos
+      POSTGRES_DB: amonn
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U amonn']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: ghcr.io/elpollo619/amonn-todo:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://amonn:CAMBIA_ESTA_CONTRASENA@db:5432/amonn   # 🔴 (1) MISMA contraseña que arriba
+      JWT_SECRET: CAMBIA_ESTA_FRASE_MUY_LARGA_Y_ALEATORIA                   # 🔴 (2) secreto de sesiones
+      WA_API_URL: http://waautomate:8080
+      WA_API_KEY: CAMBIA_ESTA_CLAVE_DE_WHATSAPP                             # 🔴 (3) clave de WhatsApp
+      WA_ENABLED: 'true'
+      REMINDER_CRON: '0 9 * * 1-5'    # recordatorios: L-V a las 9:00
+      TZ: Europe/Madrid
+    ports:
+      - '8080:4000'                   # abre la app en http://IP-DEL-NAS:8080
+
+  waautomate:
+    image: openwa/wa-automate:latest
+    init: true
+    restart: unless-stopped
+    depends_on:
+      - server
+    shm_size: '1gb'
+    environment:
+      WA_SESSION_DATA_PATH: /session
+      TZ: Europe/Madrid
+    command:
+      - '-s'
+      - 'amonn'
+      - '-w'
+      - 'http://server:4000/api/whatsapp/webhook'
+      - '-k'
+      - 'CAMBIA_ESTA_CLAVE_DE_WHATSAPP'   # 🔴 (3) MISMA clave de WhatsApp que arriba
+      - '-p'
+      - '8080'
+    volumes:
+      - ./data/wa-session:/session
