@@ -11,6 +11,24 @@
     />
     <title>Amonn · Tareas del equipo</title>
     <script>
+      // Polyfill de crypto.randomUUID: NO existe en contexto inseguro
+      // (http a una IP, como el NAS por LAN). Sin esto la app se queda en
+      // blanco en el móvil. Lo definimos con getRandomValues, que sí está
+      // disponible. Debe ejecutarse ANTES que el resto de la app.
+      ;(function () {
+        try {
+          if (window.crypto && typeof window.crypto.randomUUID !== 'function' && window.crypto.getRandomValues) {
+            window.crypto.randomUUID = function () {
+              return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function (c) {
+                return (c ^ (window.crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
+              })
+            }
+          }
+        } catch (e) {
+          /* si algo falla aquí, el capturador de abajo lo mostrará */
+        }
+      })()
+
       // Red de seguridad: si el JavaScript no arranca o lanza un error, en vez
       // de una pantalla en blanco mostramos el error en pantalla (útil para
       // diagnosticar desde el móvil, donde no hay consola a mano).
