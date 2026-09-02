@@ -7,10 +7,12 @@
 # Cambia las líneas marcadas con 🔴 (contraseñas inventadas + la API Key del
 # Gateway). La misma contraseña de la BD va en DB_PASSWORD y en DATABASE_URL.
 #
-# ⚠️ ETIQUETA DE LA IMAGEN: para ACTUALIZAR, no uses "latest" (UGOS no vuelve a
-# descargar una etiqueta que ya tiene en caché). Pon la etiqueta exacta
-# "sha-XXXXXXX" de la versión nueva y recrea el proyecto. Comprueba qué corre
-# con http://IP-DEL-NAS:8080/api/version
+# 🔄 ACTUALIZACIONES AUTOMÁTICAS: el servicio "watchtower" de abajo comprueba
+# cada 5 minutos si hay una imagen nueva de Amonn ("latest") y la actualiza
+# solo, sin tocar nada más del NAS (solo actualiza contenedores con la
+# etiqueta com.centurylinklabs.watchtower.enable). Así no hay que volver a
+# recrear el proyecto en UGOS cada vez. Comprueba qué versión corre con
+# http://IP-DEL-NAS:8080/api/version
 # ============================================================
 
 services:
@@ -35,6 +37,8 @@ services:
     image: ghcr.io/elpollo619/amonn-todo:latest
     container_name: amonn-server
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'   # Watchtower actualiza SOLO este contenedor
     healthcheck:
       test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/api/health || exit 1']
       interval: 30s
@@ -63,6 +67,17 @@ services:
       - openwa-network
     ports:
       - '8080:4000'                   # abre la app en http://IP-DEL-NAS:8080
+
+  # Actualiza Amonn automáticamente cuando se publica una imagen nueva.
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: amonn-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --interval 300 --cleanup
+    environment:
+      TZ: Europe/Madrid
 
 networks:
   amonn:

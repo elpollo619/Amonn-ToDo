@@ -111,23 +111,33 @@ Luego abre `http://IP-DEL-NAS:8080` y añade el webhook en el panel del Gateway
 | Ver estado | Docker → Container | `docker compose ps` |
 | Ver logs | Container → Protokolle | `docker compose logs -f server` |
 | Parar | Projekt → Detener | `docker compose down` |
-| Actualizar | Ver **Actualizar a una versión nueva** más abajo (etiqueta `sha-…`) | `git pull && docker compose up -d --build` |
+| Actualizar | Automático (Watchtower); ver **Actualizar a una versión nueva** | `git pull && docker compose up -d --build` |
 | Copia de seguridad | copia la carpeta `data/` | copia la carpeta `data/` |
 
 ---
 
-## 🔄 Actualizar a una versión nueva (importante en UGOS)
+## 🔄 Actualizar a una versión nueva
 
-UGOS **no vuelve a descargar** una etiqueta que ya tiene en caché, así que
-`latest` puede quedarse con una versión vieja aunque recrees el proyecto. Para
-actualizar, fija siempre la **etiqueta exacta** de la versión nueva:
+Desde el compose actual, el proyecto incluye **Watchtower**: cada 5 minutos
+mira si hay una imagen nueva de Amonn (`latest`) en GitHub y, si la hay, la
+descarga y reinicia solo `amonn-server` (la base de datos y el resto del NAS no
+se tocan). **No hay que hacer nada en UGOS**: cuando se publica una versión
+nueva, a los pocos minutos el NAS ya la está corriendo.
 
-1. Mira la última etiqueta `sha-XXXXXXX` en
-   `https://github.com/elpollo619/Amonn-ToDo/pkgs/container/amonn-todo`.
-2. En el compose del proyecto cambia la línea de la imagen a
-   `image: ghcr.io/elpollo619/amonn-todo:sha-XXXXXXX`.
-3. **Borra el proyecto (sin borrar la carpeta `data/`) y créalo de nuevo** con
-   ese compose. Editar y "Arrancar" no aplica cambios de imagen.
+Si el proyecto aún no tiene Watchtower (compose antiguo), hay que recrearlo
+una última vez con el compose nuevo:
+
+1. Docker → Projekt `amonn` → parar y **eliminar el proyecto** (la carpeta
+   `data/` con los datos NO se borra).
+2. Crear proyecto en la **misma carpeta**. Si UGOS dice que la configuración ya
+   existe, pulsa **importar** y sustituye TODO el contenido por el compose
+   nuevo (mantén la ruta de `data/` que ya usabas, p. ej. `./data/pgdata`).
+3. Iniciar. UGOS **no vuelve a descargar** una etiqueta que ya tiene en caché,
+   así que el primer arranque puede ser con la versión vieja: Watchtower la
+   sustituye en menos de 5 minutos.
+
+> El compose de UGOS solo se puede editar desde el **navegador de un PC** (la
+> app del móvil solo lo muestra).
 
 ### Comprobar qué versión corre el NAS (sin adivinar)
 
@@ -136,9 +146,8 @@ En el navegador (o con `curl`):
 http://IP-DEL-NAS:8080/api/version   → {"version":"XXXXXXX", ...}
 http://IP-DEL-NAS:8080/api/health    → {"ok":true}
 ```
-Si `version` no coincide con la etiqueta que pusiste, el NAS no cogió la imagen
-nueva: repite el paso 3. En el contenedor, **Info → Versionsnummer** también
-muestra la etiqueta.
+Si `version` no es la última publicada, espera 5 minutos (Watchtower) y vuelve a
+mirar; si sigue igual, revisa el Protokoll del contenedor `amonn-watchtower`.
 
 > 💡 La app se abre por `http://IP` (conexión no segura). Es normal en la red
 > local; por eso la web incluye un respaldo para funciones que solo existen en
