@@ -7,21 +7,21 @@
 
 - Rama: `claude/job-list-app-whatsapp-av9rwl` · HEAD `1bdfca8` · al día con `origin` (0 sin pushear) · sin cambios locales · 1 worktree.
 - PR: **#1** (draft) → `main`. `mergeable_state: clean`. CI verde hasta `af368f9`; el run de `1bdfca8` (workflow *Publicar imagen Docker*) estaba **en curso** al cerrar — ver https://github.com/elpollo619/Amonn-ToDo/actions. Publica `ghcr.io/elpollo619/amonn-todo:sha-1bdfca8` (+ `latest`).
-- Prod (NAS UGREEN NASync **DXP6800 Pro**, UGOS, Docker GUI): **no accesible desde esta sesión** (LAN doméstica `192.168.1.9`). Último estado visto por captura: contenedor `amonn-server` **In Betrieb**, imagen nueva arrancando limpia, WhatsApp conecta; `Versionsnummer` aún **sin confirmar** con `/api/version`.
+- Prod (NAS UGREEN NASync **DXP6800 Pro**, UGOS, Docker GUI): **no accesible desde esta sesión** (LAN doméstica `192.168.1.9`). Último estado visto por captura: contenedor `amonn-server` **In Betrieb**, imagen nueva arrancando limpia, WhatsApp conecta; **Verificado el 2026-09-02 18:36**: `/api/version` → `af368f9` y el **login se ve en el iPhone por 5G** (acceso remoto vía UCG Max funcionando). La pantalla en blanco está resuelta en prod.
 
 ## En curso
 
 Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respuestas SÍ/NO de WhatsApp. La causa raíz del blanco fue `crypto.randomUUID` en contexto inseguro (http+IP): arreglada con polyfill + `uid()` sin dependencia. Última mejora (`1bdfca8`): el cliente Socket.IO registra el motivo real cuando el Gateway cierra la conexión y reconecta respetando su límite de 10 conexiones/min.
 
-## Próximo paso concreto (cuando Cris esté en el WiFi de casa)
+## Próximo paso concreto
 
-1. Desplegar la imagen `sha-1bdfca8` en UGOS: **Docker → Projekt → Crear** con el compose de `docker-compose.nas.yml` (rellenar 🔴 con los valores de Cris), **carpeta nueva** (p. ej. `docker/amonn2`) para que UGOS no reimporte el compose viejo. No pulsar "diese Konfiguration importieren".
-2. Verificar: `http://192.168.1.9:8080/api/version` → `{"version":"1bdfca8"}` y `http://192.168.1.9:8080` → login. Si `version` no coincide, el NAS no cogió la imagen: repetir 1.
-3. Registrarse, poner teléfono en **Mi perfil**, crear tarea con fecha de hoy y probar el flujo: `POST /api/reminders/run` (con token) → llega WhatsApp → responder "Sí" → tarea marcada.
+1. Cris se registra en `http://192.168.1.9:8080`, pone su teléfono (+prefijo) en **Mi perfil** y crea una tarea con fecha de hoy asignada a él.
+2. Desplegar la imagen con el botón de prueba (`sha-c459464`, incluye también 1bdfca8): en UGOS, **misma carpeta** que la versión actual para conservar `data/`; si dice "la configuración ya existe", **importar** y cambiar solo la línea `image:` a `sha-c459464`. Verificar `/api/version` = `c459464`.
+3. En **Mi perfil → "Enviar avisos de WhatsApp ahora"** → llega el WhatsApp → responder "Sí" → la tarea pasa a completada. Si no llega, mirar el Protokoll: la versión nueva imprime el motivo exacto del Gateway (`UNAUTHORIZED`, `FORBIDDEN_SESSION`, `RATE_LIMITED`…).
 
 ## Pendiente (por prioridad, con criterio de "listo")
 
-1. **Confirmar la app en el NAS** — listo cuando `/api/version` = `1bdfca8` y se ve el login desde el iPhone en WiFi de casa.
+1. ~~Confirmar la app en el NAS~~ ✅ hecho (af368f9, login visible desde el iPhone).
 2. **Respuestas SÍ/NO fiables** — listo cuando en el Protokoll se vea `tiempo real suscrito a ["message.received"]` y, tras contestar "Sí" en WhatsApp, la tarea pase a completada. Si aparece `el Gateway devolvió UNAUTHORIZED/FORBIDDEN_SESSION/RATE_LIMITED`, ese código dice qué tocar (clave, permisos de sesión de la API key en el Gateway, o esperar al límite).
 3. **Acceso desde fuera de casa** (Cris lo pidió) — propuesta: Tailscale en NAS + iPhone; listo cuando `http://100.x.x.x:8080` abre la app con 4G. Alternativa: Cloudflare Tunnel con HTTPS.
 4. Cuerpo del PR #1 desactualizado (habla de `waautomate`/QR): reescribir con la arquitectura actual (OpenWA Gateway existente + Socket.IO) antes de sacarlo de draft.
