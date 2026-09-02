@@ -7,7 +7,7 @@
 
 - Rama: `claude/job-list-app-whatsapp-av9rwl` · HEAD `1bdfca8` · al día con `origin` (0 sin pushear) · sin cambios locales · 1 worktree.
 - PR: **#1** (draft) → `main`. `mergeable_state: clean`. CI verde hasta `af368f9`; el run de `1bdfca8` (workflow *Publicar imagen Docker*) estaba **en curso** al cerrar — ver https://github.com/elpollo619/Amonn-ToDo/actions. Publica `ghcr.io/elpollo619/amonn-todo:sha-1bdfca8` (+ `latest`).
-- Prod (NAS Ugreen DH4300 Plus, UGOS, Docker GUI): **no accesible desde esta sesión** (LAN doméstica `192.168.254.163`). Último estado visto por captura: contenedor `amonn-server` **In Betrieb**, imagen nueva arrancando limpia, WhatsApp conecta; `Versionsnummer` aún **sin confirmar** con `/api/version`.
+- Prod (NAS Ugreen DH4300 Plus, UGOS, Docker GUI): **no accesible desde esta sesión** (LAN doméstica `<IP-NUEVA-DEL-NAS>` (192.168.1.x, ver UniFi → Clients)). Último estado visto por captura: contenedor `amonn-server` **In Betrieb**, imagen nueva arrancando limpia, WhatsApp conecta; `Versionsnummer` aún **sin confirmar** con `/api/version`.
 
 ## En curso
 
@@ -16,7 +16,7 @@ Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respues
 ## Próximo paso concreto (cuando Cris esté en el WiFi de casa)
 
 1. Desplegar la imagen `sha-1bdfca8` en UGOS: **Docker → Projekt → Crear** con el compose de `docker-compose.nas.yml` (rellenar 🔴 con los valores de Cris), **carpeta nueva** (p. ej. `docker/amonn2`) para que UGOS no reimporte el compose viejo. No pulsar "diese Konfiguration importieren".
-2. Verificar: `http://192.168.254.163:8080/api/version` → `{"version":"1bdfca8"}` y `http://192.168.254.163:8080` → login. Si `version` no coincide, el NAS no cogió la imagen: repetir 1.
+2. Verificar: `http://<IP-NUEVA-DEL-NAS>:8080/api/version` → `{"version":"1bdfca8"}` y `http://<IP-NUEVA-DEL-NAS>:8080` → login. Si `version` no coincide, el NAS no cogió la imagen: repetir 1.
 3. Registrarse, poner teléfono en **Mi perfil**, crear tarea con fecha de hoy y probar el flujo: `POST /api/reminders/run` (con token) → llega WhatsApp → responder "Sí" → tarea marcada.
 
 ## Pendiente (por prioridad, con criterio de "listo")
@@ -29,11 +29,18 @@ Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respues
 
 ## Necesita a Cris (acciones humanas)
 
-- Estar en el WiFi de casa (o tener Tailscale) para probar: la IP `192.168.254.163` es interna.
+- Estar en el WiFi de casa (o tener Tailscale) para probar: la IP `<IP-NUEVA-DEL-NAS>` (192.168.1.x, ver UniFi → Clients) es interna.
 - Hacer el despliegue en la GUI de UGOS (no hay acceso remoto al NAS desde Claude Code).
 - Valores 🔴 del compose (contraseña de BD, `JWT_SECRET`, `WA_API_KEY`): los tiene Cris; **no van en este archivo**.
 - Decidir la opción de acceso remoto (Tailscale recomendado).
 - Sobre "darle una llave de acceso a Claude para que lo haga todo": desde la sesión remota no hay ruta de red a la LAN; una clave sola no sirve y exponer SSH/Docker a internet no es recomendable. Camino seguro: ejecutar Claude Code en un PC de casa (misma red) con acceso SSH al NAS.
+
+## Red doméstica (cambió el 2026-09-02)
+
+- Router nuevo: **UniFi Cloud Gateway Max (UCG Max)** en `192.168.1.1`, conectado directo al módem de internet. NAS ("NasBiaundCris") en el puerto 4 (2.5 GbE).
+- **La IP del NAS cambió**: ya no es `192.168.254.163`; ahora es `192.168.1.x` (verla en app UniFi → Clients → NasBiaundCris). Pendiente: fijarla ("Fixed IP") en UniFi.
+- Acceso remoto propuesto: **Teleport VPN** del UCG Max + app **WiFiman** en el iPhone (no hace falta Tailscale ni abrir puertos). Posible doble NAT si el módem de la operadora también enruta → modo bridge si Teleport no conecta.
+- Docker/compose no dependen de la IP del NAS (WA_API_URL usa el nombre de contenedor `openwa-api`): **no hay que redesplegar por el cambio de IP**.
 
 ## Gotchas de esta sesión (candidatos a CLAUDE.md si se repiten)
 
