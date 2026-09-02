@@ -32,6 +32,11 @@ app.use(
 
 // ─── API ──────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
+// Qué versión está corriendo (SHA del commit inyectado al construir la imagen).
+app.get('/api/version', (_req, res) => {
+  const sha = process.env.APP_VERSION ?? 'dev'
+  res.json({ version: sha.slice(0, 7), sha })
+})
 
 app.use('/api/auth', authRouter)
 app.use('/api/tasks', tasksRouter)

@@ -111,8 +111,38 @@ Luego abre `http://IP-DEL-NAS:8080` y añade el webhook en el panel del Gateway
 | Ver estado | Docker → Container | `docker compose ps` |
 | Ver logs | Container → Protokolle | `docker compose logs -f server` |
 | Parar | Projekt → Detener | `docker compose down` |
-| Actualizar | Projekt → recrear (baja la imagen `:latest` nueva) | `git pull && docker compose up -d --build` |
+| Actualizar | Ver **Actualizar a una versión nueva** más abajo (etiqueta `sha-…`) | `git pull && docker compose up -d --build` |
 | Copia de seguridad | copia la carpeta `data/` | copia la carpeta `data/` |
+
+---
+
+## 🔄 Actualizar a una versión nueva (importante en UGOS)
+
+UGOS **no vuelve a descargar** una etiqueta que ya tiene en caché, así que
+`latest` puede quedarse con una versión vieja aunque recrees el proyecto. Para
+actualizar, fija siempre la **etiqueta exacta** de la versión nueva:
+
+1. Mira la última etiqueta `sha-XXXXXXX` en
+   `https://github.com/elpollo619/Amonn-ToDo/pkgs/container/amonn-todo`.
+2. En el compose del proyecto cambia la línea de la imagen a
+   `image: ghcr.io/elpollo619/amonn-todo:sha-XXXXXXX`.
+3. **Borra el proyecto (sin borrar la carpeta `data/`) y créalo de nuevo** con
+   ese compose. Editar y "Arrancar" no aplica cambios de imagen.
+
+### Comprobar qué versión corre el NAS (sin adivinar)
+
+En el navegador (o con `curl`):
+```
+http://IP-DEL-NAS:8080/api/version   → {"version":"XXXXXXX", ...}
+http://IP-DEL-NAS:8080/api/health    → {"ok":true}
+```
+Si `version` no coincide con la etiqueta que pusiste, el NAS no cogió la imagen
+nueva: repite el paso 3. En el contenedor, **Info → Versionsnummer** también
+muestra la etiqueta.
+
+> 💡 La app se abre por `http://IP` (conexión no segura). Es normal en la red
+> local; por eso la web incluye un respaldo para funciones que solo existen en
+> https (como `crypto.randomUUID`).
 
 ---
 

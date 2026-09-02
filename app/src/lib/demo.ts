@@ -10,8 +10,19 @@ const PROFILES_KEY = 'amonn.demo.profiles'
 const TASKS_KEY = 'amonn.demo.tasks'
 const SESSION_KEY = 'amonn.demo.session'
 
+// Identificador único. No depende de crypto.randomUUID (que solo existe en
+// contexto seguro: https o localhost); usa getRandomValues como respaldo, que
+// sí está disponible al abrir la app por http://IP en la red local.
 function uid(): string {
-  return crypto.randomUUID()
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const b = new Uint8Array(16)
+  crypto.getRandomValues(b)
+  b[6] = (b[6] & 0x0f) | 0x40 // versión 4
+  b[8] = (b[8] & 0x3f) | 0x80 // variante RFC 4122
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
 function today(offsetDays = 0): string {

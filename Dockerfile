@@ -22,5 +22,9 @@ COPY --from=frontend /app/dist ./public
 ENV NODE_ENV=production
 ENV PUBLIC_DIR=/srv/public
 ENV PORT=4000
+# Versión de la imagen (SHA del commit). Se ve en GET /api/version para saber
+# exactamente qué está corriendo el NAS sin adivinar.
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
 EXPOSE 4000
 CMD ["node", "src/index.js"]
