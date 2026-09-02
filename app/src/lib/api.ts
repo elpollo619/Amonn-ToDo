@@ -98,6 +98,14 @@ export async function updateProfile(
   return profiles[idx]
 }
 
+// ─── Recordatorios de WhatsApp ───────────────────────────────────────
+
+/** Dispara ahora los recordatorios de WhatsApp (para probar sin esperar al cron). */
+export async function runReminders(): Promise<{ candidates: number; sent: number }> {
+  if (isDemo) return { candidates: 0, sent: 0 }
+  return apiFetch<{ candidates: number; sent: number }>('/reminders/run', { method: 'POST' })
+}
+
 // ─── Tiempo real ─────────────────────────────────────────────────────
 
 /** Se suscribe a cambios en tareas. Devuelve una función para cancelar. */
