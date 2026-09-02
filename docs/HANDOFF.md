@@ -16,8 +16,13 @@ Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respues
 ## Próximo paso concreto
 
 1. Cris se registra en `http://192.168.1.9:8080`, pone su teléfono (+prefijo) en **Mi perfil** y crea una tarea con fecha de hoy asignada a él.
-2. Desplegar la imagen con el botón de prueba (`sha-c459464`, incluye también 1bdfca8): en UGOS, **misma carpeta** que la versión actual para conservar `data/`; si dice "la configuración ya existe", **importar** y cambiar solo la línea `image:` a `sha-c459464`. Verificar `/api/version` = `c459464`.
+2. Desplegar la última imagen (`sha-3b93d84`: rediseño completo + botón de prueba + arreglo del canal de WhatsApp): en UGOS, **misma carpeta** que la versión actual para conservar `data/`; si dice "la configuración ya existe", **importar** y cambiar solo la línea `image:` a `sha-c459464`. Verificar `/api/version` = `3b93d84`.
 3. En **Mi perfil → "Enviar avisos de WhatsApp ahora"** → llega el WhatsApp → responder "Sí" → la tarea pasa a completada. Si no llega, mirar el Protokoll: la versión nueva imprime el motivo exacto del Gateway (`UNAUTHORIZED`, `FORBIDDEN_SESSION`, `RATE_LIMITED`…).
+
+## Hecho en esta sesión (2026-09-02, tarde)
+
+- Rediseño completo de la app orientado a móvil (commit `3b93d84`), verificado con capturas en 390px y 1280px. Cris lo pidió tras ver el login en el iPhone.
+- Botón "Enviar avisos ahora" en Mi perfil; cierre de sesión disponible en móvil.
 
 ## Pendiente (por prioridad, con criterio de "listo")
 
