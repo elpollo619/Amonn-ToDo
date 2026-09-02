@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { demoStore, ensureSeed } from '../lib/demo'
 import { Avatar } from '../components/Avatar'
+import { IconEye, IconEyeOff } from '../components/Icons'
+import './Login.css'
 
 export function Login() {
   const { demoMode, signIn, signUp, signInDemo } = useAuth()
@@ -9,176 +11,87 @@ export function Login() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
 
-  ensureSeed()
+  if (demoMode) ensureSeed()
   const demoProfiles = demoMode ? demoStore.getProfiles() : []
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setInfo(null)
+    setLoading(true); setError(null)
     try {
-      if (mode === 'signin') {
-        await signIn(email, password)
-      } else {
-        await signUp(email, password, name.trim() || email.split('@')[0])
-      }
+      if (mode === 'signin') await signIn(email, password)
+      else await signUp(email, password, name.trim() || email.split('@')[0])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error de autenticación')
-    } finally {
-      setLoading(false)
-    }
+      setError(err instanceof Error ? err.message : 'No se pudo entrar')
+    } finally { setLoading(false) }
   }
 
   return (
-    <div className="center-screen" style={{ padding: 20 }}>
-      <div style={{ width: '100%', maxWidth: 400 }}>
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <div
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: 14,
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fff',
-              fontSize: 26,
-              fontWeight: 800,
-              margin: '0 auto 12px',
-            }}
-          >
-            A
-          </div>
-          <h1 style={{ margin: 0, fontSize: 24 }}>Amonn</h1>
-          <p style={{ color: 'var(--text-soft)', margin: '6px 0 0', fontSize: 14 }}>
-            Tareas del equipo, calendario y avisos por WhatsApp.
-          </p>
+    <div className="login-screen">
+      <div className="login-box">
+        <div className="login-brand">
+          <div className="login-logo">A</div>
+          <h1>Amonn</h1>
+          <p>Tareas del equipo, calendario y avisos por WhatsApp.</p>
         </div>
 
         {demoMode ? (
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 22,
-              boxShadow: 'var(--shadow)',
-            }}
-          >
-            <div
-              className="demo-banner"
-              style={{ borderRadius: 8, marginBottom: 16 }}
-            >
-              🧪 Modo demostración
-            </div>
-            <p style={{ fontSize: 14, color: 'var(--text-soft)', marginTop: 0 }}>
-              Elige con quién entrar para probar la app:
-            </p>
+          <div className="card">
+            <div className="demo-banner" style={{ marginBottom: 14 }}>Modo demostración</div>
+            <p className="card-sub">Elige con quién entrar para probar la app:</p>
             {demoProfiles.map((p) => (
-              <button
-                key={p.id}
-                className="btn"
-                style={{
-                  width: '100%',
-                  justifyContent: 'flex-start',
-                  marginBottom: 8,
-                }}
-                onClick={() => signInDemo(p.id)}
-              >
-                <Avatar profile={p} size={28} />
-                {p.full_name}
+              <button key={p.id} className="btn btn-block" style={{ justifyContent: 'flex-start', marginBottom: 8 }}
+                onClick={() => signInDemo(p.id)}>
+                <Avatar profile={p} size={28} />{p.full_name}
               </button>
             ))}
           </div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: 22,
-              boxShadow: 'var(--shadow)',
-            }}
-          >
+          <form onSubmit={handleSubmit} className="card login-card">
+            <div className="segmented" style={{ marginBottom: 20 }}>
+              <button type="button" className={mode === 'signin' ? 'active' : ''} onClick={() => setMode('signin')}>Entrar</button>
+              <button type="button" className={mode === 'signup' ? 'active' : ''} onClick={() => setMode('signup')}>Crear cuenta</button>
+            </div>
+
             {mode === 'signup' && (
               <div className="field">
                 <label>Nombre completo</label>
-                <input
-                  className="input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Ana García"
-                />
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)}
+                  placeholder="Nombre y apellidos" autoComplete="name" />
               </div>
             )}
             <div className="field">
               <label>Email</label>
-              <input
-                className="input"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@empresa.com"
-              />
+              <input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@empresa.com" autoComplete="email" inputMode="email" />
             </div>
             <div className="field">
               <label>Contraseña</label>
-              <input
-                className="input"
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="input-wrap">
+                <input className="input" style={{ paddingLeft: 14, paddingRight: 44 }}
+                  type={showPw ? 'text' : 'password'} required minLength={6} value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
+                <button type="button" className="input-action" onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                  {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+                </button>
+              </div>
+              {mode === 'signup' && <span className="hint">Mínimo 6 caracteres.</span>}
             </div>
 
-            {error && (
-              <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>
-            )}
-            {info && (
-              <p style={{ color: 'var(--success)', fontSize: 13 }}>{info}</p>
-            )}
+            {error && <div className="error-box">{error}</div>}
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', justifyContent: 'center', marginTop: 6 }}
-              disabled={loading}
-            >
-              {loading
-                ? 'Un momento…'
-                : mode === 'signin'
-                ? 'Entrar'
-                : 'Crear cuenta'}
+            <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
+              {loading ? 'Un momento…' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
             </button>
-
-            <p style={{ textAlign: 'center', fontSize: 13, marginBottom: 0 }}>
-              {mode === 'signin' ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-              <button
-                type="button"
-                className="btn-ghost"
-                style={{
-                  border: 'none',
-                  color: 'var(--primary)',
-                  fontWeight: 600,
-                  padding: 0,
-                  background: 'none',
-                }}
-                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              >
-                {mode === 'signin' ? 'Regístrate' : 'Inicia sesión'}
-              </button>
-            </p>
           </form>
         )}
+
+        <p className="login-foot">Tus datos se guardan en el servidor de tu empresa, no en la nube.</p>
       </div>
     </div>
   )
