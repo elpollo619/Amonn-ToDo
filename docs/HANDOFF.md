@@ -1,7 +1,7 @@
 # HANDOFF — Amonn (tareas de equipo + WhatsApp, auto-alojado en NAS)
 
 > Un solo archivo de traspaso. Se sobreescribe en cada cierre de sesión.
-> Última actualización: 2026-09-03 (sesión remota de Claude Code).
+> Última actualización: 2026-09-03 (sesión LOCAL en el Mac de Cris, con acceso SSH al NAS).
 
 ## Estado real
 
@@ -15,11 +15,18 @@
 
 ## Próximo paso concreto
 
-0. Verificar que con el último HEAD el Protokoll de `amonn-server` muestre `tiempo real suscrito a ["message.received"]` y ya no el bucle `UNAUTHORIZED: API key is no longer valid` (carrera del Gateway, ver Gotchas).
-1. Comprobar que `/api/version` en el NAS coincide con el HEAD de la rama (Watchtower lo aplica solo).
-2. Cris escribe al número de WhatsApp de Amonn (el del OpenWA Gateway) desde su móvil: «hola» → debe responder el asistente. Luego «crea una tarea a mí: probar el asistente, para mañana» → aparece en la app. Si no responde: Protokoll de `amonn-server` (líneas `[asistente]`/`[wa]`).
-3. Cris consigue (a) la clave de Gemini en https://aistudio.google.com/apikey y (b) la contraseña de aplicación de Gmail para `elpollotue@gmail.com`; se ponen en `GEMINI_API_KEY`, `SMTP_USER`, `SMTP_PASS` del compose en UGOS (**cambiar variables de entorno requiere recrear el proyecto**: Watchtower solo actualiza imágenes). Sin ellas, el asistente funciona con reglas y no se envían emails.
-4. Añadir `APP_URL: http://192.168.1.9:8080` al compose del NAS (misma recreación que el punto 3) para que los avisos lleven enlace.
+**Solo falta una acción humana: volver a vincular el teléfono de WhatsApp (escanear el QR).**
+
+1. Cris abre `http://192.168.1.9:2785` (panel del OpenWA Gateway) desde un
+   navegador de casa, entra en la sesión `biacris` y escanea el código QR con
+   el WhatsApp del número **+41 76 226 04 47**. (También hay una copia del QR
+   en `~/Desktop/amonn-whatsapp-qr.png` del Mac, pero el QR caduca: mejor el
+   panel, que lo refresca solo.)
+2. Comprobar que quedó bien: `docker logs --tail 5 amonn-server` debe decir
+   `[wa] la sesión de WhatsApp está conectada (estado: connected)`.
+3. Cris escribe «hola» a ese número desde su móvil → debe responder el
+   asistente. Luego «crea una tarea a mí: probar el asistente, para mañana».
+4. Claves de Gemini y Gmail en el compose (ver "Necesita a Cris") + `APP_URL`.
 
 ## Hecho en esta sesión (2026-09-03)
 
@@ -59,6 +66,10 @@ git checkout claude/job-list-app-whatsapp-av9rwl
 Leer este archivo entero antes de tocar nada.
 
 ### 2. Acceso al NAS por SSH
+- **Ya funciona desde el Mac de Cris, sin contraseña ni `sudo`:**
+  `ssh -i ~/.ssh/id_ed25519_kali Cris@192.168.1.9` (el usuario `Cris` está en el
+  grupo `docker`, así que `docker ...` va sin `sudo`). La clave es la misma que
+  el `~/.ssh/config` tenía apuntando a la IP vieja `192.168.254.163`.
 - Si `ssh` no entra: en UGOS (navegador) → Systemsteuerung / Panel de control → **Terminal** → activar **SSH** (puerto 22). Usuario = el administrador de UGOS (Cris lo sabe). Docker requiere `sudo`.
 - Comprobar: `ssh USUARIO@192.168.1.9 'sudo docker ps'` → deben verse `amonn-server`, `amonn-db-1`, `amonn-watchtower`, `openwa-api`.
 - Compose de Amonn en el NAS: carpeta compartida `docker` → probablemente `/volume1/docker/docker-compose.yaml` (contiene los secretos reales; **no copiarlo al repo**). El proyecto se creó desde la GUI de UGOS con nombre `amonn`; si se recrea por CLI usar `sudo docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d`.
@@ -78,12 +89,48 @@ key is no longer valid` → ver Gotchas (carrera del Gateway). La clave
 `WA_API_KEY` ES válida (verificado en `api_keys` de `/app/data/main.sqlite`
 del contenedor `openwa-api`: activa, sin caducidad, sin IPs).
 
-### 4. Problema abierto y cómo seguir
-1. Confirmar con `docker logs amonn-server` si tras `ede447f` (espera 2 s → 4 → 8 → 15 s antes de suscribirse) llega a `tiempo real suscrito`. Cris dijo "sigue lo mismo" pero sin captura: verificar.
-2. Si sigue fallando incluso con 15 s: mirar en `docker logs openwa-api` si ahora "Client connected" aparece ANTES de "Client disconnected" (entonces NO es la carrera: `validateApiKey` lanza en la ruta WebSocket; comparar `resolveClientIp` de `events.gateway.js` con `getClientIp` de `api-key.guard.js`, y probar a quitar `extraHeaders` dejando solo `auth.apiKey`, o al revés).
-3. Prueba directa del canal desde el NAS (sin Amonn): un script Node con `socket.io-client` dentro de `amonn-server` (`docker exec -it amonn-server sh`, `node -e ...` con `/app/node_modules`) que conecte a `http://openwa-api:2785/events`, espere N s y envíe el subscribe; ver qué responde.
-4. Plan B si el tiempo real no es fiable: sondeo (polling) por REST cada 10 s de los mensajes recientes de la sesión (el Gateway tiene `GET /api/sessions/:id/messages/:chatId/history`; ver `/app/dist/modules` para un listado global) o webhook a un nombre no privado (el Gateway bloquea destinos internos por SSRF: "Destination address is not allowed").
-5. Después: probar el asistente escribiendo «hola» al número desde el móvil de Cris; crear tarea por WhatsApp; comprobar aviso al asignar.
+### 4. El problema del tiempo real: RESUELTO (2026-09-03)
+
+Diagnóstico hecho por SSH desde el Mac de Cris. **No era la clave ni la
+carrera del Gateway.** Eran tres fallos, los tres del mismo tipo: código que
+trataba un fallo como si fuera éxito.
+
+1. **El acuse del `subscribe` se perdía.** El Gateway es NestJS y
+   `handleSubscribe` hace `return {type:'subscribed'}`. En NestJS ese valor
+   **no se emite**: viaja por el *callback de acuse* de Socket.IO. `realtime.js`
+   emitía sin callback → la confirmación (y los errores de la suscripción) se
+   descartaban en silencio, y el `case 'subscribed'` era código muerto. Por eso
+   el registro se quedaba en "suscribiendo en 2s" para siempre. **La
+   suscripción sí funcionaba**: el Protokoll del Gateway lo demuestra
+   (`Client … subscribed to: session:…:message.received`, 2 s después de
+   conectar). Comprobado con una sonda: con callback llega
+   `{"type":"subscribed",…}`; sin callback, nada.
+2. **Una sesión averiada se veía como sana.** `resolveSession()` hacía
+   `connected ?? list[0]`: si ninguna sesión estaba conectada cogía la primera
+   igualmente y solo registraba el id. Ahora registra el estado y avisa.
+3. **`qr_ready` se daba por conectada**, porque contiene la subcadena `ready`
+   y `CONNECTED_RE` la aceptaba. Corregido con `isConnectedStatus()`.
+
+Arreglado en el commit `fix(wa): recibir el acuse del subscribe…` y
+**verificado contra el Gateway real**: el registro ya muestra
+`[wa] tiempo real suscrito a ["message.received"]`.
+
+### 4b. La avería de fondo: la sesión de WhatsApp está desvinculada
+
+Al consultar `GET /api/sessions` apareció lo importante:
+
+```
+name: biacris   status: "failed"   phone: 41762260447
+lastActive: 2026-08-08   ← casi un mes sin actividad
+```
+
+**El Gateway no tiene línea con WhatsApp desde el 8 de agosto**, así que no
+llegaría ningún mensaje aunque el socket estuviera perfecto. Se hizo
+`POST /api/sessions/{id}/start` y la sesión pasó a `initializing` → `qr_ready`:
+está esperando que alguien escanee el QR. **Eso solo lo puede hacer Cris**
+(ver "Próximo paso concreto"). El nuevo `startSessionWatch()` avisará en el
+Protokoll si el teléfono se vuelve a desvincular, para que no pasen otras
+semanas en silencio.
 
 ### 5. Cambios de configuración en el NAS
 - Imagen: automática (Watchtower cada 5 min tras cada push a la rama; CI publica `latest`).
@@ -107,3 +154,13 @@ del contenedor `openwa-api`: activa, sin caducidad, sin IPs).
 - El OpenWA Gateway (`src/modules/events/events.gateway.ts`) envía `{type:'error',code,...}` antes de `disconnect()`; límites: 10 handshakes/min/IP, 16 sockets/key. `socket.io-client` **no** reconecta solo tras `io server disconnect`.
 - Terminal de UGOS falla en `amonn-server`: la imagen es Alpine sin `/bin/bash` (usar `/bin/sh`).
 - El PC Windows de Cris estaba en otra red (control remoto): no sirve para probar la LAN; usar el iPhone en WiFi de casa u otro dispositivo de casa.
+- **NestJS y los acuses de Socket.IO**: un `@SubscribeMessage` que hace `return`
+  NO emite nada; el valor va por el callback de acuse. Si el cliente emite sin
+  callback, la respuesta se pierde en silencio. (Este fue el fallo del tiempo
+  real.)
+- **Cuidado con las subcadenas en los estados**: `qr_ready` contiene `ready` y
+  `disconnected` contiene `connect`. Descartar primero los estados de avería.
+- **El panel del OpenWA Gateway está en `http://192.168.1.9:2785`** (puerto
+  publicado): desde ahí se ve la sesión y se escanea el QR.
+- **Una sesión de WhatsApp puede morirse sin ruido.** Estuvo `failed` desde el
+  8 de agosto y nada lo decía. Ahora `startSessionWatch()` lo registra.
