@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
@@ -21,6 +21,13 @@ export function Profile() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ candidates: number; sent: number } | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
+  const [wa, setWa] = useState<api.WhatsAppStatus | null>(null)
+
+  useEffect(() => {
+    let active = true
+    api.whatsappStatus().then((s) => { if (active) setWa(s) }).catch(() => {})
+    return () => { active = false }
+  }, [])
 
   if (!user) return null
 
@@ -134,6 +141,50 @@ export function Profile() {
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </form>
+
+        <section className="card">
+          <h2 className="card-title">Estado de WhatsApp</h2>
+          {!wa ? (
+            <p className="card-sub" style={{ marginBottom: 0 }}>Comprobando…</p>
+          ) : (
+            <div className="status-list">
+              <div className={`status-row ${wa.connected ? 'is-ok' : 'is-bad'}`}>
+                <span className="status-dot" />
+                <div>
+                  <b>{wa.connected ? 'Número conectado' : 'Número desconectado'}</b>
+                  <div className="hint">
+                    {wa.connected
+                      ? `El Gateway dice "${wa.status}". Los avisos y el asistente funcionan.`
+                      : wa.error
+                        ? `No hay conexión con el Gateway de OpenWA (${wa.error}).`
+                        : `El Gateway dice "${wa.status}". Vuelve a vincular el número en el panel de OpenWA (escaneando el QR con WhatsApp → Dispositivos vinculados).`}
+                  </div>
+                </div>
+              </div>
+              <div className={`status-row ${wa.realtime ? 'is-ok' : 'is-bad'}`}>
+                <span className="status-dot" />
+                <div>
+                  <b>{wa.realtime ? 'Recibiendo mensajes' : 'Sin recepción de mensajes'}</b>
+                  <div className="hint">{wa.realtime ? 'El asistente escucha lo que le escribís.' : 'Amonn no está suscrito al Gateway: reintenta solo; si persiste, revisa el registro del servidor.'}</div>
+                </div>
+              </div>
+              <div className="status-row is-ok">
+                <span className="status-dot" />
+                <div>
+                  <b>Asistente: {wa.assistant === 'gemini' ? 'con Gemini (IA)' : 'con reglas básicas'}</b>
+                  <div className="hint">{wa.assistant === 'gemini' ? 'Entiende frases en lenguaje normal.' : 'Sin clave de Gemini: entiende las frases de ejemplo de abajo.'}</div>
+                </div>
+              </div>
+              <div className={`status-row ${wa.email ? 'is-ok' : 'is-muted'}`}>
+                <span className="status-dot" />
+                <div>
+                  <b>Email: {wa.email ? 'activado' : 'no configurado'}</b>
+                  <div className="hint">{wa.email ? 'Los avisos también salen por correo.' : 'Falta configurar el correo que envía (SMTP) en el servidor.'}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="card">
           <h2 className="card-title">Asistente de WhatsApp</h2>

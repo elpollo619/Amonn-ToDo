@@ -278,3 +278,11 @@ a { color: inherit; text-decoration: none; }
 
 .examples { margin: 0 0 12px; padding-left: 18px; font-size: 14px; line-height: 1.6; }
 .examples li { margin-bottom: 2px; }
+
+/* ─── Estado de WhatsApp ─────────────────────────────────── */
+.status-list { display: flex; flex-direction: column; gap: 12px; }
+.status-row { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; }
+.status-row .hint { margin-top: 2px; }
+.status-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; background: var(--text-muted); }
+.status-row.is-ok .status-dot { background: var(--success); box-shadow: 0 0 0 4px var(--success-soft); }
+.status-row.is-bad .status-dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }

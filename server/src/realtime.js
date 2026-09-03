@@ -136,6 +136,11 @@ export function connectRealtime() {
   return socket
 }
 
+/** ¿Está conectado ahora mismo el canal de tiempo real con el Gateway? */
+export function realtimeConnected() {
+  return Boolean(socket?.connected)
+}
+
 // Vuelve a suscribir si cambia la sesión resuelta.
 export function resubscribe() {
   if (socket?.connected) subscribe()

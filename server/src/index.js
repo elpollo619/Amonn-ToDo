@@ -12,8 +12,9 @@ import { tasksRouter } from './routes/tasks.js'
 import { profilesRouter } from './routes/profiles.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
-import { resolveSession, ensureWebhookRegistered } from './whatsapp.js'
-import { connectRealtime } from './realtime.js'
+import { resolveSession, ensureWebhookRegistered, getSessionStatus } from './whatsapp.js'
+import { connectRealtime, realtimeConnected } from './realtime.js'
+import { mailEnabled } from './mailer.js'
 import { errorHandler } from './util.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -64,6 +65,22 @@ app.post('/api/reminders/run', requireAuth, async (_req, res) => {
     res.json(result)
   } catch (err) {
     res.status(500).json({ error: err.message })
+  }
+})
+
+// Estado de WhatsApp (¿sigue vinculado el número?) para mostrarlo en la app.
+app.get('/api/whatsapp/status', requireAuth, async (_req, res) => {
+  const base = {
+    enabled: config.whatsapp.enabled,
+    realtime: realtimeConnected(),
+    assistant: config.gemini.apiKey ? 'gemini' : 'reglas',
+    email: mailEnabled(),
+  }
+  if (!config.whatsapp.enabled) return res.json({ ...base, connected: false, status: 'desactivado' })
+  try {
+    res.json({ ...base, ...(await getSessionStatus()) })
+  } catch (err) {
+    res.json({ ...base, connected: false, status: 'sin conexión con el Gateway', error: err.message })
   }
 })
 

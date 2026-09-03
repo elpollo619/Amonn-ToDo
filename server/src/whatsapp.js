@@ -85,6 +85,27 @@ export async function resolveSession() {
   return waState.sessionId
 }
 
+const CONNECTED_RE = /connect|working|authenticated|ready|online|open/i
+
+/**
+ * Estado actual de la sesión de WhatsApp en el Gateway (¿el número sigue
+ * vinculado?). Devuelve { sessionId, status, connected }.
+ */
+export async function getSessionStatus() {
+  const res = await fetch(`${config.whatsapp.apiUrl}/api/sessions`, { headers: waHeaders() })
+  if (!res.ok) throw new Error(`El Gateway respondió ${res.status}`)
+  const list = asList(await res.json())
+  const s = list.find((x) => (x.id ?? x.sessionId ?? x.name ?? x.session) === waState.sessionId) ?? list[0]
+  if (!s) return { sessionId: waState.sessionId, status: 'sin sesión', connected: false }
+  const status = String(s.status ?? s.state ?? 'desconocido')
+  return {
+    sessionId: waState.sessionId,
+    status,
+    connected: CONNECTED_RE.test(status) && !/disconnect|closed|logout|logged_out/i.test(status),
+    phone: s.phone ?? s.phoneNumber ?? s.me?.id ?? null,
+  }
+}
+
 /**
  * Registra (si hace falta) el webhook en el Gateway para recibir las respuestas.
  * Idempotente: si ya existe un webhook con nuestra URL, no crea otro.

@@ -106,6 +106,25 @@ export async function runReminders(): Promise<{ candidates: number; sent: number
   return apiFetch<{ candidates: number; sent: number }>('/reminders/run', { method: 'POST' })
 }
 
+// ─── Estado de WhatsApp / avisos ─────────────────────────────────────
+
+export interface WhatsAppStatus {
+  enabled: boolean
+  connected: boolean
+  status: string
+  realtime: boolean
+  assistant: 'gemini' | 'reglas'
+  email: boolean
+  sessionId?: string
+  error?: string
+}
+
+/** ¿Sigue vinculado el número de WhatsApp en el Gateway? */
+export async function whatsappStatus(): Promise<WhatsAppStatus> {
+  if (isDemo) return { enabled: true, connected: true, status: 'demo', realtime: true, assistant: 'reglas', email: false }
+  return apiFetch<WhatsAppStatus>('/whatsapp/status')
+}
+
 // ─── Tiempo real ─────────────────────────────────────────────────────
 
 /** Se suscribe a cambios en tareas. Devuelve una función para cancelar. */
