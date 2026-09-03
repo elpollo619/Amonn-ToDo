@@ -1,0 +1,19 @@
+.comentarios { gap: 10px; }
+.com { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.com-cuerpo { flex-grow: 1; min-width: 0; }
+.com-meta { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+.com-meta b { font-size: 14px; color: var(--text); }
+.com-via { background: var(--success-soft); color: var(--success); border-radius: 5px; padding: 1px 6px; font-weight: 600; }
+.com-txt { font-size: 15px; margin-top: 2px; white-space: pre-wrap; }
+.com-fotos { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.com-fotos img {
+  width: 108px; height: 80px; object-fit: cover; border-radius: 9px;
+  border: 1px solid var(--border); display: block;
+}
+.com-pdf {
+  display: inline-block; font-size: 13px; padding: 8px 11px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.com-nuevo { display: flex; gap: 8px; margin-top: 8px; }
+.com-nuevo .input { flex-grow: 1; min-width: 0; }
+.com-aviso { color: var(--warning); }

@@ -25,6 +25,7 @@ import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
+import { createComment } from './comments.service.js'
 
 /**
  * Procesa un mensaje entrante. `msg` trae al menos { from, body } y
@@ -465,6 +466,17 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         }
       }
       return avanzarBorrador(phone, user, lang, draft, users, today)
+    }
+
+    case 'add_comment': {
+      const pista = String(intent.task_hint ?? '').trim()
+      const texto = String(intent.comment ?? '').trim()
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, todasAbiertas, aliases)
+      if (!task) return t(lang, 'complete_not_found', { pista })
+      await createComment(task.id, { body: texto, userId: user.id, source: 'whatsapp' })
+      void touch('task', pista)
+      return t(lang, 'comment_added', { titulo: task.title, texto })
     }
 
     case 'add_step': {

@@ -78,6 +78,46 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Comentarios y fotos — paso 5 (2026-09-03) — TEXTO HECHO, FOTOS A FALTA DE UN VOLUMEN
+
+- **`comments` y `attachments`** + `comments.service.js` + rutas
+  `/api/tasks/:id/comments`, `/api/comments/:id`,
+  `/api/tasks/:id/attachments`, `/api/attachments/:id` (sirve el fichero) y
+  `/api/attachments/status`.
+- **Comentarios de texto: funcionan ya.** Desde la app y por WhatsApp
+  («comenta en la caldera: falta el diferencial», también `kommentiere zu…` y
+  `comenta em…`). Cada comentario guarda su origen ('app'/'whatsapp') y se
+  enseña en la app.
+- ⚠️ **LOS ADJUNTOS ESTÁN DESACTIVADOS A PROPÓSITO Y ESTO ES LO IMPORTANTE.**
+  `amonn-server` **no tiene NINGÚN volumen** (comprobado con `docker inspect`),
+  así que cualquier fichero escrito dentro se pierde cuando Watchtower recrea
+  el contenedor, o sea, **en cada despliegue**. Guardar fotos ahí sería perder
+  material de obra sin avisar. Por eso los adjuntos solo se aceptan si
+  `UPLOAD_DIR` existe y es escribible; si no, la API responde 503 con el
+  motivo y la app oculta el botón de foto y lo explica.
+- **Para activarlas** hay que tocar el compose del NAS (`/volume1/docker/
+  docker-compose.yaml`) y recrear el proyecto:
+  ```yaml
+  amonn-server:
+    environment:
+      UPLOAD_DIR: /srv/uploads
+    volumes:
+      - ./data/uploads:/srv/uploads
+  ```
+  y luego `docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d`.
+  **Pendiente de decidir con Cris**: ese fichero tiene los secretos reales y
+  recrear el proyecto tumba la app un momento, así que no se tocó sin permiso.
+- Detalles de seguridad ya resueltos: el nombre del fichero en disco lo genera
+  el servidor (nunca el del cliente), se comprueba que la ruta resuelta sigue
+  dentro de `UPLOAD_DIR`, solo se admiten jpg/png/webp/heic/pdf, tope de 12 MB,
+  y borrar un comentario o una tarea borra también sus ficheros del disco.
+- **NO hecho todavía**: bajar automáticamente las fotos que llegan por
+  WhatsApp. Necesita primero el volumen y además mirar la API de medios del
+  Gateway. Se dejó fuera a propósito en vez de dejarlo a medio cablear.
+
+Pruebas: 20 en `test/comentarios.test.mjs` (incluida la de que sin
+almacenamiento se rechaza la subida con el motivo correcto).
+
 ## Línea de tiempo — paso 4 HECHO (2026-09-03)
 
 - **Sin cambios de servidor**: se apoya entera en los plazos del paso 1.

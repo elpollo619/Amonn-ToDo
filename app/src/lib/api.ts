@@ -1,6 +1,6 @@
 import { apiFetch, eventsUrl, isDemo } from './apiClient'
 import { demoStore } from './demo'
-import type { Profile, Subtask, Task, TaskInput, TaskState, TaskStatus } from './types'
+import type { Attachment, Comment, Profile, Subtask, Task, TaskInput, TaskState, TaskStatus } from './types'
 
 /**
  * API unificada. Habla con el backend del NAS cuando está disponible, o con el
@@ -81,6 +81,58 @@ export async function deleteTask(id: string): Promise<void> {
     return
   }
   demoStore.saveTasks(demoStore.getTasks().filter((t) => t.id !== id))
+}
+
+// ─── Comentarios y adjuntos ──────────────────────────────────────────
+
+export interface EstadoAdjuntos { ok: boolean; reason: string | null; maxBytes: number; mimes: string[] }
+
+export async function attachmentsStatus(): Promise<EstadoAdjuntos> {
+  // En modo demo no hay servidor donde guardar nada: se dice y punto.
+  if (isDemo) {
+    return { ok: false, reason: 'En modo demostración no se guardan ficheros.', maxBytes: 0, mimes: [] }
+  }
+  return apiFetch<EstadoAdjuntos>('/attachments/status')
+}
+
+export async function listCommentsOf(taskId: string): Promise<{ comments: Comment[]; loose: Attachment[] }> {
+  if (isDemo) return { comments: demoStore.getComments().filter((c) => c.task_id === taskId), loose: [] }
+  return apiFetch<{ comments: Comment[]; loose: Attachment[] }>(`/tasks/${taskId}/comments`)
+}
+
+export async function createCommentOn(taskId: string, body: string, autor?: Profile | null): Promise<Comment> {
+  if (!isDemo) {
+    return apiFetch<Comment>(`/tasks/${taskId}/comments`, { method: 'POST', body: JSON.stringify({ body }) })
+  }
+  const c: Comment = {
+    id: demoStore.uid(), task_id: taskId, user_id: autor?.id ?? null, body: body.trim(),
+    source: 'app', created_at: new Date().toISOString(),
+    author_name: autor?.full_name ?? null, author_color: autor?.avatar_color ?? null, attachments: [],
+  }
+  demoStore.saveComments([...demoStore.getComments(), c])
+  return c
+}
+
+export async function deleteCommentById(id: string): Promise<void> {
+  if (isDemo) {
+    demoStore.saveComments(demoStore.getComments().filter((c) => c.id !== id))
+    return
+  }
+  await apiFetch(`/comments/${id}`, { method: 'DELETE' })
+}
+
+/** Sube un fichero: el cuerpo ES el fichero, sin multipart. */
+export async function uploadAttachment(taskId: string, file: File, commentId?: string): Promise<Attachment> {
+  const q = commentId ? `?comment_id=${encodeURIComponent(commentId)}` : ''
+  return apiFetch<Attachment>(`/tasks/${taskId}/attachments${q}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
+    body: file,
+  })
+}
+
+export function attachmentUrl(id: string): string {
+  return `/api/attachments/${id}`
 }
 
 // ─── Pasos de una tarea (subtareas) ──────────────────────────────────

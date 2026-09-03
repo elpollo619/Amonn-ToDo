@@ -141,3 +141,30 @@ create table if not exists subtasks (
   created_at timestamptz not null default now()
 );
 create index if not exists subtasks_task_idx on subtasks(task_id, position);
+
+-- ─── Comentarios y adjuntos (paso 5 del rediseño) ─────────────────────
+create table if not exists comments (
+  id         uuid primary key default gen_random_uuid(),
+  task_id    uuid not null references tasks(id) on delete cascade,
+  user_id    uuid references users(id) on delete set null,
+  body       text not null,
+  -- De dónde vino: 'app' o 'whatsapp'. Sirve para enseñarlo y para auditar.
+  source     text not null default 'app',
+  created_at timestamptz not null default now()
+);
+create index if not exists comments_task_idx on comments(task_id, created_at);
+
+-- Ficheros adjuntos. `path` es RELATIVO al directorio de subidas
+-- (UPLOAD_DIR), nunca absoluto: así mover el almacén no invalida la tabla.
+create table if not exists attachments (
+  id         uuid primary key default gen_random_uuid(),
+  task_id    uuid not null references tasks(id) on delete cascade,
+  comment_id uuid references comments(id) on delete cascade,
+  filename   text not null,
+  mime       text not null,
+  bytes      integer not null,
+  path       text not null,
+  user_id    uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists attachments_task_idx on attachments(task_id, created_at);

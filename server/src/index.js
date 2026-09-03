@@ -13,6 +13,7 @@ import { profilesRouter } from './routes/profiles.js'
 import { aliasesRouter } from './routes/aliases.js'
 import { statesRouter } from './routes/states.js'
 import { subtasksRouter } from './routes/subtasks.js'
+import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
 import {
@@ -54,6 +55,7 @@ app.use('/api/aliases', aliasesRouter)
 app.use('/api/states', statesRouter)
 // Los pasos cuelgan de /api/tasks/:id/subtasks y de /api/subtasks/:id.
 app.use('/api', subtasksRouter)
+app.use('/api', commentsRouter)
 
 // OpenWA envía aquí las respuestas entrantes (webhook, sin auth de usuario).
 app.use('/api/whatsapp/webhook', webhookRouter)

@@ -89,6 +89,7 @@ const REGLAS = {
     teamWord: /^(equipo|todos|todas|all)$/i,
     // "pon la caldera en esperando material"
     createNoun: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar|crea|crear|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar)\s+(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)\b/,
+    addComment: /^(?:comenta|comentar|anota\s+en|nota\s+en|apunta\s+en|di\s+en)\s+(?:en\s+)?(?:la |el |lo )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:anade|anadir|agrega|agregar|apunta|apuntar|suma|sumar)\s+(?:a|en)\s+(?:la |el |lo )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar)\s+(?:la |el |lo )?(.+?)\s+(?:a|en|como|al estado)\s+(.+)$/,
   },
@@ -115,6 +116,7 @@ const REGLAS = {
     me: /^(ich|mir|mich|meine)$/i,
     teamWord: /^(team|alle|all)$/i,
     createNoun: /^(?:setze|stelle|andere|verschiebe|markiere|erstelle|mach|lege)\s+(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)\b/,
+    addComment: /^(?:kommentiere|kommentar\s+zu|notiere\s+zu|vermerke)\s+(?:zu\s+)?(?:die |der |das )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:fuge|fuege|hinzufugen|erganze|erganzen)\s+(?:zu|bei)\s+(?:die |der |das )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:setze|stelle|andere|verschiebe|markiere)\s+(?:die |der |das )?(.+?)\s+(?:auf|zu|als)\s+(.+)$/,
   },
@@ -141,6 +143,7 @@ const REGLAS = {
     me: /^(eu|mim|minhas|meu)$/i,
     teamWord: /^(equipa|equipe|todos|todas|all)$/i,
     createNoun: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar|cria|criar|adiciona|anota)\s+(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)\b/,
+    addComment: /^(?:comenta|comentar|nota\s+em|apontar\s+em)\s+(?:em\s+|n[ao]\s+)?(?:a |o )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:adiciona|adicionar|acrescenta|acrescentar|junta)\s+(?:a|ao|em)\s+(?:a |o )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar)\s+(?:a |o )?(.+?)\s+(?:para|em|como)\s+(.+)$/,
   },
@@ -175,6 +178,19 @@ function parseInLang(text, ctx, lang) {
     const r = interpretReply(raw)
     if (r === 'done') return { action: 'reply_done' }
     if (r === 'not_done') return { action: 'reply_not_done' }
+  }
+
+  // "comenta en la caldera: falta el diferencial" → un COMENTARIO.
+  // Va antes de los pasos porque comparten verbos ("anota en"), y exige que
+  // la pista señale una tarea que ya existe.
+  const com = cfg.addComment ? t.match(cfg.addComment) : null
+  if (com && !cfg.createNoun.test(t)) {
+    const pista = com[1].trim()
+    const texto = com[2].trim()
+    const donde = ctx.allOpenTasks ?? ctx.openTasks ?? []
+    if (pista && texto && pickTaskByHint(pista, donde, ctx.aliases)) {
+      return { action: 'add_comment', task_hint: pista, comment: texto }
+    }
   }
 
   // "añade a la caldera: cambiar el diferencial" → un PASO dentro de la tarea.

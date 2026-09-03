@@ -42,6 +42,13 @@ export const config = {
     enabled: process.env.WA_ENABLED !== 'false',
   },
 
+  // ─── Adjuntos (fotos de obra, PDFs) ──────────────────────────
+  // Directorio donde se guardan. DEBE apuntar a un volumen del contenedor:
+  // sin volumen, los ficheros se pierden cuando Watchtower lo recrea. Si no
+  // se define, los adjuntos quedan desactivados a propósito (los
+  // comentarios de texto siguen funcionando).
+  uploadDir: process.env.UPLOAD_DIR ?? '',
+
   // ─── Asistente (entiende los mensajes de WhatsApp en lenguaje normal) ───
   // Con GEMINI_API_KEY usa Google Gemini para interpretar "crea una tarea a
   // Cristian: … para el viernes". Sin clave, usa reglas sencillas (funciona,

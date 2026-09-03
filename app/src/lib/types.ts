@@ -39,6 +39,29 @@ export interface Subtask {
   position: number
 }
 
+export interface Attachment {
+  id: string
+  task_id: string
+  comment_id: string | null
+  filename: string
+  mime: string
+  bytes: number
+  created_at: string
+}
+
+export interface Comment {
+  id: string
+  task_id: string
+  user_id: string | null
+  body: string
+  /** 'app' o 'whatsapp': se enseña para saber de dónde vino. */
+  source: string
+  created_at: string
+  author_name?: string | null
+  author_color?: string | null
+  attachments?: Attachment[]
+}
+
 export interface Task {
   id: string
   title: string

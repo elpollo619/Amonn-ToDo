@@ -5,6 +5,7 @@ import { PRIORITY_LABELS, PRIORITY_ORDER } from '../lib/constants'
 import type { Task, TaskPriority } from '../lib/types'
 import { IconTrash, IconX } from './Icons'
 import { Subtasks } from './Subtasks'
+import { Comments } from './Comments'
 import './Modal.css'
 
 interface Props {
@@ -168,6 +169,7 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
 
             {/* Los pasos solo al editar: una tarea nueva no tiene id todavía. */}
             {task?.id && <Subtasks taskId={task.id} />}
+            {task?.id && <Comments taskId={task.id} />}
 
             {error && <div className="error-box">{error}</div>}
           </div>
