@@ -31,10 +31,23 @@ let socket = null
 let lastErrorCode = null
 let reconnectDelay = 10_000 // espera actual para reconectar (crece si falla)
 let reconnectTimer = null
+let subscribeTimer = null
+let subscribeDelay = 2_000 // espera tras conectar antes de suscribirse (ver abajo)
 
 const MIN_DELAY = 10_000
 const MAX_DELAY = 120_000
 const RATE_LIMIT_DELAY = 65_000 // el límite es 10/min: esperamos > 60s
+const SUBSCRIBE_DELAY_MIN = 2_000
+const SUBSCRIBE_DELAY_MAX = 15_000
+
+// ⚠️ Carrera en el Gateway (events.gateway.ts, handleConnection): al conectar,
+// valida la API key en su base de datos con `await` y SOLO DESPUÉS guarda la
+// clave en la conexión (client.data.rawApiKey). Si nuestra suscripción llega
+// antes de que termine, handleSubscribe no encuentra la clave y responde
+// UNAUTHORIZED "API key is no longer valid" y nos desconecta (en su registro
+// se ve "Client disconnected" ANTES de "Client connected"). Por eso esperamos
+// unos segundos tras conectar antes de suscribirnos, y si aun así ocurre,
+// reintentamos esperando más.
 
 function subscribe() {
   socket.emit('message', {
@@ -47,14 +60,18 @@ function subscribe() {
 
 function scheduleReconnect(reason) {
   if (reconnectTimer) return
-  const delay = lastErrorCode === 'RATE_LIMITED' ? RATE_LIMIT_DELAY : reconnectDelay
+  let delay = reconnectDelay
+  if (lastErrorCode === 'RATE_LIMITED') delay = RATE_LIMIT_DELAY
+  // Tras la carrera de la suscripción no hace falta esperar más: la
+  // conexión en sí fue aceptada. Reconectamos pronto (respetando 10/min).
+  if (lastErrorCode === 'SUBSCRIBE_RACE') delay = MIN_DELAY
   console.log(`[wa] tiempo real: reconectaré en ${Math.round(delay / 1000)}s (${reason})`)
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
     if (socket && !socket.connected) socket.connect()
   }, delay)
   // Siguiente espera más larga (hasta el tope), por si vuelve a fallar.
-  reconnectDelay = Math.min(MAX_DELAY, reconnectDelay * 2)
+  if (lastErrorCode !== 'SUBSCRIBE_RACE') reconnectDelay = Math.min(MAX_DELAY, reconnectDelay * 2)
 }
 
 export function connectRealtime() {
@@ -75,9 +92,14 @@ export function connectRealtime() {
   })
 
   socket.on('connect', () => {
-    console.log('[wa] tiempo real conectado; suscribiendo a la sesión')
+    console.log(
+      `[wa] tiempo real conectado; suscribiendo a la sesión en ${Math.round(subscribeDelay / 1000)}s`,
+    )
     lastErrorCode = null
-    subscribe()
+    clearTimeout(subscribeTimer)
+    subscribeTimer = setTimeout(() => {
+      if (socket?.connected) subscribe()
+    }, subscribeDelay)
   })
 
   socket.on('message', (msg) => {
@@ -97,13 +119,23 @@ export function connectRealtime() {
           console.log(
             `[wa] tiempo real suscrito a ${JSON.stringify(msg.events ?? [])} (sesión ${msg.sessionId})`,
           )
-          reconnectDelay = MIN_DELAY // todo bien: reiniciamos la espera
+          reconnectDelay = MIN_DELAY // todo bien: reiniciamos las esperas
+          subscribeDelay = SUBSCRIBE_DELAY_MIN
           return
         }
         case 'error': {
           lastErrorCode = msg.code ?? null
           console.error(`[wa] tiempo real: el Gateway devolvió ${msg.code}: ${msg.message}`)
-          if (msg.code === 'UNAUTHORIZED') {
+          if (msg.code === 'UNAUTHORIZED' && /no longer valid/i.test(msg.message ?? '')) {
+            // Casi seguro la carrera descrita arriba (la clave sí es válida:
+            // el propio Gateway aceptó la conexión). Reintentar esperando más.
+            subscribeDelay = Math.min(SUBSCRIBE_DELAY_MAX, subscribeDelay * 2)
+            lastErrorCode = 'SUBSCRIBE_RACE'
+            console.error(
+              `[wa] el Gateway aún no había terminado de validar la clave al recibir la suscripción; ` +
+                `reintento esperando ${Math.round(subscribeDelay / 1000)}s tras conectar`,
+            )
+          } else if (msg.code === 'UNAUTHORIZED') {
             console.error('[wa] revisa WA_API_KEY: el Gateway no acepta la clave para el tiempo real')
           } else if (msg.code === 'FORBIDDEN_SESSION') {
             console.error(
@@ -126,6 +158,7 @@ export function connectRealtime() {
   })
 
   socket.on('disconnect', (reason) => {
+    clearTimeout(subscribeTimer)
     console.log(`[wa] tiempo real desconectado (${reason})`)
     // Cuando es el SERVIDOR (el Gateway) quien cierra, socket.io-client NO
     // reconecta solo: lo hacemos nosotros, con espera creciente y respetando

@@ -15,6 +15,7 @@
 
 ## Próximo paso concreto
 
+0. Verificar que con el último HEAD el Protokoll de `amonn-server` muestre `tiempo real suscrito a ["message.received"]` y ya no el bucle `UNAUTHORIZED: API key is no longer valid` (carrera del Gateway, ver Gotchas).
 1. Comprobar que `/api/version` en el NAS coincide con el HEAD de la rama (Watchtower lo aplica solo).
 2. Cris escribe al número de WhatsApp de Amonn (el del OpenWA Gateway) desde su móvil: «hola» → debe responder el asistente. Luego «crea una tarea a mí: probar el asistente, para mañana» → aparece en la app. Si no responde: Protokoll de `amonn-server` (líneas `[asistente]`/`[wa]`).
 3. Cris consigue (a) la clave de Gemini en https://aistudio.google.com/apikey y (b) la contraseña de aplicación de Gmail para `elpollotue@gmail.com`; se ponen en `GEMINI_API_KEY`, `SMTP_USER`, `SMTP_PASS` del compose en UGOS (**cambiar variables de entorno requiere recrear el proyecto**: Watchtower solo actualiza imágenes). Sin ellas, el asistente funciona con reglas y no se envían emails.
@@ -52,6 +53,7 @@
 ## Gotchas de esta sesión (candidatos a CLAUDE.md si se repiten)
 
 - **UGOS no re-descarga una etiqueta ya en caché** (`latest`) y editar + "Neu bereitstellen" no recreó el contenedor: por eso ahora hay Watchtower. Para cambios de **variables de entorno** sigue haciendo falta **borrar+crear** el proyecto.
+- **Carrera en el OpenWA Gateway** (`events.gateway.js` `handleConnection`): valida la API key con `await` y solo después guarda `client.data.rawApiKey`; si la suscripción llega antes, responde `UNAUTHORIZED "API key is no longer valid"` y desconecta (en su log: "Client disconnected" ANTES de "Client connected"). La clave NO es el problema (tabla `api_keys` en `/app/data/main.sqlite`, leída con `sqlite3` de `/app/node_modules`). Amonn espera 2 s (hasta 15 s) tras conectar antes de suscribirse (`realtime.js`).
 - **Watchtower en UGOS** falla con `client version 1.25 is too old` si no se pone `DOCKER_API_VERSION: '1.41'` en su `environment`.
 - **UGOS reimporta el compose viejo** si se crea el proyecto en la misma carpeta ("Die Compose-Konfiguration existiert bereits…"): usar carpeta nueva o borrar el `docker-compose.yml` viejo antes.
 - **`crypto.randomUUID` solo existe en contexto seguro** (https/localhost). La app se abre por `http://IP`: cualquier API "secure-context-only" deja la pantalla en blanco. Probar siempre por IP no-localhost (repro: `scratchpad/repro_insecure.mjs` con Playwright).
