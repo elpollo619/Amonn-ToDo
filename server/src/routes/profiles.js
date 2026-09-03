@@ -1,6 +1,7 @@
 import { asyncRouter } from '../util.js'
 import { query } from '../db.js'
 import { requireAuth, publicUser } from '../auth.js'
+import { LANGS } from '../i18n.js'
 
 export const profilesRouter = asyncRouter()
 profilesRouter.use(requireAuth)
@@ -29,6 +30,12 @@ profilesRouter.patch('/:id', async (req, res) => {
   if (b.avatar_color !== undefined) set('avatar_color', b.avatar_color)
   if (b.notify_whatsapp !== undefined) set('notify_whatsapp', Boolean(b.notify_whatsapp))
   if (b.notify_email !== undefined) set('notify_email', Boolean(b.notify_email))
+  // Elegir el idioma a mano desactiva la autodetección: a partir de ahí el
+  // asistente respeta la elección aunque escribas puntualmente en otro idioma.
+  if (b.language !== undefined && LANGS.includes(b.language)) {
+    set('language', b.language)
+    set('language_auto', false)
+  }
   if (fields.length === 0) {
     return res.status(400).json({ error: 'Nada que actualizar' })
   }

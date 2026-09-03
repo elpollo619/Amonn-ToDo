@@ -45,28 +45,88 @@ export function normalize(text) {
     .trim()
 }
 
+// ─── Configuración por idioma ─────────────────────────────────
+// Cada idioma aporta sus días, sus meses y las expresiones relativas
+// ("mañana", "morgen", "amanhã"). El resto del algoritmo es común.
+const IDIOMAS = {
+  es: {
+    weekdays: ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'],
+    months: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+      'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    hoy: /\b(?:para )?(hoy)\b/,
+    manana: /\b(?:para |antes de |hasta )?(manana)\b/,
+    pasado: /\b(?:para |el |antes del |hasta el |hasta )?(pasado manana)\b/,
+    enDias: /\b(?:para )?(?:dentro de|en) (\d{1,2}) dias?\b/,
+    enSemanas: /\b(?:para )?(?:dentro de|en) (una|1|dos|2) semanas?\b/,
+    // "5 de septiembre"
+    diaMes: (meses) => new RegExp(`\\b(\\d{1,2}) de (${meses})\\b`),
+    prefijoDia: '(?:para |hasta |antes del )?(?:el |este |proximo |el proximo )?',
+    sufijoDia: '(?: que viene| proximo)?',
+    sinFecha: /\b(sin fecha|sin plazo|cuando sea)\b/,
+  },
+  de: {
+    weekdays: ['sonntag', 'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag'],
+    months: ['januar', 'februar', 'marz', 'april', 'mai', 'juni', 'juli', 'august',
+      'september', 'oktober', 'november', 'dezember'],
+    hoy: /\b(heute)\b/,
+    manana: /\b(?:bis |am )?(morgen)\b/,
+    pasado: /\b(?:bis |am )?(ubermorgen)\b/,
+    enDias: /\bin (\d{1,2}) tagen?\b/,
+    enSemanas: /\bin (einer|1|zwei|2) wochen?\b/,
+    // "5. September"
+    diaMes: (meses) => new RegExp(`\\b(\\d{1,2})\\.? (${meses})\\b`),
+    prefijoDia: '(?:bis |am |bis zum |diesen |nachsten |am nachsten )?',
+    sufijoDia: '',
+    sinFecha: /\b(ohne datum|ohne frist|irgendwann)\b/,
+  },
+  pt: {
+    weekdays: ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'],
+    months: ['janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho', 'julho', 'agosto',
+      'setembro', 'outubro', 'novembro', 'dezembro'],
+    hoy: /\b(?:para )?(hoje)\b/,
+    manana: /\b(?:para |ate )?(amanha)\b/,
+    pasado: /\b(?:para |ate )?(depois de amanha)\b/,
+    enDias: /\b(?:daqui a|em) (\d{1,2}) dias?\b/,
+    enSemanas: /\b(?:daqui a|em) (uma|1|duas|2) semanas?\b/,
+    // "5 de setembro"
+    diaMes: (meses) => new RegExp(`\\b(\\d{1,2}) de (${meses})\\b`),
+    prefijoDia: '(?:para |ate |na |nesta |proxima |na proxima )?(?:feira )?',
+    sufijoDia: '(?:-feira)?(?: que vem)?',
+    sinFecha: /\b(sem data|sem prazo|quando der)\b/,
+  },
+}
+
+/** ¿La persona ha dicho explícitamente "sin fecha"? */
+export function saysNoDate(text, lang = 'es') {
+  const t = normalize(text)
+  return Object.values(IDIOMAS).some((cfg) => cfg.sinFecha.test(t)) ||
+    (IDIOMAS[lang]?.sinFecha.test(t) ?? false)
+}
+
 /**
- * Busca una fecha escrita en español dentro del texto. Devuelve
+ * Busca una fecha dentro del texto, en el idioma indicado. Devuelve
  * { key: 'YYYY-MM-DD', match: 'texto que la expresaba' } o null.
- * Entiende: hoy, mañana, pasado mañana, en N días, lunes…domingo (opcional
- * "que viene"/"próximo"), dd/mm, dd-mm, dd/mm/yyyy, "5 de septiembre".
+ * Entiende expresiones relativas (hoy/mañana/pasado mañana/en N días),
+ * días de la semana, dd/mm[/aaaa] (y dd.mm en alemán) y "5 de septiembre".
  */
-export function parseSpanishDate(text, today = todayKey()) {
+export function parseDate(text, today = todayKey(), lang = 'es') {
+  const cfg = IDIOMAS[lang] ?? IDIOMAS.es
   const t = normalize(text)
 
-  let m = t.match(/\b(?:para |el |antes del |hasta el |hasta )?(pasado manana)\b/)
+  // El orden importa: "pasado mañana" antes que "mañana".
+  let m = t.match(cfg.pasado)
   if (m) return { key: addDays(today, 2), match: m[0] }
-  m = t.match(/\b(?:para |antes de |hasta )?(manana)\b/)
+  m = t.match(cfg.manana)
   if (m) return { key: addDays(today, 1), match: m[0] }
-  m = t.match(/\b(?:para )?(hoy)\b/)
+  m = t.match(cfg.hoy)
   if (m) return { key: today, match: m[0] }
-  m = t.match(/\b(?:para )?(?:dentro de|en) (\d{1,2}) dias?\b/)
+  m = t.match(cfg.enDias)
   if (m) return { key: addDays(today, Number(m[1])), match: m[0] }
-  m = t.match(/\b(?:para )?(?:dentro de|en) (una|1|dos|2) semanas?\b/)
-  if (m) return { key: addDays(today, /dos|2/.test(m[1]) ? 14 : 7), match: m[0] }
+  m = t.match(cfg.enSemanas)
+  if (m) return { key: addDays(today, /dos|2|zwei|duas/.test(m[1]) ? 14 : 7), match: m[0] }
 
-  // dd/mm[/yyyy] o dd-mm[-yyyy]
-  m = t.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/)
+  // dd/mm[/aaaa], dd-mm[-aaaa] y, en alemán, dd.mm[.aaaa]
+  m = t.match(/\b(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b/)
   if (m) {
     const d = Number(m[1]); const mo = Number(m[2])
     let y = m[3] ? Number(m[3]) : Number(today.slice(0, 4))
@@ -78,22 +138,20 @@ export function parseSpanishDate(text, today = todayKey()) {
     }
   }
 
-  // "5 de septiembre"
-  m = t.match(new RegExp(`\\b(\\d{1,2}) de (${MONTHS.join('|')})\\b`))
+  // "5 de septiembre" / "5. September" / "5 de setembro"
+  m = t.match(cfg.diaMes(cfg.months.join('|')))
   if (m) {
-    const d = Number(m[1]); const mo = MONTHS.indexOf(m[2]) + 1
-    let y = Number(today.slice(0, 4))
+    const d = Number(m[1]); const mo = cfg.months.indexOf(m[2]) + 1
+    const y = Number(today.slice(0, 4))
     let key = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     if (key < today) key = `${y + 1}${key.slice(4)}`
     return { key, match: m[0] }
   }
 
-  // día de la semana: "el viernes", "para el lunes que viene", "proximo martes"
-  m = t.match(
-    new RegExp(`\\b(?:para |hasta |antes del )?(?:el |este |proximo |el proximo )?(${WEEKDAYS.join('|')})(?: que viene| proximo)?\\b`),
-  )
+  // Día de la semana: "el viernes", "am Freitag", "na sexta-feira"
+  m = t.match(new RegExp(`\\b${cfg.prefijoDia}(${cfg.weekdays.join('|')})${cfg.sufijoDia}\\b`))
   if (m) {
-    const target = WEEKDAYS.indexOf(m[1])
+    const target = cfg.weekdays.indexOf(m[1])
     const cur = weekdayOf(today)
     let diff = (target - cur + 7) % 7
     if (diff === 0) diff = 7 // "el viernes" dicho un viernes = el que viene
@@ -102,18 +160,68 @@ export function parseSpanishDate(text, today = todayKey()) {
   return null
 }
 
-/** Texto amable para una fecha: "hoy", "mañana", "viernes 5 sept", "vencida (hace 2 días)". */
-export function describeDue(key, today = todayKey()) {
-  if (!key) return 'sin fecha'
-  if (key === today) return 'hoy'
-  if (key === addDays(today, 1)) return 'mañana'
+/** Compatibilidad: el nombre viejo, solo español. */
+export function parseSpanishDate(text, today = todayKey()) {
+  return parseDate(text, today, 'es')
+}
+
+/**
+ * Prueba primero el idioma de la persona y luego los otros dos, para que
+ * alguien que escribe "am Freitag" en un chat en español siga siendo
+ * entendido. Devuelve { key, match, lang } o null.
+ */
+export function parseDateAnyLang(text, today = todayKey(), preferred = 'es') {
+  const orden = [preferred, ...Object.keys(IDIOMAS).filter((l) => l !== preferred)]
+  for (const lang of orden) {
+    const r = parseDate(text, today, lang)
+    if (r) return { ...r, lang }
+  }
+  return null
+}
+
+// ─── Texto amable para una fecha ──────────────────────────────
+const CORTOS = {
+  es: {
+    dias: ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'],
+    meses: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+  },
+  de: {
+    dias: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
+    meses: ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+  },
+  pt: {
+    dias: ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'],
+    meses: ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'],
+  },
+}
+
+/**
+ * Texto amable para una fecha, en el idioma pedido: "hoy", "morgen",
+ * "sex 5 set", "mié 3 sep (vencida hace 2 días)".
+ * Los textos vienen de i18n.js para no duplicar traducciones.
+ */
+export function describeDue(key, today = todayKey(), lang = 'es', t = null) {
+  const txt = t ?? ((l, k, v) => defaultTexts(l, k, v))
+  if (!key) return txt(lang, 'no_date')
+  if (key === today) return txt(lang, 'due_today')
+  if (key === addDays(today, 1)) return txt(lang, 'due_tomorrow')
+  const cortos = CORTOS[lang] ?? CORTOS.es
   const d = toDate(key)
-  const wd = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][d.getUTCDay()]
-  const mo = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][d.getUTCMonth()]
-  const label = `${wd} ${d.getUTCDate()} ${mo}`
+  const label = `${cortos.dias[d.getUTCDay()]} ${d.getUTCDate()} ${cortos.meses[d.getUTCMonth()]}`
   if (key < today) {
-    const days = Math.round((toDate(today) - d) / 86400000)
-    return `${label} (vencida hace ${days} día${days === 1 ? '' : 's'})`
+    const dias = Math.round((toDate(today) - d) / 86400000)
+    return txt(lang, 'due_overdue', { fecha: label, dias, s: dias === 1 ? '' : 's' })
   }
   return label
+}
+
+// Textos mínimos por si se llama a describeDue sin pasar el traductor
+// (evita una dependencia circular entre dates.js e i18n.js).
+function defaultTexts(lang, key, vars = {}) {
+  const M = {
+    es: { no_date: 'sin fecha', due_today: 'hoy', due_tomorrow: 'mañana', due_overdue: `${vars.fecha} (vencida hace ${vars.dias} día${vars.s ?? ''})` },
+    de: { no_date: 'ohne Datum', due_today: 'heute', due_tomorrow: 'morgen', due_overdue: `${vars.fecha} (seit ${vars.dias} Tag${vars.s ?? ''} überfällig)` },
+    pt: { no_date: 'sem data', due_today: 'hoje', due_tomorrow: 'amanhã', due_overdue: `${vars.fecha} (atrasada há ${vars.dias} dia${vars.s ?? ''})` },
+  }
+  return (M[lang] ?? M.es)[key]
 }

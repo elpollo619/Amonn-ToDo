@@ -3,6 +3,7 @@ import { query } from './db.js'
 import { config } from './config.js'
 import { notifyUser, firstName, taskSummary } from './notify.js'
 import { mailEnabled } from './mailer.js'
+import { t as tr, safeLang } from './i18n.js'
 
 // Envía los recordatorios (WhatsApp y/o email, según las preferencias de cada
 // persona) de las tareas que vencen hoy o están vencidas y de las que no se
@@ -14,7 +15,7 @@ export async function runReminders() {
 
   const { rows: tasks } = await query(
     `select t.*, u.id as user_id, u.full_name, u.phone, u.email,
-            u.notify_whatsapp, u.notify_email
+            u.notify_whatsapp, u.notify_email, u.language
        from tasks t
        join users u on u.id = t.assignee_id
       where t.status in ('open','in_progress')
@@ -32,17 +33,17 @@ export async function runReminders() {
     const user = {
       id: t.user_id, full_name: t.full_name, phone: t.phone, email: t.email,
       notify_whatsapp: t.notify_whatsapp, notify_email: t.notify_email,
+      language: t.language,
     }
     const name = firstName(user)
-    const link = config.appUrl ? `\n\nVerla en Amonn: ${config.appUrl}` : ''
+    // El recordatorio va en el idioma de quien lo recibe.
+    const lang = safeLang(t.language)
+    const link = config.appUrl ? tr(lang, 'see_in_app', { url: config.appUrl }) : ''
+    const resumen = taskSummary(t, lang)
     const r = await notifyUser(user, {
-      whatsapp:
-        `Hola ${name} 👋\n\n¿Has completado esta tarea?\n\n${taskSummary(t)}\n\n` +
-        `Responde SÍ si ya está hecha, o NO si sigue abierta.`,
-      email:
-        `Hola ${name},\n\nEsta tarea vence o está vencida:\n\n${taskSummary(t)}\n\n` +
-        `Cuando la termines, márcala como hecha en la app.${link}`,
-      subject: `Recordatorio: ${t.title}`,
+      whatsapp: tr(lang, 'reminder_wa', { nombre: name, resumen }),
+      email: tr(lang, 'reminder_mail', { nombre: name, resumen, link }),
+      subject: tr(lang, 'subject_reminder', { titulo: t.title }),
     })
     if (r.whatsapp || r.email) {
       await query('update tasks set last_reminder_at = now() where id = $1', [t.id])

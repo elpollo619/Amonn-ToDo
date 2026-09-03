@@ -12,6 +12,10 @@ export interface Profile {
   notify_whatsapp?: boolean
   /** Recibir avisos por email (por defecto sí). */
   notify_email?: boolean
+  /** Idioma en el que le habla el asistente de WhatsApp. */
+  language?: 'es' | 'de' | 'pt'
+  /** false cuando la persona lo eligió a mano (ya no se autodetecta). */
+  language_auto?: boolean
 }
 
 export interface Task {

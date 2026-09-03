@@ -16,6 +16,7 @@ export function Profile() {
   const [color, setColor] = useState(user?.avatar_color ?? AVATAR_COLORS[0])
   const [notifyWa, setNotifyWa] = useState(user?.notify_whatsapp !== false)
   const [notifyMail, setNotifyMail] = useState(user?.notify_email !== false)
+  const [language, setLanguage] = useState(user?.language ?? 'es')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
@@ -45,6 +46,7 @@ export function Profile() {
         avatar_color: color,
         notify_whatsapp: notifyWa,
         notify_email: notifyMail,
+        language,
       })
       await refresh(); await reload()
       show('Perfil guardado', 'success')
@@ -133,6 +135,24 @@ export function Profile() {
               <span className="toggle-text"><IconMail size={16} /> Por email{user.email && <span className="muted"> ({user.email})</span>}</span>
             </label>
             <span className="hint">Te avisamos cuando alguien te asigna una tarea y cuando una tarea tuya vence.</span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="idioma">Idioma del asistente</label>
+            <select
+              id="idioma"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as 'es' | 'de' | 'pt')}
+            >
+              <option value="es">Español</option>
+              <option value="de">Deutsch</option>
+              <option value="pt">Português</option>
+            </select>
+            <span className="hint">
+              En este idioma te escribe el asistente de WhatsApp y te llegan los avisos.
+              También puedes decirle «habla en alemán» por WhatsApp.
+              {user.language_auto !== false && ' Ahora mismo lo detecta solo por cómo escribes.'}
+            </span>
           </div>
 
           {error && <div className="error-box">{error}</div>}

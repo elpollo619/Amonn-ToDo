@@ -28,6 +28,56 @@
    asistente. Luego «crea una tarea a mí: probar el asistente, para mañana».
 4. Claves de Gemini y Gmail en el compose (ver "Necesita a Cris") + `APP_URL`.
 
+## Asistente multiidioma — Entrega 1 HECHA (2026-09-03)
+
+Cris pidió que el asistente hable **alemán, portugués y español**, que tenga
+**preguntas estándar** y que **aprenda del equipo**. Es demasiado para un solo
+diseño, así que se partió en cuatro entregas. Decisión de Cris: reglas ahora,
+**Gemini después**; idioma **guardado por persona**.
+
+### Lo que ya funciona (Entrega 1)
+
+- **`server/src/i18n.js` (nuevo).** Todos los textos del asistente en es/de/pt
+  y `t(lang, clave, datos)`. Antes estaban incrustados en `inbound.js`.
+  Incluye `detectLanguage()` (solo con mensajes de ≥15 caracteres: un "ok" no
+  cambia el idioma de nadie) y `parseLanguageCommand()` ("habla en alemán").
+- **Idioma por persona.** Columnas nuevas `users.language` ('es'|'de'|'pt') y
+  `users.language_auto`. Se autodetecta **solo mientras nadie lo haya elegido
+  a mano**; en cuanto se elige (por WhatsApp o en Mi perfil), se respeta.
+- **Comprensión en tres idiomas.** `assistant.js` tiene ahora un juego de
+  reglas por idioma (`REGLAS`) con la misma forma. Se prueba primero el idioma
+  de la persona y luego los otros dos, así "am Freitag" se entiende en un chat
+  en español. `dates.js` entiende fechas en los tres idiomas, incluido el
+  `15.10.` alemán con puntos. Sí/no también en los tres (`ja`, `sim`…).
+- **Preguntas estándar.** Si falta algo, el asistente **pregunta** en lugar de
+  crear a medias: "¿Qué hay que hacer?" → "¿Para quién?" → "¿Para cuándo?" →
+  confirmación. **Solo confirma si hubo que preguntar algo**: un mensaje
+  completo se crea directo, sin fricción. Se puede cancelar en cualquier punto.
+  El estado vive en `wa_conversations` (`conversations.js`) y **caduca a los
+  10 minutos**, para que un "sí" de mañana no se enganche a la pregunta de hoy.
+- **Los avisos van en el idioma de QUIEN LOS RECIBE**, no en el de quien crea
+  la tarea (`notify.js`, `reminders.js`).
+- **Mi perfil** tiene un selector de idioma (Español / Deutsch / Português).
+
+### Pruebas
+
+`cd server && npm test` → 28 comprobaciones de fechas + 33 del asistente, sin
+base de datos. `npm run test:db` (con `DATABASE_URL`) → 28 del diálogo completo
+contra un Postgres real: preguntas, confirmación, cancelación, cambio de
+idioma, autodetección, caducidad, y el idioma de los avisos.
+
+### Hoja de ruta acordada (pendiente)
+
+2. **Vocabulario del equipo + aprender de los errores** (sin Gemini): tabla de
+   alias ("Jasmi" → Jasmina, "la caldera" → esa tarea), que se llena sola al
+   corregir al asistente y es editable en la app. Determinista y auditable.
+3. **Gemini enchufado** (necesita la clave de Cris): entra por encima de las
+   reglas, usa el vocabulario de la entrega 2 como contexto, y trae la memoria
+   de conversación ("y esa mándasela también a Isma").
+4. **Tareas que se repiten**: detectar patrones y proponerlas. Va la última a
+   propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
+   la base de datos está casi vacía. No adelantarla.
+
 ## Hecho en esta sesión (2026-09-03)
 
 - Watchtower en `docker-compose.nas.yml` (+ fix `DOCKER_API_VERSION` porque el Docker de UGOS exige API ≥ 1.40).
@@ -164,3 +214,7 @@ semanas en silencio.
   publicado): desde ahí se ve la sesión y se escanea el QR.
 - **Una sesión de WhatsApp puede morirse sin ruido.** Estuvo `failed` desde el
   8 de agosto y nada lo decía. Ahora `startSessionWatch()` lo registra.
+- **Los textos de cara al usuario van en `i18n.js`**, nunca incrustados en la
+  lógica. Si añades un mensaje, añádelo en los tres idiomas.
+- **Cuidado al detectar idioma con mensajes cortos**: "ok", "sí", "ja" no dan
+  señal. Por eso `detectLanguage()` exige ≥15 caracteres y devuelve null.

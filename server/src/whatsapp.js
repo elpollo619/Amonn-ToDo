@@ -203,13 +203,29 @@ export async function ensureWebhookRegistered() {
 }
 
 // ─── Interpretación de la respuesta "¿Has completado la tarea?" ──────
+// Los tres idiomas del equipo (español, alemán, portugués) más inglés.
+// ⚠️ 'no' es "no" en español/portugués pero también aparece suelto en alemán
+// como parte de otras palabras: por eso se comparan palabras completas.
 const YES = [
-  'si', 'yes', 'hecho', 'hecha', 'listo', 'lista', 'ok', 'okay', 'vale',
-  'completada', 'completado', 'terminada', 'terminado', 'done', 'finalizada',
-  'finalizado', '1', '✅', '👍',
+  // español
+  'si', 'hecho', 'hecha', 'listo', 'lista', 'vale', 'completada', 'completado',
+  'terminada', 'terminado', 'finalizada', 'finalizado',
+  // alemán
+  'ja', 'jep', 'erledigt', 'fertig', 'gemacht', 'abgeschlossen', 'klar',
+  // portugués
+  'sim', 'feito', 'feita', 'concluida', 'concluido', 'pronto', 'pronta',
+  // comunes
+  'yes', 'ok', 'okay', 'done', '1', '✅', '👍',
 ]
 const NO = [
-  'no', 'aun no', 'todavia', 'pendiente', 'nope', 'sigue abierta', '2', '❌',
+  // español
+  'no', 'aun no', 'todavia', 'pendiente', 'sigue abierta',
+  // alemán
+  'nein', 'noch nicht', 'nicht', 'offen', 'unerledigt',
+  // portugués
+  'nao', 'ainda nao', 'pendente', 'em aberto',
+  // comunes
+  'nope', '2', '❌',
 ]
 
 function normalize(text) {

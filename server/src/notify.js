@@ -8,6 +8,7 @@ import { config } from './config.js'
 import { sendWhatsApp } from './whatsapp.js'
 import { sendEmail, mailEnabled } from './mailer.js'
 import { describeDue } from './dates.js'
+import { t, safeLang } from './i18n.js'
 
 const PRIORITY_LABEL = { low: 'baja', medium: 'media', high: 'ALTA 🔴' }
 
@@ -16,18 +17,18 @@ export function firstName(user) {
 }
 
 /** Resumen de una tarea para un mensaje. */
-export function taskSummary(task) {
+export function taskSummary(task, lang = 'es') {
   const lines = [`📌 ${task.title}`]
   if (task.description) lines.push(`📝 ${task.description}`)
-  lines.push(`📅 Vence: ${describeDue(task.due_date)}`)
+  lines.push(t(lang, 'summary_due', { fecha: describeDue(task.due_date, undefined, lang, t) }))
   if (task.priority && task.priority !== 'medium') {
-    lines.push(`⚡ Prioridad: ${PRIORITY_LABEL[task.priority] ?? task.priority}`)
+    lines.push(t(lang, 'summary_priority', { prioridad: t(lang, `prio_${task.priority}`) }))
   }
   return lines.join('\n')
 }
 
-function appLink() {
-  return config.appUrl ? `\n\nVerla en Amonn: ${config.appUrl}` : ''
+function appLink(lang = 'es') {
+  return config.appUrl ? t(lang, 'see_in_app', { url: config.appUrl }) : ''
 }
 
 /**
@@ -62,14 +63,18 @@ export async function notifyUser(user, { whatsapp, email, subject }) {
 /** Aviso "te han asignado una tarea". `creator` puede ser null. */
 export async function notifyTaskAssigned(task, assignee, creator) {
   if (!assignee) return { whatsapp: false, email: false }
+  // El aviso va en el idioma de QUIEN LO RECIBE, no en el de quien crea la
+  // tarea: si Cris escribe en español y asigna a alguien que habla alemán,
+  // esa persona debe recibirlo en alemán.
+  const lang = safeLang(assignee.language)
   const who = creator && creator.id !== assignee.id ? firstName(creator) : null
   const intro = who
-    ? `Hola ${firstName(assignee)} 👋 ${who} te ha asignado una tarea nueva:`
-    : `Hola ${firstName(assignee)} 👋 tienes una tarea nueva:`
-  const body = `${intro}\n\n${taskSummary(task)}${appLink()}`
+    ? t(lang, 'assigned_by', { nombre: firstName(assignee), quien: who })
+    : t(lang, 'assigned', { nombre: firstName(assignee) })
+  const body = `${intro}\n\n${taskSummary(task, lang)}${appLink(lang)}`
   return notifyUser(assignee, {
     whatsapp: body,
     email: body,
-    subject: `Nueva tarea: ${task.title}`,
+    subject: t(lang, 'subject_new_task', { titulo: task.title }),
   })
 }

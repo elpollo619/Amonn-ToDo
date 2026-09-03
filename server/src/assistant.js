@@ -10,7 +10,7 @@
 // o si Gemini falla, usa reglas en español que cubren los casos habituales.
 // ============================================================
 import { config } from './config.js'
-import { normalize, parseSpanishDate, todayKey, weekdayOf } from './dates.js'
+import { normalize, parseDateAnyLang, todayKey, weekdayOf } from './dates.js'
 import { interpretReply } from './whatsapp.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
@@ -45,97 +45,198 @@ export function matchUser(nameText, users, sender) {
   return { user: scored[0].u, candidates: [] }
 }
 
-// ─── Reglas (sin IA) ──────────────────────────────────────────
-const CREATE_RE =
-  /^(?:oye |hola |por favor |porfa )?(?:(?:crea(?:r|me)?|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar|pon(?:me)?|poner|manda|mandar|asigna(?:le)?|asignar|dile|di)\b[\s:,-]*(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)?|(?:nueva|nuevo) (?:tarea|trabajo|pendiente|recordatorio))[\s:,-]*/
-const LIST_RE =
-  /\b(que (?:tengo|hay|tenemos|tiene \w+)|mis tareas|tareas (?:abiertas|pendientes|de \w+|del equipo|de todos)|lista(?:me)?|pendientes|abiertas|resumen)\b/
-const DONE_RE =
-  /^(?:ya )?(?:hecha|hecho|terminada|terminado|terminé|termine|acabé|acabe|completada|completado|lista|listo|cierra|cerrar|marca(?:r)? como hecha|marca(?:r)? como completada|completa(?:r)?)\b\s*(?:la |el |lo )?(?:de |la de |tarea |tarea de )?(.+)?$/
-const HELP_RE = /^(ayuda|help|hola|buenas|buenos dias|buenas tardes|que puedes hacer|comandos)\b/
+// ─── Reglas (sin IA), por idioma ──────────────────────────────
+// Cada idioma aporta sus propias expresiones con la MISMA forma, para que el
+// algoritmo sea uno solo. Al interpretar se prueba primero el idioma de quien
+// escribe y luego los otros dos: así alguien que escribe "am Freitag" en un
+// chat en español sigue siendo entendido.
+//
+// ⚠️ Los patrones se comparan contra texto ya normalizado (sin acentos y en
+// minúsculas), así que aquí se escribe "fur" y no "für", "amanha" y no "amanhã".
+const REGLAS = {
+  es: {
+    create:
+      /^(?:oye |hola |por favor |porfa )?(?:(?:crea(?:r|me)?|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar|pon(?:me)?|poner|manda|mandar|asigna(?:le)?|asignar|dile|di)\b[\s:,-]*(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)?|(?:nueva|nuevo) (?:tarea|trabajo|pendiente|recordatorio))[\s:,-]*/,
+    list:
+      /\b(que (?:tengo|hay|tenemos|tiene \w+)|mis tareas|tareas (?:abiertas|pendientes|de \w+|del equipo|de todos)|lista(?:me)?|pendientes|abiertas|resumen)\b/,
+    done:
+      /^(?:ya )?(?:hecha|hecho|terminada|terminado|termine|acabe|completada|completado|lista|listo|cierra|cerrar|marca(?:r)? como hecha|marca(?:r)? como completada|completa(?:r)?)\b\s*(?:la |el |lo )?(?:de |la de |tarea |tarea de )?(.+)?$/,
+    help: /^(ayuda|help|hola|buenas|buenos dias|buenas tardes|que puedes hacer|comandos)\b/,
+    prioAlta: /\b(urgente|urgentemente|prioridad alta|importante|cuanto antes|asap)\b/,
+    prioBaja: /\b(prioridad baja|sin prisa|cuando puedas|tranqui)\b/,
+    stripPrio: [
+      [/\b(es )?(urgente|urgentemente|importante|cuanto antes|asap)\b/g, ' '],
+      [/\b(con )?prioridad (alta|baja|media)\b/g, ' '],
+    ],
+    prep: '(?:a|para)',
+    sep: '(?::|,|-|que|de|para que)',
+    ask: /^(?:necesito|quiero|hay) que ([a-z]+) (.+)$/,
+    listWho: /\b(?:tareas de|que tiene|pendientes de|abiertas de) ([a-z]+)/,
+    team: /\b(todos|equipo|todas|de todos)\b/,
+    me: /^(yo|mi|mias|mias)$/i,
+    teamWord: /^(equipo|todos|todas|all)$/i,
+  },
 
-function extractPriority(t) {
-  if (/\b(urgente|urgentemente|prioridad alta|importante|cuanto antes|asap)\b/.test(t)) return 'high'
-  if (/\b(prioridad baja|sin prisa|cuando puedas|tranqui)\b/.test(t)) return 'low'
+  de: {
+    create:
+      /^(?:hey |hallo |bitte )?(?:(?:erstelle?|erstellen|mach(?:e)?|machen|leg(?:e)? an|anlegen|notier(?:e)?|notieren|trag(?:e)? ein|eintragen|schick(?:e)?|schicken|weis(?:e)? zu|zuweisen|sag)\b[\s:,-]*(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)?|(?:neue|neuer|neues) (?:aufgabe|todo|to-do|pendenz|erinnerung))[\s:,-]*/,
+    list:
+      /\b(was (?:ist|habe ich|haben wir|hat \w+)|meine aufgaben|aufgaben (?:von \w+|vom team|des teams|offen)|offene aufgaben|offen|pendenzen|liste|ubersicht|uberblick)\b/,
+    done:
+      /^(?:schon )?(?:erledigt|fertig|gemacht|abgeschlossen|beendet|erledige|erledigt ist|als erledigt markieren|schliesse|schliessen)\b\s*(?:die |der |das )?(?:von |die von |aufgabe |aufgabe von )?(.+)?$/,
+    help: /^(hilfe|help|hallo|hi|guten morgen|guten tag|was kannst du|befehle)\b/,
+    prioAlta: /\b(dringend|eilt|wichtig|hohe prioritat|so schnell wie moglich|asap|sofort)\b/,
+    prioBaja: /\b(niedrige prioritat|keine eile|wenn du zeit hast|nicht dringend)\b/,
+    stripPrio: [
+      [/\b(ist )?(dringend|eilt|wichtig|sofort|asap|so schnell wie moglich)\b/g, ' '],
+      [/\b(mit )?(hohe|niedrige|mittlere) prioritat\b/g, ' '],
+    ],
+    prep: '(?:fur|an)',
+    sep: '(?::|,|-|dass|soll|zu)',
+    ask: /^(?:ich brauche|kannst du|konnte|soll) ([a-z]+) (.+)$/,
+    listWho: /\b(?:aufgaben von|was hat|pendenzen von|offene von) ([a-z]+)/,
+    team: /\b(alle|team|vom team|des teams)\b/,
+    me: /^(ich|mir|mich|meine)$/i,
+    teamWord: /^(team|alle|all)$/i,
+  },
+
+  pt: {
+    create:
+      /^(?:ei |ola |por favor |se faz favor )?(?:(?:cria(?:r)?|adiciona(?:r)?|acrescenta(?:r)?|anota(?:r)?|apontar?|poe|por|manda(?:r)?|atribui(?:r)?|diz)\b[\s:,-]*(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)?|(?:nova|novo) (?:tarefa|trabalho|pendente|lembrete))[\s:,-]*/,
+    list:
+      /\b(o que (?:tenho|ha|temos|tem \w+)|minhas tarefas|as minhas tarefas|tarefas (?:abertas|pendentes|de \w+|do \w+|da equipa|da equipe|de todos)|lista(?:me)?|pendentes|em aberto|resumo)\b/,
+    done:
+      /^(?:ja )?(?:feito|feita|concluida|concluido|terminada|terminado|acabei|pronto|pronta|fecha(?:r)?|marca(?:r)? como feita|completa(?:r)?)\b\s*(?:a |o )?(?:de |a de |tarefa |tarefa de )?(.+)?$/,
+    help: /^(ajuda|help|ola|oi|bom dia|boa tarde|o que podes fazer|comandos)\b/,
+    prioAlta: /\b(urgente|urgentemente|prioridade alta|importante|quanto antes|asap|ja)\b/,
+    prioBaja: /\b(prioridade baixa|sem pressa|quando puderes|com calma)\b/,
+    stripPrio: [
+      [/\b(e )?(urgente|urgentemente|importante|quanto antes|asap)\b/g, ' '],
+      [/\b(com )?prioridade (alta|baixa|media)\b/g, ' '],
+    ],
+    prep: '(?:para|ao|a)',
+    sep: '(?::|,|-|que|de|para que)',
+    ask: /^(?:preciso|quero|e preciso) que (?:o |a )?([a-z]+) (.+)$/,
+    listWho: /\b(?:tarefas de|tarefas do|tarefas da|o que tem|pendentes de) ([a-z]+)/,
+    team: /\b(todos|equipa|equipe|todas)\b/,
+    me: /^(eu|mim|minhas|meu)$/i,
+    teamWord: /^(equipa|equipe|todos|todas|all)$/i,
+  },
+}
+
+function extractPriority(t, cfg) {
+  if (cfg.prioAlta.test(t)) return 'high'
+  if (cfg.prioBaja.test(t)) return 'low'
   return null
 }
 
-function stripPriority(t) {
-  return t
-    .replace(/\b(es )?(urgente|urgentemente|importante|cuanto antes|asap)\b/g, ' ')
-    .replace(/\b(con )?prioridad (alta|baja|media)\b/g, ' ')
+function stripPriority(t, cfg) {
+  let out = t
+  for (const [re, rep] of cfg.stripPrio) out = out.replace(re, rep)
+  return out
 }
 
-/** Interpretación por reglas. Devuelve un "intent" con la misma forma que Gemini. */
-export function parseWithRules(text, ctx) {
+/**
+ * Interpretación por reglas en UN idioma concreto. Devuelve un "intent" con la
+ * misma forma que devuelve Gemini, o { action: 'unknown' }.
+ */
+function parseInLang(text, ctx, lang) {
+  const cfg = REGLAS[lang]
   const raw = String(text ?? '').trim()
   const t = normalize(raw)
   if (!t) return { action: 'unknown' }
 
-  if (HELP_RE.test(t) && t.split(' ').length <= 3) return { action: 'help' }
+  if (cfg.help.test(t) && t.split(' ').length <= 3) return { action: 'help' }
 
-  // Respuesta corta a un recordatorio ("sí", "no", "hecho")
+  // Respuesta corta a un recordatorio ("sí", "no", "ja", "sim", "erledigt")
   if (t.split(' ').length <= 2) {
     const r = interpretReply(raw)
     if (r === 'done') return { action: 'reply_done' }
     if (r === 'not_done') return { action: 'reply_not_done' }
   }
 
-  if (CREATE_RE.test(t)) {
-    let rest = t.replace(CREATE_RE, '')
-    const priority = extractPriority(rest)
-    rest = stripPriority(rest)
-    const due = parseSpanishDate(rest, ctx.today)
+  if (cfg.create.test(t)) {
+    let rest = t.replace(cfg.create, '')
+    const priority = extractPriority(rest, cfg)
+    rest = stripPriority(rest, cfg)
+    const due = parseDateAnyLang(rest, ctx.today, lang)
     if (due) rest = rest.replace(due.match, ' ')
-    // "a Cristian: ..." / "para Cristian que ..." / "a Cristian de ..."
     let assignee = null
-    const m = rest.match(/^(?:a|para) ([a-z]+(?: [a-z]+)?)\s*(?::|,|-|que|de|para que)?\s*/)
+    const sepRe = new RegExp(`^${cfg.prep} ([a-z]+(?: [a-z]+)?)\\s*${cfg.sep}?\\s*`)
+    const m = rest.match(sepRe)
     if (m) {
       // prueba con dos palabras y con una (por si el nombre es "ana maria")
       const two = m[1]; const one = two.split(' ')[0]
       const tryTwo = matchUser(two, ctx.users, ctx.sender)
       const tryOne = matchUser(one, ctx.users, ctx.sender)
       if (tryTwo.user) { assignee = two; rest = rest.slice(m[0].length) }
-      else if (tryOne.user || one === 'mi') {
+      else {
         assignee = one
-        rest = rest.slice(rest.indexOf(one) + one.length).replace(/^\s*(?::|,|-|que|de|para que)?\s*/, '')
-      } else { assignee = one; rest = rest.slice(rest.indexOf(one) + one.length).replace(/^\s*(?::|,|-|que|de)?\s*/, '') }
+        rest = rest.slice(rest.indexOf(one) + one.length)
+          .replace(new RegExp(`^\\s*${cfg.sep}?\\s*`), '')
+      }
     } else {
-      // "... a Cristian" al final
-      const end = rest.match(/\b(?:a|para) ([a-z]+)\s*$/)
+      const endRe = new RegExp(`\\b${cfg.prep} ([a-z]+)\\s*$`)
+      const end = rest.match(endRe)
       if (end) {
         const r = matchUser(end[1], ctx.users, ctx.sender)
-        if (r.user || end[1] === 'mi') { assignee = end[1]; rest = rest.slice(0, end.index) }
+        if (r.user) { assignee = end[1]; rest = rest.slice(0, end.index) }
       }
     }
-    const title = restoreCase(cleanTitle(rest), raw)
+    const title = restoreCase(cleanTitle(rest, lang), raw)
     return { action: 'create_task', title, assignee, due: due?.key ?? null, priority, description: null }
   }
 
-  const done = t.match(DONE_RE)
-  if (done && !/\bno\b/.test(t.split(' ')[0])) {
-    const hint = (done[1] ?? '').replace(/^(la |el |de |tarea )+/, '').trim()
+  const done = t.match(cfg.done)
+  if (done && !/^(no|nein|nao)\b/.test(t)) {
+    // Recorta artículos y preposiciones de los tres idiomas al principio de
+    // la pista ("la de la caldera", "die von der Heizung", "a da caldeira").
+    const hint = (done[1] ?? '')
+      .replace(/^(la |el |lo |de |del |tarea |die |der |das |den |von |vom |aufgabe |a |o |da |do |das |dos |tarefa )+/, '')
+      .trim()
     if (!hint) return { action: 'reply_done' }
     return { action: 'complete_task', task_hint: hint }
   }
 
-  if (LIST_RE.test(t)) {
-    const who = t.match(/\b(?:tareas de|que tiene|pendientes de|abiertas de) ([a-z]+)/)
-    if (/\b(todos|equipo|todas|de todos)\b/.test(t)) return { action: 'list_tasks', who: 'equipo' }
+  if (cfg.list.test(t)) {
+    if (cfg.team.test(t)) return { action: 'list_tasks', who: 'equipo' }
+    const who = t.match(cfg.listWho)
     return { action: 'list_tasks', who: who ? who[1] : null }
   }
 
-  // Frase que pide algo a alguien sin decir "tarea": "necesito que Luis mire la caldera mañana"
-  const ask = t.match(/^(?:necesito|quiero|hay) que ([a-z]+) (.+)$/)
+  // Frase que pide algo a alguien sin decir "tarea":
+  // "necesito que Luis mire la caldera mañana" / "kannst du Luis die Heizung prüfen"
+  const ask = t.match(cfg.ask)
   if (ask) {
     const r = matchUser(ask[1], ctx.users, ctx.sender)
     if (r.user) {
       let rest = ask[2]
-      const priority = extractPriority(rest); rest = stripPriority(rest)
-      const due = parseSpanishDate(rest, ctx.today)
+      const priority = extractPriority(rest, cfg); rest = stripPriority(rest, cfg)
+      const due = parseDateAnyLang(rest, ctx.today, lang)
       if (due) rest = rest.replace(due.match, ' ')
-      return { action: 'create_task', title: restoreCase(cleanTitle(rest), raw), assignee: ask[1], due: due?.key ?? null, priority, description: null }
+      return {
+        action: 'create_task',
+        title: restoreCase(cleanTitle(rest, lang), raw),
+        assignee: ask[1],
+        due: due?.key ?? null,
+        priority,
+        description: null,
+      }
     }
+  }
+  return { action: 'unknown' }
+}
+
+/**
+ * Interpretación por reglas. Prueba el idioma de quien escribe y, si no
+ * entiende nada, los otros dos.
+ */
+export function parseWithRules(text, ctx) {
+  const preferido = REGLAS[ctx.lang] ? ctx.lang : 'es'
+  const orden = [preferido, ...Object.keys(REGLAS).filter((l) => l !== preferido)]
+  for (const lang of orden) {
+    const intent = parseInLang(text, ctx, lang)
+    if (intent.action !== 'unknown') return { ...intent, lang }
   }
   return { action: 'unknown' }
 }
@@ -157,19 +258,38 @@ const INFINITIVE = {
   dibuje: 'dibujar', dibujes: 'dibujar', imprima: 'imprimir', imprimas: 'imprimir',
 }
 
-function cleanTitle(s) {
-  let t = String(s ?? '')
-    .replace(/^[\s,;:.-]+/, '')
-    .replace(/^(?:que |de que |para que )+/, '')
-    .replace(/^(?:necesito|quiero|hace falta|tiene|tienes|hay) que (?:me |le |nos |te )?/, '')
-    .replace(/^(?:me |le |nos |te )+/, '')
-    .replace(/\s+(?:para|antes de|hasta|el|la|en|de|a|por|con)\s*$/, '')
+// Limpieza del título por idioma: quita muletillas del principio y
+// preposiciones sueltas al final. Solo el español pasa el verbo a infinitivo
+// (INFINITIVE); en alemán y portugués basta con la limpieza.
+const LIMPIEZA = {
+  es: {
+    inicio: [/^(?:que |de que |para que )+/, /^(?:necesito|quiero|hace falta|tiene|tienes|hay) que (?:me |le |nos |te )?/, /^(?:me |le |nos |te )+/],
+    final: /\s+(?:para|antes de|hasta|el|la|en|de|a|por|con)\s*$/,
+  },
+  de: {
+    inicio: [/^(?:dass |soll |zu )+/, /^(?:ich brauche|kannst du|bitte) /, /^(?:mir |ihm |uns |dir )+/],
+    final: /\s+(?:bis|am|der|die|das|in|von|zu|fur|mit)\s*$/,
+  },
+  pt: {
+    inicio: [/^(?:que |de que |para que )+/, /^(?:preciso|quero|e preciso) que (?:me |lhe |nos |te )?/, /^(?:me |lhe |nos |te )+/],
+    final: /\s+(?:para|antes de|ate|o|a|em|de|por|com)\s*$/,
+  },
+}
+
+function cleanTitle(s, lang = 'es') {
+  const cfg = LIMPIEZA[lang] ?? LIMPIEZA.es
+  let t = String(s ?? '').replace(/^[\s,;:.-]+/, '')
+  for (const re of cfg.inicio) t = t.replace(re, '')
+  t = t
+    .replace(cfg.final, '')
     .replace(/[\s,;:.-]+$/, '')
     .replace(/\s+/g, ' ')
     .trim()
-  const words = t.split(' ')
-  if (words[0] && INFINITIVE[words[0]]) words[0] = INFINITIVE[words[0]]
-  t = words.join(' ')
+  if (lang === 'es') {
+    const words = t.split(' ')
+    if (words[0] && INFINITIVE[words[0]]) words[0] = INFINITIVE[words[0]]
+    t = words.join(' ')
+  }
   return t
 }
 
