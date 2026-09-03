@@ -56,47 +56,33 @@ revinculó la sesión (Cris escaneó el QR). El asistente habla **español, alem
 y portugués**, aprende apodos y correcciones, y entiende plazos, estados,
 pasos y comentarios por mensaje.
 
-## 4. LO ÚNICO QUE FALTA: fotos entrantes por WhatsApp
+## 4. LO ÚNICO QUE FALTA: probar las fotos con una foto de verdad
 
-El almacenamiento de Amonn **ya está resuelto**: el contenedor tiene el volumen
-`/volume1/docker/data/uploads → /srv/uploads` y `UPLOAD_DIR` puesto
-(verificado: un fichero sobrevive a recrear el contenedor).
-`createAttachment()` en `server/src/comments.service.js` ya guarda ficheros.
-Lo que falta es **sacar los bytes de la foto del Gateway**.
+Las fotos entrantes **ya están programadas y probadas** (ver el HANDOFF, que
+tiene el detalle). Resumen de lo esencial:
 
-**Lo ya averiguado (no lo repitas):**
+- El Gateway **sí manda la foto**: entera, en base64, dentro del propio
+  mensaje, en `metadata.media.data`. No busques ficheros; la carpeta `media/`
+  está vacía y no importa.
+- Si el pie de foto dice la tarea, se pega ahí. Si no, se guarda igual y el
+  asistente pregunta a cuál va, con lista numerada.
 
-- El Gateway **no tiene ninguna ruta REST de descarga de medios**. La única
-  ruta con imágenes en `message.controller.js` es `POST send-image` (enviar).
-- Sus datos están en el volumen `openwa_openwa-data` → `/app/data`, con un
-  directorio `media/` que **está vacío (0 ficheros)**.
-- `STORAGE_TYPE` y `STORAGE_LOCAL_PATH` existen como variables del Gateway
-  pero **están sin definir**. Sospecha principal: no guarda medios por defecto.
-- En sus payloads de mensaje solo aparece `mimetype`. No hay `mediaUrl`,
-  `mediaId` ni `hasMedia`.
-- `better-sqlite3` NO está en `/app/node_modules` del Gateway; usa `sqlite3`.
+**Lo que falta es solo comprobarlo en vivo**, porque el código está probado
+contra la forma que guarda la base de datos, no contra el evento en directo:
 
-**Primer paso, y es el que lo decide todo:** pídele a Cris que **envíe una foto
-al número de Amonn (+41 76 226 04 47)** y captura el payload CRUDO del evento
-`message.received`. La forma rápida: una sonda con `socket.io-client` dentro de
-`amonn-server` que imprima el evento entero (el patrón está en la sección del
-tiempo real del HANDOFF), o un `console.log` temporal del payload en
-`server/src/realtime.js`.
+1. Despliega (`git push`; Watchtower lo aplica en ≤5 min).
+2. Pide a Cris una foto al +41 76 226 04 47, con y sin pie de foto.
+3. Mira que la foto aparece en la tarea dentro de la app.
+4. Si no aparece, busca esta línea en `docker logs amonn-server`:
+   `[wa] llega algo que parece foto pero sin datos; forma: ...`
+   Esa lista de claves dice dónde está realmente la imagen; añade esa ruta al
+   array `RUTAS` de `server/src/media.js` y listo.
 
-**Tres caminos según lo que veas**, de mejor a peor:
-
-1. La foto viene en el propio evento → llamar a `createAttachment()` y ya está;
-   todo lo demás existe.
-2. El Gateway la guarda en su volumen → montar `openwa_openwa-data` en
-   `amonn-server` **en solo lectura** y copiar el fichero (otro cambio de
-   compose de Amonn).
-3. No guarda nada → activar `STORAGE_TYPE`/`STORAGE_LOCAL_PATH` en el compose
-   del **Gateway** (`/volume1/docker/OpenWA-main/docker-compose.yml`) y
-   recrearlo. Ojo: eso es tocar el Gateway, no Amonn. **Pide permiso a Cris.**
-
-Cuando llegue la foto, engánchala como comentario de la tarea que corresponda
-(mira cómo lo hace `add_comment` en `server/src/inbound.js`) y decide con Cris
-a qué tarea se asocia si el mensaje no lo dice.
+⚠️ Cris trabaja a veces desde fuera de la oficina y entonces **el NAS no es
+alcanzable por SSH** (su casa y la oficina usan el mismo rango 192.168.1.x, así
+que ninguna VPN lo arregla). Sí puede entrar por el panel web del NAS. Si hace
+falta acceso remoto de verdad, lo que toca es **instalar Tailscale en el NAS**;
+Cris ya lo usa en sus otros equipos.
 
 ## 5. Pruebas
 

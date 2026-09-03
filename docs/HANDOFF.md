@@ -78,47 +78,60 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
-## Fotos entrantes por WhatsApp — NO HECHO, pero el terreno ya está explorado
+## Fotos entrantes por WhatsApp — IMPLEMENTADO, FALTA VERIFICAR EN VIVO
 
-Es lo único que falta del paso 5. El almacenamiento de Amonn ya está resuelto
-(ver arriba); lo que falta es sacar los bytes de la foto del Gateway.
+**El hallazgo que lo desbloqueó (2026-09-03):** el Gateway **sí guarda la
+foto**, pero NO como fichero: la mete entera, en base64, dentro del propio
+mensaje. En su base de datos (`/app/data/openwa.sqlite`, tabla `messages`) un
+mensaje de tipo `image` trae:
 
-**Lo averiguado (2026-09-03), para no repetir el camino:**
+```
+metadata.media.mimetype = "image/jpeg"
+metadata.media.data     = "/9j/4AAQSkZJRgABAQ..."   (714.564 caracteres)
+```
 
-- El Gateway **no tiene ninguna ruta REST de descarga de medios**. En
-  `/app/dist/modules/message/message.controller.js` la única ruta con media es
-  `POST send-image` (para enviar). Nada de `download`, `file` ni `media`.
-- Sus datos viven en un **volumen Docker con nombre**:
-  `openwa_openwa-data` → `/app/data` (origen real:
-  `/volume1/@docker/volumes/openwa_openwa-data/_data`). Dentro hay un
-  directorio `media/`, **pero está VACÍO (0 ficheros)**.
-- `STORAGE_TYPE` y `STORAGE_LOCAL_PATH` existen como variables del Gateway
-  pero **están sin definir**. Sospecha principal: el Gateway no guarda los
-  medios por defecto y hay que activarlo con esas variables.
-- En el código del Gateway el campo que aparece en los payloads de mensaje es
-  `mimetype` (26 apariciones en `modules/message` y `modules/events`). No se
-  vio ningún `mediaUrl`, `mediaId`, `hasMedia` ni similar.
-- `better-sqlite3` NO está en `/app/node_modules` (la sesión anterior usó
-  `sqlite3`); para mirar `openwa.sqlite` hay que usar ese.
+Verificado decodificando esos bytes: JPEG real de 2000x1500, 535.923 bytes.
 
-**El siguiente paso concreto, y es el más rápido:** que Cris envíe UNA foto al
-número de Amonn y capturar el payload crudo del evento `message.received`. Con
-eso se sabe de golpe si la foto viene incrustada (base64), por una referencia
-a fichero, o si no viene nada y hace falta configurar `STORAGE_TYPE`. Se puede
-capturar con una sonda de `socket.io-client` dentro de `amonn-server` (el
-patrón está en la sección del tiempo real de este mismo archivo) imprimiendo
-el evento entero, o añadiendo temporalmente un `console.log` del payload en
-`realtime.js`.
+Por eso las pistas anteriores despistaban, y **quedan invalidadas**: la carpeta
+`media/` está vacía y `STORAGE_TYPE`/`STORAGE_LOCAL_PATH` siguen sin definir,
+pero eso da igual — no hacen falta. No busques ficheros: la foto viaja dentro
+del mensaje.
 
-**Tres caminos posibles según lo que se vea**, de mejor a peor:
-1. La foto llega en el propio evento → guardarla con `createAttachment()` y
-   listo (todo lo demás ya está hecho).
-2. El Gateway la guarda en su volumen → montar `openwa_openwa-data` en
-   `amonn-server` **en solo lectura** y copiar el fichero. Requiere otro
-   cambio de compose.
-3. No guarda nada → activar `STORAGE_TYPE`/`STORAGE_LOCAL_PATH` en el compose
-   del Gateway (`/volume1/docker/OpenWA-main/docker-compose.yml`) y recrearlo.
-   Ojo: eso es tocar el Gateway, no Amonn.
+**Lo implementado** (`server/src/media.js` + enganches en `inbound.js`):
+
+- `extraerFoto(msg)` saca `{buffer, mime}` buscando en varias rutas posibles
+  (`metadata.media`, `media`, `data.media`, ...) porque el Gateway no
+  documenta la forma del evento en vivo. Acepta base64 pelado y `data:...`.
+- **`handleInbound` ya no descarta los mensajes sin texto.** Ese `return` era
+  la razón de fondo por la que una foto sin pie de foto no llegaba a ninguna
+  parte.
+- Si el pie de foto identifica la tarea, la foto se pega ahí y el pie queda
+  como comentario. Si no, **se guarda igualmente** en `uploads/pendientes/` y
+  el asistente pregunta a cuál va, reutilizando el flujo `which_task` (que ya
+  sabe de números, cancelar y caducidad); el campo nuevo del pending es
+  `foto_id`. Decisión acordada con Cris: nunca descartar una foto.
+- Textos nuevos en los tres idiomas (`photo_added`, `photo_which_task`,
+  `photo_no_tasks`, `photo_no_storage`, `photo_bad_type`, `photo_too_big`).
+- Pruebas en `server/test/fotos.test.mjs`, dentro de `npm run test:db`.
+
+**LO QUE FALTA: verificarlo con una foto real.** Todo lo anterior está probado
+contra la forma del mensaje que guarda la base de datos, pero **no se ha
+confirmado que el evento en vivo `message.received` traiga `metadata.media`**.
+Si no lo trajera, `extraerFoto` devuelve null y el registro escribe:
+
+```
+[wa] llega algo que parece foto pero sin datos; forma: <claves del mensaje>
+```
+
+Esa línea dice exactamente dónde mirar. Planes B, si hiciera falta: leer el
+mensaje de `openwa.sqlite` montando el volumen `openwa_openwa-data` en solo
+lectura, o pedir el mensaje al Gateway por su API.
+
+**Sonda de diagnóstico** (por si hay que volver a mirar el evento crudo):
+contenedor `amonn-wa-probe` en el NAS, script en `/home/Cris/wa-probe/probe.mjs`,
+salida en el volumen `amonn-wa-probe`. ⚠️ Debe resolver el sessionId real
+consultando `GET /api/sessions`: si se suscribe con `"auto"` literal, **el
+Gateway acusa la suscripción como correcta pero no envía ningún evento**.
 
 ## Comentarios y fotos — paso 5 HECHO (2026-09-03)
 

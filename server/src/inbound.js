@@ -25,7 +25,11 @@ import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
-import { createComment } from './comments.service.js'
+import { createComment, createAttachment, storageStatus } from './comments.service.js'
+import {
+  extraerFoto, pareceFoto, describirForma, motivoRechazo,
+  guardarPendiente, leerPendiente, borrarPendiente,
+} from './media.js'
 
 /**
  * Procesa un mensaje entrante. `msg` trae al menos { from, body } y
@@ -36,13 +40,23 @@ export async function handleInbound(msg) {
   if (msg.fromMe) return
   const from = msg.from ?? ''
   if (!from || msg.isGroup || String(from).endsWith('@g.us')) return // ignora grupos
-  const text = msg.body ?? msg.content ?? msg.text ?? ''
-  if (!text || typeof text !== 'string') return
+  const bruto = msg.body ?? msg.content ?? msg.text ?? ''
+  const text = typeof bruto === 'string' ? bruto : ''
+
+  // Una foto SIN pie de foto es un mensaje sin texto: antes se descartaba aquí
+  // mismo y se perdía. Ahora el mensaje sigue adelante si trae imagen.
+  const foto = extraerFoto(msg)
+  if (!foto && pareceFoto(msg)) {
+    // Parece una foto pero no encontramos los bytes. Dejamos constancia de la
+    // FORMA del mensaje (nunca su contenido) para saber dónde mirar.
+    console.warn(`[wa] llega algo que parece foto pero sin datos; forma: ${describirForma(msg).join(' ')}`)
+  }
+  if (!text && !foto) return
 
   const phone = chatIdToPhone(from)
   let reply
   try {
-    reply = await processMessage(phone, text)
+    reply = await processMessage(phone, text, { foto })
   } catch (err) {
     console.error('[asistente] error procesando el mensaje:', err.message)
     // Aún sin saber quién es, respondemos en el idioma que parezca.
@@ -251,6 +265,20 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
       await learn({ kind: 'task', phrase: pending.hint, keywords: keywordsDe(task), createdBy: user.id })
       extra = t(lang, 'learned_task', { pista: normalizePhrase(pending.hint) })
     }
+    // La pregunta pudo venir de una foto que no sabíamos dónde poner.
+    if (pending.foto_id) {
+      const guardada = leerPendiente(pending.foto_id)
+      if (!guardada) return t(lang, 'photo_no_storage', { motivo: 'la foto ya no está guardada' })
+      await createAttachment(elegida, {
+        buffer: guardada.buffer,
+        mime: guardada.mime,
+        filename: `whatsapp.${guardada.mime.split('/')[1] ?? 'jpg'}`,
+        userId: user.id,
+      })
+      borrarPendiente(pending.foto_id)
+      return t(lang, 'photo_added', { titulo: task?.title ?? '' }) + extra
+    }
+
     // La pregunta pudo venir de "márcala hecha" o de "ponla en X".
     if (pending.estado_id) {
       const estado = (await listStates()).find((e) => e.id === pending.estado_id)
@@ -350,7 +378,7 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
 
 // ─── Lógica principal ─────────────────────────────────────────
 /** Exportada para las pruebas: devuelve la respuesta sin enviarla. */
-export async function processMessage(phone, text) {
+export async function processMessage(phone, text, { foto = null } = {}) {
   const user = await findUserByPhone(phone)
   if (!user) {
     return t(detectLanguage(text) ?? 'es', 'unknown_user')
@@ -390,6 +418,13 @@ export async function processMessage(phone, text) {
     // procesando la frase con normalidad (p. ej. "la caldera es urgente").
   }
 
+  // 3.5) ¿Viene una foto? Se atiende aparte: una foto es una foto, no la
+  // respuesta a una pregunta que estuviera pendiente.
+  if (foto) {
+    const aliasesFoto = await loadAliases()
+    return manejarFoto(phone, user, lang, foto, text, aliasesFoto)
+  }
+
   // 4) ¿Estábamos a mitad de una conversación?
   const pending = await getPending(phone)
   if (pending?.caducada) {
@@ -404,6 +439,57 @@ export async function processMessage(phone, text) {
   }
 
   return procesarNuevo(phone, user, lang, text, users, today, aliases)
+}
+
+/**
+ * Una foto que llega por WhatsApp. Si el pie de foto dice a qué tarea va, se
+ * pega ahí; si no, se GUARDA IGUALMENTE y se pregunta. Nunca se descarta:
+ * una foto de obra perdida no se recupera.
+ */
+async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
+  const estado = storageStatus()
+  if (!estado.ok) return t(lang, 'photo_no_storage', { motivo: estado.reason })
+
+  const rechazo = motivoRechazo(foto)
+  if (rechazo === 'tipo') return t(lang, 'photo_bad_type')
+  if (rechazo === 'tamaño') return t(lang, 'photo_too_big')
+
+  const pista = String(texto ?? '').trim()
+  const openTasks = await openTasksFor(user.id)
+  let task = pickTaskByHint(pista, openTasks, aliases)
+  if (!task) task = pickTaskByHint(pista, await openTasksAll(), aliases)
+
+  const nombre = `whatsapp.${foto.mime.split('/')[1] ?? 'jpg'}`
+
+  if (task) {
+    let commentId = null
+    // El pie de foto, si lo hay, se queda como comentario junto a la imagen.
+    if (pista) {
+      const c = await createComment(task.id, { body: pista, userId: user.id, source: 'whatsapp' })
+      commentId = c.id
+    }
+    await createAttachment(task.id, {
+      buffer: foto.buffer, mime: foto.mime, filename: nombre, userId: user.id, commentId,
+    })
+    if (pista) void touch('task', pista)
+    return t(lang, 'photo_added', { titulo: task.title })
+  }
+
+  // No sabemos a qué tarea va: se guarda primero y se pregunta después.
+  const candidatas = (openTasks.length ? openTasks : await openTasksAll()).slice(0, 8)
+  if (candidatas.length === 0) return t(lang, 'photo_no_tasks')
+
+  const fotoId = guardarPendiente(foto.buffer, foto.mime)
+  if (!fotoId) return t(lang, 'photo_no_storage', { motivo: 'no hay dónde guardarla' })
+  await setPending(phone, user.id, {
+    esperando: 'which_task',
+    hint: pista,
+    ids: candidatas.map((x) => x.id),
+    foto_id: fotoId,
+  })
+  return t(lang, 'photo_which_task', {
+    lista: candidatas.map((x, i) => `${i + 1}. ${x.title}`).join('\n'),
+  })
 }
 
 async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {
