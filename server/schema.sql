@@ -57,3 +57,23 @@ create table if not exists wa_conversations (
 -- ¿El idioma se sigue detectando solo? Pasa a false en cuanto alguien lo
 -- elige a mano ("habla en alemán"), para no volver a pisárselo.
 alter table users add column if not exists language_auto boolean not null default true;
+
+-- Vocabulario del equipo: cómo llama la gente a las personas y a las tareas.
+--  kind='person' → phrase apunta a un usuario ("jasmi" → Jasmina)
+--  kind='task'   → phrase apunta a unas palabras clave ("la caldera" →
+--                  "caldera revision"), no a una tarea concreta: las tareas se
+--                  completan y se repiten, las palabras duran.
+-- Se llena solo cuando alguien corrige al asistente, y a mano ("jasmi es Jasmina").
+create table if not exists aliases (
+  id           uuid primary key default gen_random_uuid(),
+  kind         text not null check (kind in ('person', 'task')),
+  phrase       text not null,
+  user_id      uuid references users(id) on delete cascade,
+  keywords     text,
+  created_by   uuid references users(id) on delete set null,
+  hits         integer not null default 0,
+  last_used_at timestamptz,
+  created_at   timestamptz not null default now(),
+  unique (kind, phrase)
+);
+create index if not exists aliases_kind_phrase_idx on aliases (kind, phrase);

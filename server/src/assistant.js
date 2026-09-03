@@ -12,6 +12,7 @@
 import { config } from './config.js'
 import { normalize, parseDateAnyLang, todayKey, weekdayOf } from './dates.js'
 import { interpretReply } from './whatsapp.js'
+import { resolvePerson, resolveTask } from './aliases.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -20,10 +21,20 @@ const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'vi
  * Encuentra a una persona del equipo por cómo la nombran ("cristian",
  * "Cristian Amaya", "cris"). Devuelve { user } o { candidates } si hay dudas.
  */
-export function matchUser(nameText, users, sender) {
+export function matchUser(nameText, users, sender, aliases = []) {
   const q = normalize(nameText).replace(/[.,;:]/g, '').trim()
   if (!q) return { user: null, candidates: [] }
-  if (/^(mi|me|yo|a mi|para mi|mio)$/.test(q)) return { user: sender, candidates: [] }
+  // "para mí" en los tres idiomas.
+  if (/^(mi|me|yo|a mi|para mi|mio|ich|mir|mich|fur mich|eu|mim|para mim)$/.test(q)) {
+    return { user: sender, candidates: [] }
+  }
+  // El vocabulario del equipo manda sobre el parecido de nombres: si alguien
+  // enseñó que "jasmi" es Jasmina, no hay nada que adivinar.
+  const porAlias = resolvePerson(aliases, nameText)
+  if (porAlias) {
+    const u = users.find((x) => x.id === porAlias)
+    if (u) return { user: u, candidates: [], viaAlias: true }
+  }
   const scored = users
     .map((u) => {
       const full = normalize(u.full_name ?? '')
@@ -167,8 +178,8 @@ function parseInLang(text, ctx, lang) {
     if (m) {
       // prueba con dos palabras y con una (por si el nombre es "ana maria")
       const two = m[1]; const one = two.split(' ')[0]
-      const tryTwo = matchUser(two, ctx.users, ctx.sender)
-      const tryOne = matchUser(one, ctx.users, ctx.sender)
+      const tryTwo = matchUser(two, ctx.users, ctx.sender, ctx.aliases)
+      const tryOne = matchUser(one, ctx.users, ctx.sender, ctx.aliases)
       if (tryTwo.user) { assignee = two; rest = rest.slice(m[0].length) }
       else {
         assignee = one
@@ -179,7 +190,7 @@ function parseInLang(text, ctx, lang) {
       const endRe = new RegExp(`\\b${cfg.prep} ([a-z]+)\\s*$`)
       const end = rest.match(endRe)
       if (end) {
-        const r = matchUser(end[1], ctx.users, ctx.sender)
+        const r = matchUser(end[1], ctx.users, ctx.sender, ctx.aliases)
         if (r.user) { assignee = end[1]; rest = rest.slice(0, end.index) }
       }
     }
@@ -208,7 +219,7 @@ function parseInLang(text, ctx, lang) {
   // "necesito que Luis mire la caldera mañana" / "kannst du Luis die Heizung prüfen"
   const ask = t.match(cfg.ask)
   if (ask) {
-    const r = matchUser(ask[1], ctx.users, ctx.sender)
+    const r = matchUser(ask[1], ctx.users, ctx.sender, ctx.aliases)
     if (r.user) {
       let rest = ask[2]
       const priority = extractPriority(rest, cfg); rest = stripPriority(rest, cfg)
@@ -385,8 +396,13 @@ export async function interpret(text, ctx) {
 }
 
 /** Elige la tarea que mejor encaja con unas palabras clave. */
-export function pickTaskByHint(hint, tasks) {
-  const words = normalize(hint).split(' ').filter((w) => w.length >= 3 && !['tarea', 'del', 'los', 'las', 'con', 'para', 'que'].includes(w))
+export function pickTaskByHint(hint, tasks, aliases = []) {
+  // Si el equipo enseñó qué significa esa frase ("la caldera"), se buscan
+  // TAMBIÉN sus palabras clave, no solo las que se escribieron.
+  const extra = resolveTask(aliases, hint)
+  const texto = extra ? `${hint} ${extra}` : hint
+  const IGNORAR = ['tarea', 'del', 'los', 'las', 'con', 'para', 'que', 'die', 'der', 'das', 'von', 'aufgabe', 'tarefa', 'dos', 'das']
+  const words = normalize(texto).split(' ').filter((w) => w.length >= 3 && !IGNORAR.includes(w))
   if (words.length === 0 || tasks.length === 0) return null
   let best = null
   for (const t of tasks) {

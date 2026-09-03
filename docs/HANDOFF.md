@@ -78,6 +78,43 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Vocabulario del equipo — Entrega 2 HECHA (2026-09-03)
+
+- **`aliases` (tabla nueva) + `server/src/aliases.js`.** Dos tipos:
+  `person` ("jasmi" → Jasmina) y `task` ("la caldera" → las palabras que
+  identifican esa tarea). Los alias de tarea **no** apuntan a una tarea
+  concreta a propósito: las tareas se completan y se repiten cada mes, pero la
+  forma de nombrarlas dura.
+- **Aprende de las correcciones.** Antes, un nombre no reconocido abortaba la
+  creación ("no encuentro a X, así que no he creado la tarea"). Ahora
+  **pregunta** y guarda la respuesta: la siguiente vez "Chispas" ya es Isma.
+  Igual con las tareas: si no sabe cuál es "la de calefacción", enseña una
+  lista numerada y aprende de la elección.
+- **Enseñanza a mano:** "Jasmi es Jasmina" (también `ist` y `é`). Se exige que
+  la parte derecha sea una persona real y que ambas partes sean cortas, para
+  no confundir "la caldera es urgente" con una enseñanza.
+- **API** `GET/POST/DELETE /api/aliases`. **La pantalla para gestionarlo NO
+  está hecha a propósito**: entra con el rediseño, para no construirla dos veces.
+- ⚠️ **Detalle de seguridad de uso que descubrió una prueba:** si el asistente
+  preguntaba "¿cuál de estas?" y la persona escribía otra cosa, la coincidencia
+  floja podía **completar una tarea que nadie pidió**. Ahora solo acepta un
+  número o un texto que identifique UNA candidata sin ambigüedad; cualquier
+  otra cosa abandona la pregunta y se trata como mensaje nuevo.
+
+Pruebas: `npm run test:db` → 28 del diálogo + 16 del vocabulario.
+
+## Rediseño del tool — propuesta entregada (2026-09-03)
+
+Cris pidió un diseño desde cero. Se le entregaron **tres direcciones** en un
+lienzo (ordenador + móvil de cada una), pendientes de que elija:
+**A · Hoy primero** (agenda por urgencia, misma forma en las dos pantallas —
+recomendada), **B · Panel del taller** (denso, oscuro, escritorio primero,
+la mejor para "quién hace qué"), **C · Bandeja** (una línea por tarea, creación
+escribiendo `@persona /fecha !urgente`).
+Cris respondió que usan móvil y ordenador **por igual** y que le estorban las
+cuatro cosas: urgencia poco visible, crear tareas lento, no se ve quién hace
+qué, y el aspecto. **No empezar a construir hasta que elija dirección.**
+
 ## Hecho en esta sesión (2026-09-03)
 
 - Watchtower en `docker-compose.nas.yml` (+ fix `DOCKER_API_VERSION` porque el Docker de UGOS exige API ≥ 1.40).

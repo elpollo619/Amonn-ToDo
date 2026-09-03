@@ -109,6 +109,12 @@ const TEXTOS = {
       '• "¿Qué tengo abierto?"\n' +
       '• "Hecha la de la caldera"\n\n' +
       'Escribe "ayuda" para ver más ejemplos.',
+    teach_ok: 'Anotado: a partir de ahora «{frase}» es {nombre} 👍',
+    teach_unknown: 'No encuentro a "{nombre}" en el equipo, así que no lo anoto. Personas: {lista}.',
+    learned_person: '\n\n(Anotado: «{frase}» es {nombre}.)',
+    ask_which_task: 'No sé cuál es «{pista}». ¿Cuál de estas? Responde con el número:\n{lista}',
+    learned_task: '\n\n(Anotado: «{pista}» es esa.)',
+    not_a_number: 'Dime el número de la tarea, o «cancela».',
     reminder_wa: 'Hola {nombre} 👋\n\n¿Has completado esta tarea?\n\n{resumen}\n\nResponde SÍ si ya está hecha, o NO si sigue abierta.',
     reminder_mail: 'Hola {nombre},\n\nEsta tarea vence o está vencida:\n\n{resumen}\n\nCuando la termines, márcala como hecha en la app.{link}',
     subject_reminder: 'Recordatorio: {titulo}',
@@ -176,6 +182,12 @@ const TEXTOS = {
       '• "Was ist offen?"\n' +
       '• "Die Heizung ist erledigt"\n\n' +
       'Schreib "Hilfe" für mehr Beispiele.',
+    teach_ok: 'Notiert: «{frase}» ist ab jetzt {nombre} 👍',
+    teach_unknown: 'Ich finde "{nombre}" nicht im Team, also notiere ich es nicht. Personen: {lista}.',
+    learned_person: '\n\n(Notiert: «{frase}» ist {nombre}.)',
+    ask_which_task: 'Ich weiss nicht, welche «{pista}» ist. Welche davon? Antworte mit der Nummer:\n{lista}',
+    learned_task: '\n\n(Notiert: «{pista}» ist diese.)',
+    not_a_number: 'Sag mir die Nummer der Aufgabe, oder «abbrechen».',
     reminder_wa: 'Hallo {nombre} 👋\n\nHast du diese Aufgabe erledigt?\n\n{resumen}\n\nAntworte JA, wenn sie fertig ist, oder NEIN, wenn sie noch offen ist.',
     reminder_mail: 'Hallo {nombre},\n\nDiese Aufgabe ist fällig oder überfällig:\n\n{resumen}\n\nMarkiere sie in der App als erledigt, sobald du fertig bist.{link}',
     subject_reminder: 'Erinnerung: {titulo}',
@@ -243,6 +255,12 @@ const TEXTOS = {
       '• "O que tenho em aberto?"\n' +
       '• "Feita a da caldeira"\n\n' +
       'Escreve "ajuda" para veres mais exemplos.',
+    teach_ok: 'Anotado: a partir de agora «{frase}» é {nombre} 👍',
+    teach_unknown: 'Não encontro "{nombre}" na equipa, por isso não anoto. Pessoas: {lista}.',
+    learned_person: '\n\n(Anotado: «{frase}» é {nombre}.)',
+    ask_which_task: 'Não sei qual é «{pista}». Qual destas? Responde com o número:\n{lista}',
+    learned_task: '\n\n(Anotado: «{pista}» é essa.)',
+    not_a_number: 'Diz-me o número da tarefa, ou «cancela».',
     reminder_wa: 'Olá {nombre} 👋\n\nJá concluíste esta tarefa?\n\n{resumen}\n\nResponde SIM se já está feita, ou NÃO se continua em aberto.',
     reminder_mail: 'Olá {nombre},\n\nEsta tarefa vence ou está atrasada:\n\n{resumen}\n\nQuando a terminares, marca-a como feita na aplicação.{link}',
     subject_reminder: 'Lembrete: {titulo}',

@@ -10,6 +10,7 @@ import { requireAuth } from './auth.js'
 import { authRouter } from './routes/auth.js'
 import { tasksRouter } from './routes/tasks.js'
 import { profilesRouter } from './routes/profiles.js'
+import { aliasesRouter } from './routes/aliases.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
 import {
@@ -47,6 +48,7 @@ app.get('/api/version', (_req, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api/tasks', tasksRouter)
 app.use('/api/profiles', profilesRouter)
+app.use('/api/aliases', aliasesRouter)
 
 // OpenWA envía aquí las respuestas entrantes (webhook, sin auth de usuario).
 app.use('/api/whatsapp/webhook', webhookRouter)

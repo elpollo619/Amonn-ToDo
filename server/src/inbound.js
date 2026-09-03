@@ -22,6 +22,7 @@ import { firstName, taskSummary } from './notify.js'
 import { describeDue, parseDateAnyLang, saysNoDate, todayKey, normalize } from './dates.js'
 import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
 import { getPending, setPending, clearPending } from './conversations.js'
+import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 
 /**
  * Procesa un mensaje entrante. `msg` trae al menos { from, body } y
@@ -82,6 +83,30 @@ function listText(lang, titulo, tasks, today) {
 
 const nombres = (users) => users.map((u) => u.full_name).filter(Boolean).join(', ')
 
+// "jasmi es Jasmina" / "jasmi ist Jasmina" / "jasmi é a Jasmina".
+// Se exige que la parte izquierda sea corta y la derecha una persona real,
+// para no confundirlo con una frase normal ("la caldera es urgente").
+const ENSENAR_RE = /^(.{2,28}?)\s+(?:es|significa|ist|bedeutet|e|é)\s+(?:el |la |o |a |der |die |das )?(.{2,28})$/i
+
+/** ¿Es un intento de enseñar vocabulario? Devuelve {frase, nombre} o null. */
+function parseTeach(text) {
+  const m = String(text ?? '').trim().match(ENSENAR_RE)
+  if (!m) return null
+  const frase = m[1].trim()
+  const nombre = m[2].trim()
+  if (frase.split(/\s+/).length > 3 || nombre.split(/\s+/).length > 3) return null
+  return { frase, nombre }
+}
+
+/** Palabras que identifican una tarea, para recordar cómo la llama el equipo. */
+function keywordsDe(task) {
+  return normalize(`${task.title} ${task.description ?? ''}`)
+    .split(' ')
+    .filter((w) => w.length >= 4)
+    .slice(0, 4)
+    .join(' ')
+}
+
 // ─── Crear una tarea (con preguntas si falta algo) ─────────────
 /**
  * Decide el siguiente paso de un borrador de tarea: preguntar lo que falta,
@@ -95,7 +120,11 @@ async function avanzarBorrador(phone, user, lang, draft, users, today) {
   }
   if (!draft.assignee_id && !draft.sin_responsable) {
     await setPending(phone, user.id, { ...draft, esperando: 'who', preguntado: true })
-    return t(lang, 'ask_who', { titulo: draft.title })
+    // Si veníamos de un nombre que no reconocimos, se dice: es más claro que
+    // preguntar en seco, y avisa de que hay un apodo por aprender.
+    return draft.nombre_no_reconocido
+      ? t(lang, 'ask_person_again', { nombre: draft.nombre_no_reconocido, lista: nombres(users) })
+      : t(lang, 'ask_who', { titulo: draft.title })
   }
   if (draft.due === undefined) {
     await setPending(phone, user.id, { ...draft, esperando: 'when', preguntado: true })
@@ -141,12 +170,15 @@ async function crearTarea(user, lang, draft, users, today) {
       : t(lang, 'not_notified', { nombre: firstName(assignee) })
   }
   const link = config.appUrl ? t(lang, 'see_link', { url: config.appUrl }) : ''
-  return t(lang, 'created', { para, resumen: taskSummary(task, lang) }) + nota + link
+  const aprendido = draft.aprendido
+    ? t(lang, 'learned_person', { frase: draft.aprendido.frase, nombre: draft.aprendido.nombre })
+    : ''
+  return t(lang, 'created', { para, resumen: taskSummary(task, lang) }) + nota + link + aprendido
 }
 
 /** Convierte lo que dijo la persona sobre "para quién" en un id de usuario. */
-function resolverPersona(texto, users, sender, lang) {
-  const m = matchUser(texto, users, sender)
+function resolverPersona(texto, users, sender, lang, aliases = []) {
+  const m = matchUser(texto, users, sender, aliases)
   if (m.candidates.length > 1) {
     return { error: t(lang, 'person_ambiguous', { nombre: texto, lista: nombres(m.candidates) }) }
   }
@@ -155,12 +187,51 @@ function resolverPersona(texto, users, sender, lang) {
 }
 
 // ─── Continuar una conversación a medias ──────────────────────
-async function continuarPendiente(phone, user, lang, pending, texto, users, today) {
+async function continuarPendiente(phone, user, lang, pending, texto, users, today, aliases = []) {
   const t0 = normalize(texto)
   // Cancelar en cualquier momento.
   if (/^(cancela|cancelar|olvidalo|dejalo|abbrechen|vergiss es|cancel|esquece)\b/.test(t0)) {
     await clearPending(phone)
     return t(lang, 'cancelled')
+  }
+
+  // "¿Cuál de estas?" tras no saber a qué tarea se refería. No es un
+  // borrador de tarea, así que se resuelve aparte.
+  if (pending.esperando === 'which_task') {
+    const todas = await openTasksAll()
+    const candidatas = todas.filter((x) => (pending.ids ?? []).includes(x.id))
+    // Solo se acepta un número, o un texto que identifique UNA sola candidata
+    // sin ambigüedad. Una coincidencia floja no vale: completar la tarea
+    // equivocada porque alguien ignoró la pregunta y escribió otra cosa es
+    // mucho peor que volver a preguntar.
+    const soloDigitos = /^\s*\d{1,2}\s*$/.test(t0)
+    const n = soloDigitos ? Number.parseInt(t0.trim(), 10) : NaN
+    let elegida = n >= 1 && n <= (pending.ids ?? []).length ? pending.ids[n - 1] : null
+    if (!elegida) {
+      const palabras = t0.split(' ').filter((w) => w.length >= 4)
+      const exactas = palabras.length
+        ? candidatas.filter((c) => {
+            const titulo = normalize(`${c.title} ${c.description ?? ''}`)
+            return palabras.every((w) => titulo.includes(w))
+          })
+        : []
+      if (exactas.length === 1) elegida = exactas[0].id
+    }
+    if (!elegida) {
+      // Ni número ni coincidencia clara: se abandona la pregunta y el mensaje
+      // se trata como uno nuevo, en lugar de secuestrarlo.
+      await clearPending(phone)
+      return null
+    }
+    await clearPending(phone)
+    const task = candidatas.find((x) => x.id === elegida)
+    await completeTask(elegida)
+    let extra = ''
+    if (pending.hint && task) {
+      await learn({ kind: 'task', phrase: pending.hint, keywords: keywordsDe(task), createdBy: user.id })
+      extra = t(lang, 'learned_task', { pista: normalizePhrase(pending.hint) })
+    }
+    return t(lang, 'completed', { titulo: task?.title ?? '' }) + extra
   }
 
   const draft = { ...pending }
@@ -172,7 +243,7 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
       break
 
     case 'who': {
-      const r = resolverPersona(texto, users, user, lang)
+      const r = resolverPersona(texto, users, user, lang, aliases)
       if (r.error) return r.error
       if (r.noEncontrada) {
         // Se puede dejar sin responsable diciéndolo explícitamente.
@@ -184,6 +255,18 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
         return t(lang, 'ask_person_again', { nombre: texto.trim(), lista: nombres(users) })
       }
       draft.assignee_id = r.user.id
+      // Aprender de la corrección: si preguntamos porque no reconocimos un
+      // nombre ("jasmi") y ahora sí sabemos a quién se refiere, se anota.
+      if (draft.nombre_no_reconocido) {
+        await learn({
+          kind: 'person',
+          phrase: draft.nombre_no_reconocido,
+          userId: r.user.id,
+          createdBy: user.id,
+        })
+        draft.aprendido = { frase: normalizePhrase(draft.nombre_no_reconocido), nombre: firstName(r.user) }
+        delete draft.nombre_no_reconocido
+      }
       break
     }
 
@@ -242,26 +325,39 @@ export async function processMessage(phone, text) {
   }
 
   const users = await listUsers()
+  const aliases = await loadAliases()
 
-  // 3) ¿Estábamos a mitad de una conversación?
+  // 3) ¿Está enseñando vocabulario? ("jasmi es Jasmina")
+  const ensenanza = parseTeach(text)
+  if (ensenanza) {
+    const r = resolverPersona(ensenanza.nombre, users, user, lang, aliases)
+    if (r.user) {
+      await learn({ kind: 'person', phrase: ensenanza.frase, userId: r.user.id, createdBy: user.id })
+      return t(lang, 'teach_ok', { frase: normalizePhrase(ensenanza.frase), nombre: firstName(r.user) })
+    }
+    // Si la parte derecha no es una persona, NO era una enseñanza: seguimos
+    // procesando la frase con normalidad (p. ej. "la caldera es urgente").
+  }
+
+  // 4) ¿Estábamos a mitad de una conversación?
   const pending = await getPending(phone)
   if (pending?.caducada) {
     // Se le avisa y se procesa el mensaje nuevo con normalidad.
     const aviso = t(lang, 'cancelled_timeout')
-    const resto = await procesarNuevo(phone, user, lang, text, users, today)
+    const resto = await procesarNuevo(phone, user, lang, text, users, today, aliases)
     return `${aviso}\n\n${resto}`
   }
   if (pending) {
-    const r = await continuarPendiente(phone, user, lang, pending, text, users, today)
+    const r = await continuarPendiente(phone, user, lang, pending, text, users, today, aliases)
     if (r !== null) return r
   }
 
-  return procesarNuevo(phone, user, lang, text, users, today)
+  return procesarNuevo(phone, user, lang, text, users, today, aliases)
 }
 
-async function procesarNuevo(phone, user, lang, text, users, today) {
+async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {
   const openTasks = await openTasksFor(user.id)
-  const intent = await interpret(text, { sender: user, users, openTasks, lang, today })
+  const intent = await interpret(text, { sender: user, users, openTasks, lang, today, aliases })
 
   switch (intent.action) {
     case 'help':
@@ -273,7 +369,7 @@ async function procesarNuevo(phone, user, lang, text, users, today) {
         return listText(lang, t(lang, 'title_team_tasks'), await openTasksAll(), today)
       }
       if (who && !/^(yo|mi|mias|ich|mir|meine|eu|mim|minhas)$/i.test(who)) {
-        const m = matchUser(who, users, user)
+        const m = matchUser(who, users, user, aliases)
         if (!m.user) return t(lang, 'person_not_found', { nombre: who, lista: nombres(users) })
         return listText(
           lang,
@@ -295,25 +391,44 @@ async function procesarNuevo(phone, user, lang, text, users, today) {
       }
       const nombre = (intent.assignee ?? '').toString().trim()
       if (nombre) {
-        const r = resolverPersona(nombre, users, user, lang)
+        const r = resolverPersona(nombre, users, user, lang, aliases)
         if (r.error) return r.error
         if (r.noEncontrada) {
-          return t(lang, 'person_not_found_create', { nombre, lista: nombres(users) })
+          // Antes se abandonaba la tarea aquí. Ahora se pregunta y la
+          // respuesta se guarda en el vocabulario: así el asistente aprende
+          // los apodos del equipo en lugar de tropezar siempre con ellos.
+          draft.nombre_no_reconocido = nombre
+        } else {
+          draft.assignee_id = r.user.id
+          if (r.user && normalizePhrase(nombre) !== normalizePhrase(firstName(r.user))) {
+            void touch('person', nombre)
+          }
         }
-        draft.assignee_id = r.user.id
       }
       return avanzarBorrador(phone, user, lang, draft, users, today)
     }
 
     case 'complete_task': {
       const hint = String(intent.task_hint ?? '').trim()
-      let task = pickTaskByHint(hint, openTasks)
-      if (!task) task = pickTaskByHint(hint, await openTasksAll())
-      if (!task) {
-        return `${t(lang, 'complete_not_found', { pista: hint })}\n\n${listText(lang, t(lang, 'title_my_tasks'), openTasks, today)}`
+      let task = pickTaskByHint(hint, openTasks, aliases)
+      if (!task) task = pickTaskByHint(hint, await openTasksAll(), aliases)
+      if (task) {
+        await completeTask(task.id)
+        void touch('task', hint)
+        return t(lang, 'completed', { titulo: task.title })
       }
-      await completeTask(task.id)
-      return t(lang, 'completed', { titulo: task.title })
+      // No sabemos cuál es. Antes se volcaba la lista entera y ahí acababa
+      // todo; ahora se pregunta con números y la respuesta se aprende, así
+      // que "la caldera" funcionará la próxima vez.
+      const candidatas = (openTasks.length ? openTasks : await openTasksAll()).slice(0, 8)
+      if (candidatas.length === 0) return t(lang, 'no_open_tasks', { nombre: firstName(user) })
+      await setPending(phone, user.id, {
+        esperando: 'which_task',
+        hint,
+        ids: candidatas.map((x) => x.id),
+      })
+      const lista = candidatas.map((x, i) => `${i + 1}. ${x.title}`).join('\n')
+      return t(lang, 'ask_which_task', { pista: hint, lista })
     }
 
     case 'reply_done':
