@@ -86,3 +86,42 @@ create index if not exists aliases_kind_phrase_idx on aliases (kind, phrase);
 alter table tasks add column if not exists start_date date;
 alter table tasks add column if not exists work_days  numeric(4,1);
 create index if not exists tasks_start_idx on tasks(start_date);
+
+-- ─── Estados propios del taller (paso 2 del rediseño) ─────────────────
+-- Cada equipo define sus estados ("Esperando material", "Pendiente de
+-- cliente", "Por facturar") en vez de conformarse con tres.
+--
+-- `kind` es la CLASE del estado y es lo que mantiene compatible todo lo que
+-- ya existía: el asistente de WhatsApp, los recordatorios y las consultas
+-- siguen preguntando por tasks.status ('open' | 'in_progress' | 'done'), y el
+-- servidor lo mantiene sincronizado con el estado elegido. Así no hay dos
+-- fuentes de verdad ni hubo que reescribir media aplicación.
+create table if not exists task_states (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  kind       text not null check (kind in ('open', 'in_progress', 'done')),
+  color      text not null default 'slate',
+  position   integer not null default 0,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists task_states_name_idx on task_states (lower(name));
+
+alter table tasks add column if not exists state_id uuid references task_states(id) on delete set null;
+create index if not exists tasks_state_idx on tasks(state_id);
+
+-- Los tres de siempre, para que nada empiece vacío. is_default marca a cuál
+-- van las tareas si se borra un estado de esa misma clase.
+insert into task_states (name, kind, color, position, is_default)
+  select * from (values
+    ('Abierta',   'open',        'slate', 0, true),
+    ('En curso',  'in_progress', 'blue',  1, true),
+    ('Hecha',     'done',        'green', 2, true)
+  ) as v(name, kind, color, position, is_default)
+  where not exists (select 1 from task_states);
+
+-- Las tareas que ya existían se enganchan al estado por defecto de su clase.
+update tasks t
+   set state_id = s.id
+  from task_states s
+ where t.state_id is null and s.is_default and s.kind = t.status;

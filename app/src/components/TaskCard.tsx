@@ -39,6 +39,12 @@ export function TaskCard({ task, onOpen }: { task: Task; onOpen: (task: Task) =>
             <span className="truncate">{firstName}</span>
           </span>
           <PriorityBadge priority={task.priority} />
+          {/* El estado propio del equipo, si no es uno de los de serie. */}
+          {task.state_name && !task.state_is_default && (
+            <span className={`chip-estado-min color-${task.state_color ?? 'slate'}`}>
+              {task.state_name}
+            </span>
+          )}
           {due && (
             <span
               className={

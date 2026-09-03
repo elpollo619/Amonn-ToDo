@@ -9,11 +9,12 @@ import {
 import * as api from '../lib/api'
 import { subscribeTasks } from '../lib/api'
 import { useAuth } from './AuthContext'
-import type { Profile, Task, TaskInput } from '../lib/types'
+import type { Profile, Task, TaskInput, TaskState } from '../lib/types'
 
 interface DataState {
   tasks: Task[]
   profiles: Profile[]
+  states: TaskState[]
   loading: boolean
   error: string | null
   reload: () => Promise<void>
@@ -29,15 +30,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
+  const [states, setStates] = useState<TaskState[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     try {
       setError(null)
-      const [t, p] = await Promise.all([api.listTasks(), api.listProfiles()])
+      const [t, p, e] = await Promise.all([api.listTasks(), api.listProfiles(), api.listStates()])
       setTasks(t)
       setProfiles(p)
+      setStates(e)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar datos')
     } finally {
@@ -54,6 +57,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const value: DataState = {
     tasks,
     profiles,
+    states,
     loading,
     error,
     reload,

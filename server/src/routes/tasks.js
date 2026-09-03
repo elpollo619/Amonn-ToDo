@@ -3,6 +3,7 @@ import { query } from '../db.js'
 import { requireAuth } from '../auth.js'
 import { broadcast } from '../events.js'
 import { createTask, getUser, STATUSES, PRIORITIES } from '../tasks.service.js'
+import { resolveState } from '../states.service.js'
 import { notifyTaskAssigned } from '../notify.js'
 
 export const tasksRouter = asyncRouter()
@@ -10,7 +11,14 @@ tasksRouter.use(requireAuth)
 
 // Listar todas las tareas del equipo.
 tasksRouter.get('/', async (_req, res) => {
-  const { rows } = await query('select * from tasks order by created_at desc')
+  // Se devuelve también el estado (nombre y color) para que la app pueda
+  // pintarlo sin una segunda consulta por tarea.
+  const { rows } = await query(
+    `select t.*, s.name as state_name, s.color as state_color,
+            s.kind as state_kind, s.is_default as state_is_default
+       from tasks t left join task_states s on s.id = t.state_id
+      order by t.created_at desc`,
+  )
   res.json(rows)
 })
 
@@ -44,9 +52,14 @@ tasksRouter.patch('/:id', async (req, res) => {
   if (b.due_date !== undefined) set('due_date', b.due_date || null)
   if (b.start_date !== undefined) set('start_date', b.start_date || null)
   if (b.work_days !== undefined) set('work_days', b.work_days === null ? null : Number(b.work_days))
-  if (b.status !== undefined && STATUSES.includes(b.status)) {
-    set('status', b.status)
-    set('completed_at', b.status === 'done' ? new Date().toISOString() : null)
+  // Estado y status van SIEMPRE juntos: si llega uno, se calcula el otro. Es
+  // lo que impide que una tarea quede "Hecha" en el tablero pero abierta para
+  // el asistente, o al revés.
+  if (b.state_id !== undefined || (b.status !== undefined && STATUSES.includes(b.status))) {
+    const resuelto = await resolveState({ state_id: b.state_id, status: b.status })
+    set('state_id', resuelto.state_id)
+    set('status', resuelto.status)
+    set('completed_at', resuelto.status === 'done' ? new Date().toISOString() : null)
   }
   if (b.last_reminder_at !== undefined) set('last_reminder_at', b.last_reminder_at)
 

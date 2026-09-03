@@ -3,21 +3,20 @@ import { useSearchParams } from 'react-router-dom'
 import { useData } from '../context/DataContext'
 import { TaskCard } from '../components/TaskCard'
 import { TaskModal } from '../components/TaskModal'
+import { StatesModal } from '../components/StatesModal'
 import { IconPlus, IconSearch, IconTasks, IconX } from '../components/Icons'
-import { STATUS_LABELS, STATUS_ORDER } from '../lib/constants'
 import { todayKey } from '../lib/dates'
 import type { Task, TaskStatus } from '../lib/types'
 import './Board.css'
 
-const TAB_LABELS: Record<TaskStatus, string> = { open: 'Abiertas', in_progress: 'En curso', done: 'Hechas' }
-
 export function Board() {
-  const { tasks, profiles, loading, profileById } = useData()
+  const { tasks, profiles, states, loading, profileById } = useData()
   const [params, setParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<TaskStatus>('open')
+  const [tab, setTab] = useState<string>('')
+  const [editandoEstados, setEditandoEstados] = useState(false)
   const filterAssignee = params.get('persona') ?? ''
 
   function setFilterAssignee(id: string) {
@@ -37,19 +36,30 @@ export function Board() {
     })
   }, [tasks, filterAssignee, search])
 
-  const byStatus = useMemo(() => {
-    const groups: Record<TaskStatus, Task[]> = { open: [], in_progress: [], done: [] }
+  // Las columnas ya no son los tres estados fijos: son los que el equipo haya
+  // definido. Una tarea sin estado (creada antes de esta función) cae en el
+  // estado por defecto de su clase, así que nunca desaparece del tablero.
+  const columnas = useMemo(() => {
+    if (states.length === 0) return []
+    const porDefecto = (kind: TaskStatus) =>
+      states.find((e) => e.kind === kind && e.is_default) ?? states.find((e) => e.kind === kind)
+    const grupos = new Map<string, Task[]>(states.map((e) => [e.id, []]))
     const rank = { high: 0, medium: 1, low: 2 }
-    for (const t of filtered) groups[t.status].push(t)
-    for (const key of STATUS_ORDER) {
-      groups[key].sort((a, b) => {
+    for (const t of filtered) {
+      const destino = (t.state_id && grupos.has(t.state_id) ? t.state_id : porDefecto(t.status)?.id) ?? null
+      if (destino) grupos.get(destino)!.push(t)
+    }
+    for (const lista of grupos.values()) {
+      lista.sort((a, b) => {
         const r = rank[a.priority] - rank[b.priority]
         if (r !== 0) return r
         return (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
       })
     }
-    return groups
-  }, [filtered])
+    return states.map((estado) => ({ estado, tareas: grupos.get(estado.id) ?? [] }))
+  }, [filtered, states])
+
+  const tabActiva = tab || columnas[0]?.estado.id || ''
 
   const stats = useMemo(() => {
     const today = todayKey()
@@ -105,6 +115,9 @@ export function Board() {
             <option key={p.id} value={p.id}>{p.full_name}</option>
           ))}
         </select>
+        <button className="btn btn-ghost btn-sm" onClick={() => setEditandoEstados(true)}>
+          Editar estados
+        </button>
       </div>
 
       {filteredPerson && (
@@ -115,17 +128,18 @@ export function Board() {
       )}
 
       <div className="segmented mobile-only board-tabs">
-        {STATUS_ORDER.map((s) => (
-          <button key={s} className={tab === s ? 'active' : ''} onClick={() => setTab(s)}>
-            {TAB_LABELS[s]} <span className="count">{byStatus[s].length}</span>
+        {columnas.map(({ estado, tareas }) => (
+          <button key={estado.id} className={tabActiva === estado.id ? 'active' : ''}
+            onClick={() => setTab(estado.id)}>
+            {estado.name} <span className="count">{tareas.length}</span>
           </button>
         ))}
       </div>
 
       {loading ? (
         <div className="board">
-          {STATUS_ORDER.map((s) => (
-            <div className={'column' + (tab === s ? ' is-active' : '')} key={s}>
+          {[0, 1, 2].map((i) => (
+            <div className={'column' + (i === 0 ? ' is-active' : '')} key={i}>
               <div className="skeleton" style={{ height: 88, marginBottom: 10 }} />
               <div className="skeleton" style={{ height: 88 }} />
             </div>
@@ -140,20 +154,18 @@ export function Board() {
         </div>
       ) : (
         <div className="board">
-          {STATUS_ORDER.map((status) => (
-            <section className={'column' + (tab === status ? ' is-active' : '')} key={status}>
+          {columnas.map(({ estado, tareas }) => (
+            <section className={'column' + (tabActiva === estado.id ? ' is-active' : '')} key={estado.id}>
               <div className="column-head">
-                <span className={`chip ${status === 'open' ? 'chip-open' : status === 'in_progress' ? 'chip-progress' : 'chip-done'}`}>
-                  {STATUS_LABELS[status]}
-                </span>
-                <span className="column-count">{byStatus[status].length}</span>
+                <span className={`chip chip-estado color-${estado.color}`}>{estado.name}</span>
+                <span className="column-count">{tareas.length}</span>
               </div>
-              {byStatus[status].length === 0 ? (
+              {tareas.length === 0 ? (
                 <div className="col-empty">
                   {search || filterAssignee ? 'Nada que coincida con el filtro.' : 'Sin tareas aquí.'}
                 </div>
               ) : (
-                byStatus[status].map((t) => <TaskCard key={t.id} task={t} onOpen={openEdit} />)
+                tareas.map((t) => <TaskCard key={t.id} task={t} onOpen={openEdit} />)
               )}
             </section>
           ))}
@@ -163,6 +175,7 @@ export function Board() {
       <button className="fab" onClick={openNew} aria-label="Nueva tarea"><IconPlus size={26} /></button>
 
       {modalOpen && <TaskModal task={editingTask} onClose={() => setModalOpen(false)} />}
+      {editandoEstados && <StatesModal onClose={() => setEditandoEstados(false)} />}
     </>
   )
 }

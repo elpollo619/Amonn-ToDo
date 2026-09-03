@@ -1,4 +1,4 @@
-import type { Profile, Task } from './types'
+import type { Profile, Task, TaskState } from './types'
 
 /**
  * Modo demo: guarda todo en el navegador (localStorage) con datos de ejemplo.
@@ -9,6 +9,7 @@ import type { Profile, Task } from './types'
 const PROFILES_KEY = 'amonn.demo.profiles'
 const TASKS_KEY = 'amonn.demo.tasks'
 const SESSION_KEY = 'amonn.demo.session'
+const STATES_KEY = 'amonn.demo.states'
 
 // Identificador único. No depende de crypto.randomUUID (que solo existe en
 // contexto seguro: https o localhost); usa getRandomValues como respaldo, que
@@ -129,12 +130,26 @@ function write<T>(key: string, value: T): void {
   }
 }
 
+// Los tres de serie, igual que en el servidor.
+const seedStates: TaskState[] = [
+  { id: 'st-open', name: 'Abierta', kind: 'open', color: 'slate', position: 0, is_default: true },
+  { id: 'st-doing', name: 'En curso', kind: 'in_progress', color: 'blue', position: 1, is_default: true },
+  { id: 'st-done', name: 'Hecha', kind: 'done', color: 'green', position: 2, is_default: true },
+]
+
 export function ensureSeed(): void {
   if (!localStorage.getItem(PROFILES_KEY)) write(PROFILES_KEY, seedProfiles)
   if (!localStorage.getItem(TASKS_KEY)) write(TASKS_KEY, seedTasks())
+  if (!localStorage.getItem(STATES_KEY)) write(STATES_KEY, seedStates)
 }
 
 export const demoStore = {
+  getStates(): TaskState[] {
+    return read<TaskState[]>(STATES_KEY, seedStates)
+  },
+  saveStates(list: TaskState[]): void {
+    write(STATES_KEY, list)
+  },
   getProfiles(): Profile[] {
     return read<Profile[]>(PROFILES_KEY, seedProfiles)
   },

@@ -8,8 +8,18 @@
 }
 .board-tabs { margin-bottom: 14px; }
 
-.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
-.column { background: var(--surface-2); border-radius: var(--radius); padding: 10px; min-height: 90px; }
+/* Con estados libres el tablero puede tener cualquier número de columnas, así
+   que ya no es una rejilla de tres: es una fila que se desplaza a lo lado,
+   como cualquier tablero. Antes, la cuarta columna caía debajo. */
+.board {
+  display: flex; gap: 16px; align-items: flex-start;
+  overflow-x: auto; padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+.column {
+  background: var(--surface-2); border-radius: var(--radius); padding: 10px;
+  min-height: 90px; flex: 0 0 300px; scroll-snap-align: start;
+}
 .column-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 10px; }
 .column-count {
   background: var(--surface); border: 1px solid var(--border); border-radius: 999px;

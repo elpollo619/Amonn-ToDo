@@ -1,6 +1,6 @@
 import { apiFetch, eventsUrl, isDemo } from './apiClient'
 import { demoStore } from './demo'
-import type { Profile, Task, TaskInput } from './types'
+import type { Profile, Task, TaskInput, TaskState, TaskStatus } from './types'
 
 /**
  * API unificada. Habla con el backend del NAS cuando está disponible, o con el
@@ -73,6 +73,69 @@ export async function deleteTask(id: string): Promise<void> {
     return
   }
   demoStore.saveTasks(demoStore.getTasks().filter((t) => t.id !== id))
+}
+
+// ─── Estados de las tareas ───────────────────────────────────────────
+
+export async function listStates(): Promise<TaskState[]> {
+  if (isDemo) return demoStore.getStates()
+  const r = await apiFetch<{ states: TaskState[] }>('/states')
+  return r.states
+}
+
+export async function createState(input: { name: string; kind: TaskStatus; color?: string }): Promise<TaskState> {
+  if (!isDemo) {
+    return apiFetch<TaskState>('/states', { method: 'POST', body: JSON.stringify(input) })
+  }
+  const lista = demoStore.getStates()
+  const estado: TaskState = {
+    id: demoStore.uid(),
+    name: input.name.trim(),
+    kind: input.kind,
+    color: input.color ?? 'slate',
+    position: lista.length,
+    is_default: false,
+  }
+  demoStore.saveStates([...lista, estado])
+  return estado
+}
+
+export async function updateState(id: string, patch: Partial<TaskState>): Promise<TaskState> {
+  if (!isDemo) {
+    return apiFetch<TaskState>(`/states/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  }
+  const lista = demoStore.getStates()
+  const i = lista.findIndex((e) => e.id === id)
+  if (i === -1) throw new Error('Ese estado no existe')
+  lista[i] = { ...lista[i], ...patch }
+  demoStore.saveStates(lista)
+  return lista[i]
+}
+
+export async function deleteState(id: string): Promise<void> {
+  if (!isDemo) {
+    await apiFetch(`/states/${id}`, { method: 'DELETE' })
+    return
+  }
+  const lista = demoStore.getStates()
+  const estado = lista.find((e) => e.id === id)
+  if (!estado) return
+  const hermano = lista.find((e) => e.kind === estado.kind && e.id !== id)
+  if (!hermano) throw new Error('No puedes borrar el último estado de ese tipo')
+  demoStore.saveTasks(
+    demoStore.getTasks().map((t) => (t.state_id === id ? { ...t, state_id: hermano.id } : t)),
+  )
+  demoStore.saveStates(lista.filter((e) => e.id !== id))
+}
+
+export async function reorderStates(ids: string[]): Promise<TaskState[]> {
+  if (!isDemo) {
+    return apiFetch<TaskState[]>('/states/reorder', { method: 'POST', body: JSON.stringify({ ids }) })
+  }
+  const lista = demoStore.getStates()
+  const ordenada = ids.map((id, pos) => ({ ...lista.find((e) => e.id === id)!, position: pos }))
+  demoStore.saveStates(ordenada)
+  return ordenada
 }
 
 // ─── Personas / equipo ───────────────────────────────────────────────

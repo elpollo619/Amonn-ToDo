@@ -18,6 +18,17 @@ export interface Profile {
   language_auto?: boolean
 }
 
+/** Estado de una tarea, definido por el equipo (las columnas del tablero). */
+export interface TaskState {
+  id: string
+  name: string
+  /** Clase del estado: es lo que mantiene compatible el resto del sistema. */
+  kind: TaskStatus
+  color: string
+  position: number
+  is_default: boolean
+}
+
 export interface Task {
   id: string
   title: string
@@ -32,6 +43,11 @@ export interface Task {
   start_date?: string | null
   /** Días de trabajo que lleva. Es lo que mide la carga real del equipo. */
   work_days?: number | string | null
+  /** Estado elegido por el equipo. */
+  state_id?: string | null
+  state_name?: string | null
+  state_color?: string | null
+  state_is_default?: boolean | null
   completed_at: string | null
   last_reminder_at: string | null
   created_at: string
@@ -47,4 +63,5 @@ export interface TaskInput {
   due_date?: string | null
   start_date?: string | null
   work_days?: number | null
+  state_id?: string | null
 }

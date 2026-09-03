@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
-import { PRIORITY_LABELS, PRIORITY_ORDER, STATUS_LABELS, STATUS_ORDER } from '../lib/constants'
-import type { Task, TaskPriority, TaskStatus } from '../lib/types'
+import { PRIORITY_LABELS, PRIORITY_ORDER } from '../lib/constants'
+import type { Task, TaskPriority } from '../lib/types'
 import { IconTrash, IconX } from './Icons'
 import './Modal.css'
 
@@ -12,17 +12,18 @@ interface Props {
   onClose: () => void
 }
 
-const STATUS_DOT: Record<TaskStatus, string> = { open: '#d97706', in_progress: '#0284c7', done: '#15803d' }
 const PRIORITY_DOT: Record<TaskPriority, string> = { high: '#dc2626', medium: '#0284c7', low: '#9aa1b4' }
 
 export function TaskModal({ task, defaultDate, onClose }: Props) {
-  const { profiles, addTask, editTask, removeTask } = useData()
+  const { profiles, states, addTask, editTask, removeTask } = useData()
   const { show } = useToast()
   const editing = Boolean(task)
 
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'open')
+  // El estado sustituye al viejo trío fijo. Si la tarea no tiene ninguno
+  // (creada antes de esta función), se elige el de serie de su clase.
+  const [stateId, setStateId] = useState<string>(task?.state_id ?? '')
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium')
   const [assignee, setAssignee] = useState<string>(task?.assignee_id ?? '')
   const [dueDate, setDueDate] = useState<string>(task?.due_date ?? defaultDate ?? '')
@@ -30,6 +31,13 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
   const [workDays, setWorkDays] = useState<string>(
     task?.work_days === null || task?.work_days === undefined ? '' : String(Number(task.work_days)),
   )
+  // Si la tarea no traía estado, se usa el de serie de su clase: así el
+  // selector nunca aparece sin nada marcado.
+  const estadoElegido =
+    stateId ||
+    states.find((e) => e.kind === (task?.status ?? 'open') && e.is_default)?.id ||
+    states.find((e) => e.kind === (task?.status ?? 'open'))?.id ||
+    ''
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,7 +57,7 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
       const payload = {
         title: title.trim(),
         description: description.trim() || null,
-        status, priority,
+        state_id: estadoElegido || null, priority,
         assignee_id: assignee || null,
         due_date: dueDate || null,
         start_date: startDate || null,
@@ -147,11 +155,11 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
 
             <div className="field">
               <label>Estado</label>
-              <div className="choice-group">
-                {STATUS_ORDER.map((s) => (
-                  <button type="button" key={s} className="choice" aria-pressed={status === s}
-                    onClick={() => setStatus(s)}>
-                    <span className="dot" style={{ background: STATUS_DOT[s] }} />{STATUS_LABELS[s]}
+              <div className="choice-group choice-wrap">
+                {states.map((e) => (
+                  <button type="button" key={e.id} className="choice" aria-pressed={estadoElegido === e.id}
+                    onClick={() => setStateId(e.id)}>
+                    <span className={`dot punto-color color-${e.color}`} />{e.name}
                   </button>
                 ))}
               </div>

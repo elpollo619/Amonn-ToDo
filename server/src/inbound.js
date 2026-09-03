@@ -14,15 +14,16 @@
 import { query } from './db.js'
 import { config } from './config.js'
 import { sendWhatsApp, chatIdToPhone, interpretReply } from './whatsapp.js'
-import { interpret, matchUser, pickTaskByHint } from './assistant.js'
+import { interpret, matchUser, pickTaskByHint, parseWithRules } from './assistant.js'
 import {
-  createTask, completeTask, openTasksFor, openTasksAll, listUsers,
+  createTask, completeTask, setTaskState, openTasksFor, openTasksAll, listUsers,
 } from './tasks.service.js'
 import { firstName, taskSummary } from './notify.js'
 import { describeRange, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
 import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
 import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
+import { listStates, matchStateByName } from './states.service.js'
 
 /**
  * Procesa un mensaje entrante. `msg` trae al menos { from, body } y
@@ -75,7 +76,12 @@ function listText(lang, titulo, tasks, today) {
   const lines = tasks.slice(0, 15).map((task, i) => {
     const who = task.assignee_name ? ` · ${task.assignee_name.split(' ')[0]}` : ''
     const prio = task.priority === 'high' ? ' 🔴' : ''
-    return `${i + 1}. ${task.title}${prio} · ${describeRange(task.start_date, task.due_date, today, lang, t)}${who}`
+    // Se enseña el estado salvo que sea uno de los de serie (Abierta / En
+    // curso / Hecha): si no, todas las líneas dirían "Abierta" y no aportaría
+    // nada. Ojo: no vale filtrar por clase, porque un estado propio como
+    // "Por facturar" es de clase 'open' y sí hay que verlo.
+    const estado = task.state_name && !task.state_is_default ? ` · ${task.state_name}` : ''
+    return `${i + 1}. ${task.title}${prio} · ${describeRange(task.start_date, task.due_date, today, lang, t)}${estado}${who}`
   })
   const more = tasks.length > 15 ? t(lang, 'list_more', { resto: tasks.length - 15 }) : ''
   return `${t(lang, 'list_header', { titulo, total: tasks.length })}\n${lines.join('\n')}${more}`
@@ -234,13 +240,35 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
     }
     await clearPending(phone)
     const task = candidatas.find((x) => x.id === elegida)
-    await completeTask(elegida)
     let extra = ''
     if (pending.hint && task) {
       await learn({ kind: 'task', phrase: pending.hint, keywords: keywordsDe(task), createdBy: user.id })
       extra = t(lang, 'learned_task', { pista: normalizePhrase(pending.hint) })
     }
+    // La pregunta pudo venir de "márcala hecha" o de "ponla en X".
+    if (pending.estado_id) {
+      const estado = (await listStates()).find((e) => e.id === pending.estado_id)
+      if (estado) {
+        await setTaskState(elegida, estado)
+        return t(lang, 'state_changed', { titulo: task?.title ?? '', estado: estado.name }) + extra
+      }
+    }
+    await completeTask(elegida)
     return t(lang, 'completed', { titulo: task?.title ?? '' }) + extra
+  }
+
+  // Si el mensaje es claramente OTRA cosa (una pregunta, un saludo, otra
+  // tarea), se abandona la pregunta en vez de tragárselo como respuesta. Es la
+  // misma lección que en "¿cuál de estas?": secuestrar un mensaje es peor que
+  // perder el hilo.
+  if (pending.esperando === 'who' || pending.esperando === 'what') {
+    const otra = parseWithRules(texto, {
+      sender: user, users, aliases, today, lang, openTasks: [], states: [],
+    })
+    if (['list_tasks', 'help', 'complete_task', 'set_state'].includes(otra.action)) {
+      await clearPending(phone)
+      return null
+    }
   }
 
   const draft = { ...pending }
@@ -374,7 +402,14 @@ export async function processMessage(phone, text) {
 
 async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {
   const openTasks = await openTasksFor(user.id)
-  const intent = await interpret(text, { sender: user, users, openTasks, lang, today, aliases })
+  const estados = await listStates()
+  const todasAbiertas = await openTasksAll()
+  const intent = await interpret(text, {
+    sender: user, users, openTasks, lang, today, aliases, states: estados,
+    // Para reconocer "pon la caldera en X" hace falta poder mirar las tareas
+    // de todo el equipo, no solo las de quien escribe.
+    allOpenTasks: todasAbiertas,
+  })
 
   switch (intent.action) {
     case 'help':
@@ -425,6 +460,34 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         }
       }
       return avanzarBorrador(phone, user, lang, draft, users, today)
+    }
+
+    case 'set_state': {
+      const pista = String(intent.task_hint ?? '').trim()
+      const pedido = String(intent.state ?? '').trim()
+      const m = matchStateByName(estados, pedido)
+      if (m.candidates.length > 1) {
+        return t(lang, 'state_ambiguous', { estado: pedido, lista: m.candidates.map((e) => e.name).join(', ') })
+      }
+      if (!m.state) {
+        return t(lang, 'state_not_found', { estado: pedido, lista: estados.map((e) => e.name).join(', ') })
+      }
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, await openTasksAll(), aliases)
+      if (!task) {
+        const candidatas = (openTasks.length ? openTasks : await openTasksAll()).slice(0, 8)
+        if (candidatas.length === 0) return t(lang, 'no_open_tasks', { nombre: firstName(user) })
+        await setPending(phone, user.id, {
+          esperando: 'which_task',
+          hint: pista,
+          ids: candidatas.map((x) => x.id),
+          estado_id: m.state.id,
+        })
+        return t(lang, 'ask_which_task', { pista, lista: candidatas.map((x, i) => `${i + 1}. ${x.title}`).join('\n') })
+      }
+      await setTaskState(task.id, m.state)
+      void touch('task', pista)
+      return t(lang, 'state_changed', { titulo: task.title, estado: m.state.name })
     }
 
     case 'complete_task': {

@@ -227,6 +227,13 @@ function FilaTarea({
         <div className="fila-titulo">
           {task.title}
           {task.priority === 'high' && <span className="chip-urgente">urgente</span>}
+          {/* Solo los estados propios: enseñar "Abierta" en cada línea no
+              aportaría nada. */}
+          {task.state_name && !task.state_is_default && (
+            <span className={`chip-estado-min color-${task.state_color ?? 'slate'}`}>
+              {task.state_name}
+            </span>
+          )}
         </div>
         <div className="fila-pie">
           <span className={plazo.overdue ? 'plazo-vencido' : plazo.today ? 'plazo-hoy' : ''}>

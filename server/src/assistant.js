@@ -13,6 +13,7 @@ import { config } from './config.js'
 import { normalize, parseDateAnyLang, parseRange, parseWorkDays, todayKey, weekdayOf } from './dates.js'
 import { interpretReply } from './whatsapp.js'
 import { resolvePerson, resolveTask } from './aliases.js'
+import { matchStateByName } from './states.service.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -86,6 +87,9 @@ const REGLAS = {
     team: /\b(todos|equipo|todas|de todos)\b/,
     me: /^(yo|mi|mias|mias)$/i,
     teamWord: /^(equipo|todos|todas|all)$/i,
+    // "pon la caldera en esperando material"
+    createNoun: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar|crea|crear|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar)\\s+(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)\\b/,
+    setState: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar)\s+(?:la |el |lo )?(.+?)\s+(?:a|en|como|al estado)\s+(.+)$/,
   },
 
   de: {
@@ -109,6 +113,8 @@ const REGLAS = {
     team: /\b(alle|team|vom team|des teams)\b/,
     me: /^(ich|mir|mich|meine)$/i,
     teamWord: /^(team|alle|all)$/i,
+    createNoun: /^(?:setze|stelle|andere|verschiebe|markiere|erstelle|mach|lege)\\s+(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)\\b/,
+    setState: /^(?:setze|stelle|andere|verschiebe|markiere)\s+(?:die |der |das )?(.+?)\s+(?:auf|zu|als)\s+(.+)$/,
   },
 
   pt: {
@@ -132,6 +138,8 @@ const REGLAS = {
     team: /\b(todos|equipa|equipe|todas)\b/,
     me: /^(eu|mim|minhas|meu)$/i,
     teamWord: /^(equipa|equipe|todos|todas|all)$/i,
+    createNoun: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar|cria|criar|adiciona|anota)\\s+(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)\\b/,
+    setState: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar)\s+(?:a |o )?(.+?)\s+(?:para|em|como)\s+(.+)$/,
   },
 }
 
@@ -164,6 +172,30 @@ function parseInLang(text, ctx, lang) {
     const r = interpretReply(raw)
     if (r === 'done') return { action: 'reply_done' }
     if (r === 'not_done') return { action: 'reply_not_done' }
+  }
+
+  // "pon la caldera en esperando material".
+  //
+  // ⚠️ Va ANTES de crear porque comparten verbo ("pon"), pero solo cuenta si
+  // la cola de la frase es un estado QUE EXISTE. Sin esa condición, "pon una
+  // tarea a Isma: revisar la caldera" se interpretaría como un cambio de
+  // estado, y con ella la decisión es determinista y no hay solapamiento.
+  const est = cfg.setState ? t.match(cfg.setState) : null
+  if (est && !cfg.createNoun.test(t)) {
+    const pista = est[1].trim()
+    const pedido = est[2].trim()
+    const estados = Array.isArray(ctx.states) ? ctx.states : []
+    const m = matchStateByName(estados, pedido)
+    // Cuenta como cambio de estado si el estado existe, O si la pista señala
+    // una tarea que ya existe. En el segundo caso el estado no existirá y se
+    // responderá "no tengo ese estado", que es lo útil: quien escribe "pon la
+    // caldera en pendiente de pintura" no está creando una tarea llamada
+    // "caldera en pendiente de pintura".
+    const candidatasTareas = ctx.allOpenTasks ?? ctx.openTasks ?? []
+    const señalaTarea = pista ? Boolean(pickTaskByHint(pista, candidatasTareas, ctx.aliases)) : false
+    if (pista && (m.state || m.candidates.length > 0 || señalaTarea)) {
+      return { action: 'set_state', task_hint: pista, state: pedido }
+    }
   }
 
   if (cfg.create.test(t)) {

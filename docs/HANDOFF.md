@@ -78,6 +78,42 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Estados propios del taller — paso 2 HECHO (2026-09-03)
+
+- **`task_states` + `tasks.state_id`.** El equipo define los nombres de las
+  columnas ("Esperando material", "Pendiente de cliente", "Por facturar").
+- **La pieza clave es `kind`.** Cada estado pertenece a una de las tres CLASES
+  que el resto del sistema ya entendía (`open` / `in_progress` / `done`), y el
+  servidor mantiene `tasks.status` igual a la clase del estado. Por eso el
+  asistente de WhatsApp, los recordatorios y las consultas siguen funcionando
+  sin cambios: **no hay dos fuentes de verdad**. Todo pasa por
+  `resolveState()` / `setTaskState()`; nunca se escribe `status` a mano.
+- **Por WhatsApp**: "pon la caldera en esperando material" (y `setze … auf …`,
+  `põe … em …`). Si el estado no existe, lo dice y enumera los que hay; si la
+  frase encaja con varios, pregunta en vez de elegir.
+  ⚠️ `pon` es TAMBIÉN verbo de crear, así que la regla de estado va antes que
+  la de crear pero **exige que la cola sea un estado real o que la pista
+  señale una tarea existente**. Sin esa condición, "pon una tarea a Isma: X"
+  se interpretaría como cambio de estado.
+- Marcar una tarea como hecha (por WhatsApp o en la app) mueve **también** el
+  estado al de clase `done`; si no, una tarea cerrada seguiría en la columna
+  "Esperando material".
+- Borrar un estado reubica sus tareas en el primero de su clase (no se pierde
+  ninguna) y **no se puede borrar el último de una clase**.
+- App: el tablero pinta una columna por estado y ahora **se desplaza a lo
+  ancho** (antes era una rejilla de tres y la cuarta caía debajo). Botón
+  «Editar estados» en el tablero. Selector de estado en la tarea. Chip del
+  estado en las tarjetas y en Hoy, **solo si no es uno de los de serie**
+  (por clase no valdría: "Por facturar" es de clase `open` y sí hay que verlo).
+- ⚠️ Otra corrección de la misma familia que las anteriores: una pregunta
+  pendiente ("¿para quién es?") ya no se traga un mensaje que claramente es
+  otra cosa (una consulta, un saludo, otro cambio de estado).
+
+Pruebas: 22 nuevas en `test/estados.test.mjs`.
+
+### Siguiente en el orden acordado
+3. Subtareas. 4. Línea de tiempo. 5. Comentarios y fotos.
+
 ## Rediseño — dirección elegida y paso 1 HECHO (2026-09-03)
 
 Cris eligió una **mezcla de la A y la B**, y pidió además: plazos con **inicio
