@@ -155,6 +155,39 @@ mirar; si sigue igual, revisa el Protokoll del contenedor `amonn-watchtower`.
 
 ---
 
+## 🤖 Asistente de WhatsApp, avisos y email
+
+**Qué hace el número de WhatsApp de Amonn** (el de tu OpenWA Gateway):
+
+- Avisa a cada persona **al momento** cuando alguien le asigna una tarea.
+- Recuerda las tareas que vencen (L–V a las 9:00) y entiende "sí / no".
+- Es un **asistente**: cualquier persona del equipo (con su teléfono guardado
+  en "Mi perfil") puede escribirle:
+  - «Crea una tarea a Luis: revisar la caldera, para el viernes»
+  - «Necesito que Ana prepare el presupuesto Gómez mañana, urgente»
+  - «¿Qué tengo abierto?» · «Tareas de Luis» · «Tareas del equipo»
+  - «Hecha la de la caldera»
+
+Cada persona elige en **Mi perfil** si quiere avisos por WhatsApp, por email o
+ambos.
+
+| Variable | Para qué | Si se deja vacía |
+|---|---|---|
+| `APP_URL` | Enlace a la app en los avisos | Los avisos van sin enlace |
+| `GEMINI_API_KEY` | Google Gemini interpreta los mensajes en lenguaje normal | Se usan reglas sencillas en español (funciona, entiende menos) |
+| `SMTP_USER` + `SMTP_PASS` | Enviar emails desde un Gmail (contraseña de aplicación) | No se envían emails |
+
+Cómo conseguir la **contraseña de aplicación de Gmail**: en la cuenta de Google
+→ Seguridad → activar "Verificación en dos pasos" → "Contraseñas de
+aplicaciones" → crear una (16 letras). Esa es `SMTP_PASS`; `SMTP_USER` es el
+correo completo.
+
+Cómo conseguir la **clave de Gemini**: https://aistudio.google.com/apikey →
+"Create API key". Con el uso de un equipo pequeño cuesta céntimos al mes (o
+nada, dentro del nivel gratuito).
+
+---
+
 ## ⚠️ Aviso sobre WhatsApp (OpenWA Gateway)
 
 El OpenWA Gateway usa WhatsApp de forma **no oficial** (motor Baileys, como

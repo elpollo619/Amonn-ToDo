@@ -33,3 +33,9 @@ create table if not exists tasks (
 create index if not exists tasks_assignee_idx on tasks(assignee_id);
 create index if not exists tasks_status_idx   on tasks(status);
 create index if not exists tasks_due_idx      on tasks(due_date);
+
+-- ─── Preferencias de avisos (añadidas después; idempotente) ───────────
+alter table users add column if not exists notify_whatsapp boolean not null default true;
+alter table users add column if not exists notify_email    boolean not null default true;
+-- Desde dónde se creó la tarea: 'app' o 'whatsapp' (asistente).
+alter table tasks add column if not exists source text not null default 'app';

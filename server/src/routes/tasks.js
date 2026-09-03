@@ -2,12 +2,11 @@ import { asyncRouter } from '../util.js'
 import { query } from '../db.js'
 import { requireAuth } from '../auth.js'
 import { broadcast } from '../events.js'
+import { createTask, getUser, STATUSES, PRIORITIES } from '../tasks.service.js'
+import { notifyTaskAssigned } from '../notify.js'
 
 export const tasksRouter = asyncRouter()
 tasksRouter.use(requireAuth)
-
-const STATUSES = ['open', 'in_progress', 'done']
-const PRIORITIES = ['low', 'medium', 'high']
 
 // Listar todas las tareas del equipo.
 tasksRouter.get('/', async (_req, res) => {
@@ -15,34 +14,20 @@ tasksRouter.get('/', async (_req, res) => {
   res.json(rows)
 })
 
-// Crear una tarea.
+// Crear una tarea (avisa al responsable por WhatsApp/email si no es quien la crea).
 tasksRouter.post('/', async (req, res) => {
   const b = req.body ?? {}
-  if (!b.title || !b.title.trim()) {
+  if (!b.title || !String(b.title).trim()) {
     return res.status(400).json({ error: 'El título es obligatorio' })
   }
-  const status = STATUSES.includes(b.status) ? b.status : 'open'
-  const priority = PRIORITIES.includes(b.priority) ? b.priority : 'medium'
-  const { rows } = await query(
-    `insert into tasks (title, description, status, priority, assignee_id, created_by, due_date)
-     values ($1,$2,$3,$4,$5,$6,$7) returning *`,
-    [
-      b.title.trim(),
-      b.description ?? null,
-      status,
-      priority,
-      b.assignee_id || null,
-      req.userId,
-      b.due_date || null,
-    ],
-  )
-  broadcast()
-  res.json(rows[0])
+  const task = await createTask(b, req.userId)
+  res.json(task)
 })
 
 // Editar una tarea (campos parciales).
 tasksRouter.patch('/:id', async (req, res) => {
   const b = req.body ?? {}
+  const before = (await query('select assignee_id from tasks where id = $1', [req.params.id])).rows[0]
   const fields = []
   const values = []
   let i = 1
@@ -75,7 +60,17 @@ tasksRouter.patch('/:id', async (req, res) => {
   )
   if (!rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' })
   broadcast()
-  res.json(rows[0])
+  // Si se ha asignado a otra persona, avisarla.
+  const task = rows[0]
+  if (
+    b.assignee_id !== undefined && task.assignee_id &&
+    task.assignee_id !== before?.assignee_id && task.assignee_id !== req.userId &&
+    task.status !== 'done'
+  ) {
+    const [assignee, creator] = await Promise.all([getUser(task.assignee_id), getUser(req.userId)])
+    notifyTaskAssigned(task, assignee, creator).catch(() => {})
+  }
+  res.json(task)
 })
 
 // Eliminar una tarea.

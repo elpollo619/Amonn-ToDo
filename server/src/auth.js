@@ -49,8 +49,7 @@ export function requireAuth(req, res, next) {
 /** Quita el hash de contraseña antes de enviar un usuario al cliente. */
 export function publicUser(row) {
   if (!row) return null
-  const { password_hash, email, ...rest } = row
+  const { password_hash, ...rest } = row
   void password_hash
-  void email
   return rest
 }

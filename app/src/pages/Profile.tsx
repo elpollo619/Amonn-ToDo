@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import { Avatar } from '../components/Avatar'
-import { IconLogout, IconWhatsApp } from '../components/Icons'
+import { IconLogout, IconWhatsApp, IconMail } from '../components/Icons'
 import { AVATAR_COLORS } from '../lib/constants'
 import * as api from '../lib/api'
 
@@ -14,6 +14,8 @@ export function Profile() {
   const [name, setName] = useState(user?.full_name ?? '')
   const [phone, setPhone] = useState(user?.phone ?? '')
   const [color, setColor] = useState(user?.avatar_color ?? AVATAR_COLORS[0])
+  const [notifyWa, setNotifyWa] = useState(user?.notify_whatsapp !== false)
+  const [notifyMail, setNotifyMail] = useState(user?.notify_email !== false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [testing, setTesting] = useState(false)
@@ -34,6 +36,8 @@ export function Profile() {
         full_name: name.trim() || null,
         phone: phoneTrim.replace(/[\s-]/g, '') || null,
         avatar_color: color,
+        notify_whatsapp: notifyWa,
+        notify_email: notifyMail,
       })
       await refresh(); await reload()
       show('Perfil guardado', 'success')
@@ -70,7 +74,7 @@ export function Profile() {
       <div className="page-header">
         <div>
           <h1>Mi perfil</h1>
-          <div className="subtitle">Tu nombre, tu color y el teléfono para los avisos de WhatsApp.</div>
+          <div className="subtitle">Tu nombre, tu color y cómo quieres recibir los avisos.</div>
         </div>
       </div>
 
@@ -109,12 +113,44 @@ export function Profile() {
             <span className="hint">Con el prefijo del país (España: +34). Sin él, los avisos no llegan.</span>
           </div>
 
+          <div className="field">
+            <label>Avisos</label>
+            <label className="toggle">
+              <input type="checkbox" checked={notifyWa} onChange={(e) => setNotifyWa(e.target.checked)} />
+              <span className="toggle-track" aria-hidden="true" />
+              <span className="toggle-text"><IconWhatsApp size={16} /> Por WhatsApp{!phoneTrim && <span className="muted"> (pon tu teléfono arriba)</span>}</span>
+            </label>
+            <label className="toggle">
+              <input type="checkbox" checked={notifyMail} onChange={(e) => setNotifyMail(e.target.checked)} />
+              <span className="toggle-track" aria-hidden="true" />
+              <span className="toggle-text"><IconMail size={16} /> Por email{user.email && <span className="muted"> ({user.email})</span>}</span>
+            </label>
+            <span className="hint">Te avisamos cuando alguien te asigna una tarea y cuando una tarea tuya vence.</span>
+          </div>
+
           {error && <div className="error-box">{error}</div>}
 
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </form>
+
+        <section className="card">
+          <h2 className="card-title">Asistente de WhatsApp</h2>
+          <p className="card-sub">
+            Escribe al número de WhatsApp de Amonn (el mismo que te envía los avisos) y él crea o consulta tareas por ti.
+            Solo funciona desde el teléfono que tienes guardado arriba. Ejemplos:
+          </p>
+          <ul className="examples">
+            <li>«Crea una tarea a Luis: revisar la caldera, para el viernes»</li>
+            <li>«Necesito que Ana prepare el presupuesto Gómez mañana, urgente»</li>
+            <li>«¿Qué tengo abierto?» · «Tareas de Luis» · «Tareas del equipo»</li>
+            <li>«Hecha la de la caldera»</li>
+          </ul>
+          <p className="card-sub" style={{ marginBottom: 0 }}>
+            La persona asignada recibe el aviso al momento. Luego puedes completar la tarea (fecha, prioridad, detalles) desde aquí.
+          </p>
+        </section>
 
         <section className="card">
           <h2 className="card-title">Probar los avisos de WhatsApp</h2>

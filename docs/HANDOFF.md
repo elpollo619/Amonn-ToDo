@@ -1,44 +1,46 @@
 # HANDOFF — Amonn (tareas de equipo + WhatsApp, auto-alojado en NAS)
 
 > Un solo archivo de traspaso. Se sobreescribe en cada cierre de sesión.
-> Última actualización: 2026-09-02 (sesión remota de Claude Code).
+> Última actualización: 2026-09-03 (sesión remota de Claude Code).
 
-## Estado real (verificado en git al cerrar)
+## Estado real
 
-- Rama: `claude/job-list-app-whatsapp-av9rwl` · HEAD `1bdfca8` · al día con `origin` (0 sin pushear) · sin cambios locales · 1 worktree.
-- PR: **#1** (draft) → `main`. `mergeable_state: clean`. CI verde hasta `af368f9`; el run de `1bdfca8` (workflow *Publicar imagen Docker*) estaba **en curso** al cerrar — ver https://github.com/elpollo619/Amonn-ToDo/actions. Publica `ghcr.io/elpollo619/amonn-todo:sha-1bdfca8` (+ `latest`).
-- Prod (NAS UGREEN NASync **DXP6800 Pro**, UGOS, Docker GUI): **no accesible desde esta sesión** (LAN doméstica `192.168.1.9`). Último estado visto por captura: contenedor `amonn-server` **In Betrieb**, imagen nueva arrancando limpia, WhatsApp conecta; **Verificado el 2026-09-02 18:36**: `/api/version` → `af368f9` y el **login se ve en el iPhone por 5G** (acceso remoto vía UCG Max funcionando). La pantalla en blanco está resuelta en prod.
+- Rama: `claude/job-list-app-whatsapp-av9rwl`. PR **#1** (draft) → `main`, `mergeable_state: clean`.
+- Prod (NAS UGREEN DXP6800 Pro, UGOS, `192.168.1.9`): **`/api/version` = `91fbbac` verificado el 2026-09-03 08:07** (login OK desde el iPhone por 5G). El proyecto `amonn` en UGOS lleva ahora **Watchtower** (`amonn-watchtower`, con `DOCKER_API_VERSION: '1.41'`): cada 5 min descarga `latest` si cambió y reinicia solo `amonn-server`. **Ya no hay que recrear el proyecto para actualizar**: basta con hacer push (CI publica `latest`).
+- Cris tiene su teléfono guardado en Mi perfil (2026-09-02).
 
 ## En curso
 
-Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respuestas SÍ/NO de WhatsApp. La causa raíz del blanco fue `crypto.randomUUID` en contexto inseguro (http+IP): arreglada con polyfill + `uid()` sin dependencia. Última mejora (`1bdfca8`): el cliente Socket.IO registra el motivo real cuando el Gateway cierra la conexión y reconecta respetando su límite de 10 conexiones/min.
+Último push: **asistente de WhatsApp + avisos al asignar + email + preferencias** (ver "Hecho"). CI construye la imagen; Watchtower la aplicará en el NAS en ≤5 min tras publicarse. Verificar con `/api/version` (debe ser el SHA del último commit de la rama).
 
 ## Próximo paso concreto
 
-1. Cris se registra en `http://192.168.1.9:8080`, pone su teléfono (+prefijo) en **Mi perfil** y crea una tarea con fecha de hoy asignada a él.
-2. Desplegar la última imagen (`sha-91fbbac`: rediseño completo + botón de prueba + arreglo del canal de WhatsApp; NO existe `sha-3b93d84` porque ambos commits se subieron en un mismo push y CI etiqueta con el SHA de cabecera): en UGOS, **misma carpeta** que la versión actual para conservar `data/`; si dice "la configuración ya existe", **importar** y cambiar solo la línea `image:` a `sha-91fbbac`. Verificar `/api/version` = `91fbbac`.
-3. En **Mi perfil → "Enviar avisos de WhatsApp ahora"** → llega el WhatsApp → responder "Sí" → la tarea pasa a completada. Si no llega, mirar el Protokoll: la versión nueva imprime el motivo exacto del Gateway (`UNAUTHORIZED`, `FORBIDDEN_SESSION`, `RATE_LIMITED`…).
+1. Comprobar que `/api/version` en el NAS coincide con el HEAD de la rama (Watchtower lo aplica solo).
+2. Cris escribe al número de WhatsApp de Amonn (el del OpenWA Gateway) desde su móvil: «hola» → debe responder el asistente. Luego «crea una tarea a mí: probar el asistente, para mañana» → aparece en la app. Si no responde: Protokoll de `amonn-server` (líneas `[asistente]`/`[wa]`).
+3. Cris consigue (a) la clave de Gemini en https://aistudio.google.com/apikey y (b) la contraseña de aplicación de Gmail para `elpollotue@gmail.com`; se ponen en `GEMINI_API_KEY`, `SMTP_USER`, `SMTP_PASS` del compose en UGOS (**cambiar variables de entorno requiere recrear el proyecto**: Watchtower solo actualiza imágenes). Sin ellas, el asistente funciona con reglas y no se envían emails.
+4. Añadir `APP_URL: http://192.168.1.9:8080` al compose del NAS (misma recreación que el punto 3) para que los avisos lleven enlace.
 
-## Hecho en esta sesión (2026-09-02, tarde)
+## Hecho en esta sesión (2026-09-03)
 
-- Rediseño completo de la app orientado a móvil (commit `3b93d84`), verificado con capturas en 390px y 1280px. Cris lo pidió tras ver el login en el iPhone.
-- Botón "Enviar avisos ahora" en Mi perfil; cierre de sesión disponible en móvil.
+- Watchtower en `docker-compose.nas.yml` (+ fix `DOCKER_API_VERSION` porque el Docker de UGOS exige API ≥ 1.40).
+- **Asistente de WhatsApp** (`server/src/assistant.js` + `inbound.js`): crear tareas en lenguaje normal ("crea una tarea a Luis: revisar la caldera, para el viernes", "necesito que Ana prepare X mañana urgente"), listar ("qué tengo abierto", "tareas de Luis", "tareas del equipo"), completar ("hecha la de la caldera"), sí/no a recordatorios, ayuda. Gemini si hay `GEMINI_API_KEY`; si no (o si falla), reglas en español (`parseWithRules`, probadas con 17 frases). Fechas en español en `dates.js`.
+- **Aviso al asignar** (`notify.js`, `tasks.service.js`): al crear/reasignar una tarea a otra persona, WhatsApp y/o email según `users.notify_whatsapp` / `notify_email` (nuevas columnas, default true). Recordatorios también por email si hay SMTP.
+- **Email** (`mailer.js`, nodemailer, SMTP Gmail con contraseña de aplicación). `publicUser` ahora incluye `email`.
+- App: Mi perfil con interruptores WhatsApp/email y tarjeta explicando el asistente.
+- Probado de punta a punta en local (Postgres 5433 + mock del Gateway): 12 mensajes correctos, `scratchpad/e2e.mjs`.
 
-## Pendiente (por prioridad, con criterio de "listo")
+## Pendiente (por prioridad)
 
-1. ~~Confirmar la app en el NAS~~ ✅ hecho (af368f9, login visible desde el iPhone).
-2. **Respuestas SÍ/NO fiables** — listo cuando en el Protokoll se vea `tiempo real suscrito a ["message.received"]` y, tras contestar "Sí" en WhatsApp, la tarea pase a completada. Si aparece `el Gateway devolvió UNAUTHORIZED/FORBIDDEN_SESSION/RATE_LIMITED`, ese código dice qué tocar (clave, permisos de sesión de la API key en el Gateway, o esperar al límite).
-3. **Acceso desde fuera de casa** (Cris lo pidió) — propuesta: Tailscale en NAS + iPhone; listo cuando `http://100.x.x.x:8080` abre la app con 4G. Alternativa: Cloudflare Tunnel con HTTPS.
-4. Cuerpo del PR #1 desactualizado (habla de `waautomate`/QR): reescribir con la arquitectura actual (OpenWA Gateway existente + Socket.IO) antes de sacarlo de draft.
-5. Mejora menor: healthcheck ya añadido al compose del NAS; comprobar que UGOS lo muestra en verde.
+1. Probar el asistente en prod con el WhatsApp real (paso 2 de arriba).
+2. Claves de Gemini y Gmail en el compose (paso 3). Recomendado Gemini: entiende variaciones que las reglas no.
+3. Cuerpo del PR #1 desactualizado (habla de `waautomate`/QR): reescribir antes de sacarlo de draft.
+4. Mejora futura: que el asistente pida confirmación antes de crear cuando la frase es ambigua; adjuntos/fotos por WhatsApp.
 
 ## Necesita a Cris (acciones humanas)
 
-- Estar en el WiFi de casa (o tener Tailscale) para probar: la IP `192.168.1.9` es interna.
-- Hacer el despliegue en la GUI de UGOS (no hay acceso remoto al NAS desde Claude Code).
-- Valores 🔴 del compose (contraseña de BD, `JWT_SECRET`, `WA_API_KEY`): los tiene Cris; **no van en este archivo**.
-- Decidir la opción de acceso remoto (Tailscale recomendado).
-- Sobre "darle una llave de acceso a Claude para que lo haga todo": desde la sesión remota no hay ruta de red a la LAN; una clave sola no sirve y exponer SSH/Docker a internet no es recomendable. Camino seguro: ejecutar Claude Code en un PC de casa (misma red) con acceso SSH al NAS.
+- Recrear el proyecto en UGOS (desde el navegador de un PC; la app del móvil solo muestra el compose) cuando haya que cambiar variables de entorno.
+- Valores 🔴 del compose (contraseña BD, `JWT_SECRET`, `WA_API_KEY`, y ahora `GEMINI_API_KEY`, `SMTP_PASS`): los tiene Cris; **no van en este archivo**.
+- Cris mencionó "una API con Google que ya juntamos con el OpenWA": no es visible desde aquí (está en su NAS/Gateway); Amonn necesita su propia clave en `GEMINI_API_KEY` (puede ser la misma clave si es de Google AI Studio).
 
 ## Red doméstica (cambió el 2026-09-02)
 
@@ -49,7 +51,8 @@ Cerrando la cadena de arreglos de la "pantalla en blanco" y del canal de respues
 
 ## Gotchas de esta sesión (candidatos a CLAUDE.md si se repiten)
 
-- **UGOS no re-descarga una etiqueta ya en caché** (`latest`): fijar siempre `sha-XXXXXXX` y **borrar+crear** el proyecto; editar + "Starten" no aplica cambios de imagen.
+- **UGOS no re-descarga una etiqueta ya en caché** (`latest`) y editar + "Neu bereitstellen" no recreó el contenedor: por eso ahora hay Watchtower. Para cambios de **variables de entorno** sigue haciendo falta **borrar+crear** el proyecto.
+- **Watchtower en UGOS** falla con `client version 1.25 is too old` si no se pone `DOCKER_API_VERSION: '1.41'` en su `environment`.
 - **UGOS reimporta el compose viejo** si se crea el proyecto en la misma carpeta ("Die Compose-Konfiguration existiert bereits…"): usar carpeta nueva o borrar el `docker-compose.yml` viejo antes.
 - **`crypto.randomUUID` solo existe en contexto seguro** (https/localhost). La app se abre por `http://IP`: cualquier API "secure-context-only" deja la pantalla en blanco. Probar siempre por IP no-localhost (repro: `scratchpad/repro_insecure.mjs` con Playwright).
 - El OpenWA Gateway (`src/modules/events/events.gateway.ts`) envía `{type:'error',code,...}` antes de `disconnect()`; límites: 10 handshakes/min/IP, 16 sockets/key. `socket.io-client` **no** reconecta solo tras `io server disconnect`.

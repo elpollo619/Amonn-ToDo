@@ -42,6 +42,32 @@ export const config = {
     enabled: process.env.WA_ENABLED !== 'false',
   },
 
+  // ─── Asistente (entiende los mensajes de WhatsApp en lenguaje normal) ───
+  // Con GEMINI_API_KEY usa Google Gemini para interpretar "crea una tarea a
+  // Cristian: … para el viernes". Sin clave, usa reglas sencillas (funciona,
+  // pero entiende menos variaciones).
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY ?? '',
+    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+  },
+
+  // ─── Email (avisos por correo) ─────────────────────────────
+  // Con SMTP_USER + SMTP_PASS se activan los avisos por email. Para Gmail:
+  // SMTP_USER = tu@gmail.com y SMTP_PASS = "contraseña de aplicación".
+  mail: {
+    host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT ?? 465),
+    user: process.env.SMTP_USER ?? '',
+    pass: process.env.SMTP_PASS ?? '',
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? '',
+    get enabled() {
+      return Boolean(this.user && this.pass)
+    },
+  },
+
+  // URL pública de la app (para poner enlaces en los avisos). Ej: http://192.168.1.9:8080
+  appUrl: (process.env.APP_URL ?? '').replace(/\/+$/, ''),
+
   // Cron de recordatorios (formato cron). Por defecto: L-V a las 9:00.
   reminderCron: process.env.REMINDER_CRON ?? '0 9 * * 1-5',
   // Horas mínimas entre dos recordatorios de la misma tarea.

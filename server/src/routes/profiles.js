@@ -27,6 +27,8 @@ profilesRouter.patch('/:id', async (req, res) => {
   if (b.full_name !== undefined) set('full_name', b.full_name)
   if (b.phone !== undefined) set('phone', b.phone)
   if (b.avatar_color !== undefined) set('avatar_color', b.avatar_color)
+  if (b.notify_whatsapp !== undefined) set('notify_whatsapp', Boolean(b.notify_whatsapp))
+  if (b.notify_email !== undefined) set('notify_email', Boolean(b.notify_email))
   if (fields.length === 0) {
     return res.status(400).json({ error: 'Nada que actualizar' })
   }

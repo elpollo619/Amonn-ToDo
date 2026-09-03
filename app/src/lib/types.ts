@@ -3,10 +3,15 @@ export type TaskPriority = 'low' | 'medium' | 'high'
 
 export interface Profile {
   id: string
+  email?: string | null
   full_name: string | null
   phone: string | null
   avatar_color: string
   created_at: string
+  /** Recibir avisos por WhatsApp (por defecto sí). */
+  notify_whatsapp?: boolean
+  /** Recibir avisos por email (por defecto sí). */
+  notify_email?: boolean
 }
 
 export interface Task {

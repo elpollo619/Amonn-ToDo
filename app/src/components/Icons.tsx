@@ -118,3 +118,12 @@ export const IconFlag = (p: P) => (
     <path d="M5 21V4M5 4h11l-1.5 3.5L16 11H5" />
   </svg>
 )
+
+export function IconMail({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </svg>
+  )
+}

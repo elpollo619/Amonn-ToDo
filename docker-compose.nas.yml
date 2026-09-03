@@ -62,6 +62,21 @@ services:
 
       REMINDER_CRON: '0 9 * * 1-5'    # recordatorios: L-V a las 9:00
       TZ: Europe/Madrid
+
+      # ─── Enlace a la app en los avisos ───
+      APP_URL: http://192.168.1.9:8080          # 🔴 (4) la dirección con la que abrís Amonn
+
+      # ─── Asistente de WhatsApp (entiende lenguaje normal) ───
+      # Clave de Google AI Studio (https://aistudio.google.com/apikey). Si se
+      # deja vacía, el asistente usa reglas sencillas (funciona igual, entiende menos).
+      GEMINI_API_KEY: ''                        # 🔴 (5) opcional
+
+      # ─── Avisos por email (Gmail) ───
+      # SMTP_USER = el Gmail que envía; SMTP_PASS = "contraseña de aplicación"
+      # (Google → Seguridad → Verificación en 2 pasos → Contraseñas de aplicaciones).
+      # Si se dejan vacíos, no se envían emails (WhatsApp sigue funcionando).
+      SMTP_USER: ''                             # 🔴 (6) opcional
+      SMTP_PASS: ''                             # 🔴 (6) opcional
     networks:
       - amonn
       - openwa-network
