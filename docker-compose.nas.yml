@@ -78,6 +78,9 @@ services:
     command: --label-enable --interval 300 --cleanup
     environment:
       TZ: Europe/Madrid
+      # El Docker de UGOS exige API >= 1.40; sin esto Watchtower falla con
+      # "client version 1.25 is too old".
+      DOCKER_API_VERSION: '1.41'
 
 networks:
   amonn:
