@@ -29,6 +29,16 @@ export interface TaskState {
   is_default: boolean
 }
 
+/** Un paso dentro de una tarea. No se asigna ni tiene plazo: es una lista
+ *  de comprobación, y su valor está en el avance del conjunto. */
+export interface Subtask {
+  id: string
+  task_id: string
+  title: string
+  done: boolean
+  position: number
+}
+
 export interface Task {
   id: string
   title: string
@@ -48,6 +58,9 @@ export interface Task {
   state_name?: string | null
   state_color?: string | null
   state_is_default?: boolean | null
+  /** Avance de los pasos, que viene calculado en la consulta. */
+  subtasks_total?: number | null
+  subtasks_done?: number | null
   completed_at: string | null
   last_reminder_at: string | null
   created_at: string

@@ -125,3 +125,19 @@ update tasks t
    set state_id = s.id
   from task_states s
  where t.state_id is null and s.is_default and s.kind = t.status;
+
+-- ─── Subtareas / pasos (paso 3 del rediseño) ──────────────────────────
+-- Una tarea grande ("Reforma piso 2") tiene pasos dentro ("medir ventanas",
+-- "pedir material"). Los pasos NO son tareas: no se asignan, no tienen plazo
+-- ni avisos. Son una lista de comprobación dentro de la tarea, y su valor
+-- está en el avance del conjunto (2 de 5).
+create table if not exists subtasks (
+  id         uuid primary key default gen_random_uuid(),
+  task_id    uuid not null references tasks(id) on delete cascade,
+  title      text not null,
+  done       boolean not null default false,
+  position   integer not null default 0,
+  created_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists subtasks_task_idx on subtasks(task_id, position);

@@ -4,6 +4,7 @@ import { requireAuth } from '../auth.js'
 import { broadcast } from '../events.js'
 import { createTask, getUser, STATUSES, PRIORITIES } from '../tasks.service.js'
 import { resolveState } from '../states.service.js'
+import { SUBTASK_COUNTS_SQL } from '../subtasks.service.js'
 import { notifyTaskAssigned } from '../notify.js'
 
 export const tasksRouter = asyncRouter()
@@ -15,8 +16,12 @@ tasksRouter.get('/', async (_req, res) => {
   // pintarlo sin una segunda consulta por tarea.
   const { rows } = await query(
     `select t.*, s.name as state_name, s.color as state_color,
-            s.kind as state_kind, s.is_default as state_is_default
-       from tasks t left join task_states s on s.id = t.state_id
+            s.kind as state_kind, s.is_default as state_is_default,
+            coalesce(sc.subtasks_total, 0) as subtasks_total,
+            coalesce(sc.subtasks_done, 0) as subtasks_done
+       from tasks t
+       left join task_states s on s.id = t.state_id
+       ${SUBTASK_COUNTS_SQL}
       order by t.created_at desc`,
   )
   res.json(rows)

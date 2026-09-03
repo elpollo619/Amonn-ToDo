@@ -24,6 +24,7 @@ import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
 import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
+import { createSubtask, listSubtasks } from './subtasks.service.js'
 
 /**
  * Procesa un mensaje entrante. `msg` trae al menos { from, body } y
@@ -81,7 +82,11 @@ function listText(lang, titulo, tasks, today) {
     // nada. Ojo: no vale filtrar por clase, porque un estado propio como
     // "Por facturar" es de clase 'open' y sí hay que verlo.
     const estado = task.state_name && !task.state_is_default ? ` · ${task.state_name}` : ''
-    return `${i + 1}. ${task.title}${prio} · ${describeRange(task.start_date, task.due_date, today, lang, t)}${estado}${who}`
+    // El avance solo se enseña si la tarea tiene pasos.
+    const pasos = Number(task.subtasks_total) > 0
+      ? ` · ${task.subtasks_done}/${task.subtasks_total}`
+      : ''
+    return `${i + 1}. ${task.title}${prio} · ${describeRange(task.start_date, task.due_date, today, lang, t)}${estado}${pasos}${who}`
   })
   const more = tasks.length > 15 ? t(lang, 'list_more', { resto: tasks.length - 15 }) : ''
   return `${t(lang, 'list_header', { titulo, total: tasks.length })}\n${lines.join('\n')}${more}`
@@ -460,6 +465,25 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         }
       }
       return avanzarBorrador(phone, user, lang, draft, users, today)
+    }
+
+    case 'add_step': {
+      const pista = String(intent.task_hint ?? '').trim()
+      const texto = String(intent.step ?? '').trim()
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, todasAbiertas, aliases)
+      if (!task) {
+        return t(lang, 'complete_not_found', { pista })
+      }
+      await createSubtask(task.id, { title: texto, createdBy: user.id })
+      const pasos = await listSubtasks(task.id)
+      void touch('task', pista)
+      return t(lang, 'step_added', {
+        titulo: task.title,
+        paso: texto,
+        hechos: pasos.filter((p) => p.done).length,
+        total: pasos.length,
+      })
     }
 
     case 'set_state': {

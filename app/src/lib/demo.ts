@@ -1,4 +1,4 @@
-import type { Profile, Task, TaskState } from './types'
+import type { Profile, Subtask, Task, TaskState } from './types'
 
 /**
  * Modo demo: guarda todo en el navegador (localStorage) con datos de ejemplo.
@@ -10,6 +10,7 @@ const PROFILES_KEY = 'amonn.demo.profiles'
 const TASKS_KEY = 'amonn.demo.tasks'
 const SESSION_KEY = 'amonn.demo.session'
 const STATES_KEY = 'amonn.demo.states'
+const SUBTASKS_KEY = 'amonn.demo.subtasks'
 
 // Identificador único. No depende de crypto.randomUUID (que solo existe en
 // contexto seguro: https o localhost); usa getRandomValues como respaldo, que
@@ -144,6 +145,12 @@ export function ensureSeed(): void {
 }
 
 export const demoStore = {
+  getSubtasks(): Subtask[] {
+    return read<Subtask[]>(SUBTASKS_KEY, [])
+  },
+  saveSubtasks(list: Subtask[]): void {
+    write(SUBTASKS_KEY, list)
+  },
   getStates(): TaskState[] {
     return read<TaskState[]>(STATES_KEY, seedStates)
   },

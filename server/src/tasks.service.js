@@ -2,6 +2,7 @@
 // asistente de WhatsApp (assistant.js). Aquí viven los avisos al asignar.
 import { query } from './db.js'
 import { resolveState, defaultStateFor } from './states.service.js'
+import { SUBTASK_COUNTS_SQL } from './subtasks.service.js'
 import { broadcast } from './events.js'
 import { notifyTaskAssigned } from './notify.js'
 
@@ -95,8 +96,12 @@ export async function completeTask(id) {
 export async function openTasksFor(userId) {
   const { rows } = await query(
     `select t.*, s.name as state_name, s.color as state_color, s.kind as state_kind,
-            s.is_default as state_is_default
-       from tasks t left join task_states s on s.id = t.state_id
+            s.is_default as state_is_default,
+            coalesce(sc.subtasks_total, 0) as subtasks_total,
+            coalesce(sc.subtasks_done, 0) as subtasks_done
+       from tasks t
+       left join task_states s on s.id = t.state_id
+       ${SUBTASK_COUNTS_SQL}
       where t.assignee_id = $1 and t.status in ('open','in_progress')
       order by t.due_date asc nulls last, t.start_date asc nulls last, t.created_at asc`,
     [userId],
@@ -109,10 +114,13 @@ export async function openTasksAll() {
   const { rows } = await query(
     `select t.*, u.full_name as assignee_name,
             s.name as state_name, s.color as state_color, s.kind as state_kind,
-            s.is_default as state_is_default
+            s.is_default as state_is_default,
+            coalesce(sc.subtasks_total, 0) as subtasks_total,
+            coalesce(sc.subtasks_done, 0) as subtasks_done
        from tasks t
        left join users u on u.id = t.assignee_id
        left join task_states s on s.id = t.state_id
+       ${SUBTASK_COUNTS_SQL}
       where t.status in ('open','in_progress')
       order by t.due_date asc nulls last, t.start_date asc nulls last, t.created_at asc`,
   )

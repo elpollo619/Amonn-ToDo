@@ -78,6 +78,41 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Subtareas / pasos — paso 3 HECHO (2026-09-03)
+
+- **Tabla `subtasks`** + `subtasks.service.js` + `/api/tasks/:id/subtasks` y
+  `/api/subtasks/:id`.
+- **Decisión de diseño: un paso NO es una tarea.** No se asigna, no tiene
+  plazo y no genera avisos. Es una lista de comprobación dentro de la tarea, y
+  lo que aporta es el avance del conjunto ("2 de 5"). Hacerlos tareas de
+  verdad habría duplicado media aplicación para nada.
+- **El avance viene en la consulta**, no con una consulta por tarea:
+  `SUBTASK_COUNTS_SQL` se engancha a las tres consultas de tareas
+  (`/api/tasks`, `openTasksFor`, `openTasksAll`).
+- **Por WhatsApp**: "añade a la caldera: cambiar el diferencial" (y
+  `füge zu … :`, `adiciona a … :`). Mismo guardarraíl que con los estados:
+  «añade» también sirve para crear una tarea, así que solo cuenta como paso si
+  la pista señala una tarea existente y la frase no lleva el sustantivo
+  "tarea". Las listas enseñan `2/5` solo si la tarea tiene pasos.
+- App: sección «Pasos» en la tarea (solo al EDITAR: una tarea nueva aún no
+  tiene id al que colgarlos), con barra de avance, marcar/desmarcar y borrar.
+  Chip `2/5` en las tarjetas del tablero y en Hoy.
+- ⚠️ **Dos fallos que costaron tiempo y conviene recordar:**
+  1. Las expresiones regulares insertadas por script quedaron con **doble
+     barra invertida** (`\\s` en vez de `\s`), así que no coincidían nunca.
+     `createNoun` estuvo roto sin que se notara porque otras condiciones
+     tapaban el fallo. **Verificar siempre las regex con una prueba directa
+     después de generarlas.**
+  2. El formulario de los pasos estaba **anidado dentro** del formulario de la
+     tarea (HTML inválido): Enter enviaba el de fuera, guardaba la tarea y
+     cerraba el modal sin crear el paso. Ahora es un `<div>` con Enter
+     manejado a mano.
+
+Pruebas: 17 nuevas en `test/pasos.test.mjs`.
+
+### Siguiente en el orden acordado
+4. Línea de tiempo. 5. Comentarios y fotos.
+
 ## Estados propios del taller — paso 2 HECHO (2026-09-03)
 
 - **`task_states` + `tasks.state_id`.** El equipo define los nombres de las

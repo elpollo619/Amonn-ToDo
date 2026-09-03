@@ -40,6 +40,9 @@ export function TaskCard({ task, onOpen }: { task: Task; onOpen: (task: Task) =>
           </span>
           <PriorityBadge priority={task.priority} />
           {/* El estado propio del equipo, si no es uno de los de serie. */}
+          {Number(task.subtasks_total) > 0 && (
+            <span className="chip chip-muted">{task.subtasks_done}/{task.subtasks_total}</span>
+          )}
           {task.state_name && !task.state_is_default && (
             <span className={`chip-estado-min color-${task.state_color ?? 'slate'}`}>
               {task.state_name}

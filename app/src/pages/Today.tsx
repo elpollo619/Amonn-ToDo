@@ -240,6 +240,9 @@ function FilaTarea({
             {plazo.label}
           </span>
           {diasDeTrabajo(task) > 0 && <span className="fila-dias">{diasDeTrabajo(task)} d</span>}
+          {Number(task.subtasks_total) > 0 && (
+            <span className="fila-pasos">{task.subtasks_done}/{task.subtasks_total} pasos</span>
+          )}
         </div>
       </div>
       {asignada && <Avatar profile={asignada} size={26} />}

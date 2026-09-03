@@ -88,7 +88,8 @@ const REGLAS = {
     me: /^(yo|mi|mias|mias)$/i,
     teamWord: /^(equipo|todos|todas|all)$/i,
     // "pon la caldera en esperando material"
-    createNoun: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar|crea|crear|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar)\\s+(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)\\b/,
+    createNoun: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar|crea|crear|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar)\s+(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)\b/,
+    addStep: /^(?:anade|anadir|agrega|agregar|apunta|apuntar|suma|sumar)\s+(?:a|en)\s+(?:la |el |lo )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar)\s+(?:la |el |lo )?(.+?)\s+(?:a|en|como|al estado)\s+(.+)$/,
   },
 
@@ -113,7 +114,8 @@ const REGLAS = {
     team: /\b(alle|team|vom team|des teams)\b/,
     me: /^(ich|mir|mich|meine)$/i,
     teamWord: /^(team|alle|all)$/i,
-    createNoun: /^(?:setze|stelle|andere|verschiebe|markiere|erstelle|mach|lege)\\s+(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)\\b/,
+    createNoun: /^(?:setze|stelle|andere|verschiebe|markiere|erstelle|mach|lege)\s+(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)\b/,
+    addStep: /^(?:fuge|fuege|hinzufugen|erganze|erganzen)\s+(?:zu|bei)\s+(?:die |der |das )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:setze|stelle|andere|verschiebe|markiere)\s+(?:die |der |das )?(.+?)\s+(?:auf|zu|als)\s+(.+)$/,
   },
 
@@ -138,7 +140,8 @@ const REGLAS = {
     team: /\b(todos|equipa|equipe|todas)\b/,
     me: /^(eu|mim|minhas|meu)$/i,
     teamWord: /^(equipa|equipe|todos|todas|all)$/i,
-    createNoun: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar|cria|criar|adiciona|anota)\\s+(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)\\b/,
+    createNoun: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar|cria|criar|adiciona|anota)\s+(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)\b/,
+    addStep: /^(?:adiciona|adicionar|acrescenta|acrescentar|junta)\s+(?:a|ao|em)\s+(?:a |o )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar)\s+(?:a |o )?(.+?)\s+(?:para|em|como)\s+(.+)$/,
   },
 }
@@ -172,6 +175,21 @@ function parseInLang(text, ctx, lang) {
     const r = interpretReply(raw)
     if (r === 'done') return { action: 'reply_done' }
     if (r === 'not_done') return { action: 'reply_not_done' }
+  }
+
+  // "añade a la caldera: cambiar el diferencial" → un PASO dentro de la tarea.
+  //
+  // ⚠️ Mismo cuidado que con los estados: "añade" también sirve para crear una
+  // tarea. Solo cuenta como paso si la pista señala una tarea que ya existe y
+  // la frase no lleva el sustantivo "tarea".
+  const paso = cfg.addStep ? t.match(cfg.addStep) : null
+  if (paso && !cfg.createNoun.test(t)) {
+    const pista = paso[1].trim()
+    const texto = paso[2].trim()
+    const dondeBuscar = ctx.allOpenTasks ?? ctx.openTasks ?? []
+    if (pista && texto && pickTaskByHint(pista, dondeBuscar, ctx.aliases)) {
+      return { action: 'add_step', task_hint: pista, step: texto }
+    }
   }
 
   // "pon la caldera en esperando material".

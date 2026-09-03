@@ -1,6 +1,6 @@
 import { apiFetch, eventsUrl, isDemo } from './apiClient'
 import { demoStore } from './demo'
-import type { Profile, Task, TaskInput, TaskState, TaskStatus } from './types'
+import type { Profile, Subtask, Task, TaskInput, TaskState, TaskStatus } from './types'
 
 /**
  * API unificada. Habla con el backend del NAS cuando está disponible, o con el
@@ -11,7 +11,15 @@ import type { Profile, Task, TaskInput, TaskState, TaskStatus } from './types'
 // ─── Tareas ──────────────────────────────────────────────────────────
 
 export async function listTasks(): Promise<Task[]> {
-  if (isDemo) return demoStore.getTasks()
+  if (isDemo) {
+    // En el servidor el avance de los pasos viene calculado en la consulta;
+    // aquí se calcula igual para que el modo demo se comporte como el real.
+    const pasos = demoStore.getSubtasks()
+    return demoStore.getTasks().map((t) => {
+      const suyos = pasos.filter((p) => p.task_id === t.id)
+      return { ...t, subtasks_total: suyos.length, subtasks_done: suyos.filter((p) => p.done).length }
+    })
+  }
   return apiFetch<Task[]>('/tasks')
 }
 
@@ -73,6 +81,51 @@ export async function deleteTask(id: string): Promise<void> {
     return
   }
   demoStore.saveTasks(demoStore.getTasks().filter((t) => t.id !== id))
+}
+
+// ─── Pasos de una tarea (subtareas) ──────────────────────────────────
+
+export async function listSubtasks(taskId: string): Promise<Subtask[]> {
+  if (isDemo) return demoStore.getSubtasks().filter((p) => p.task_id === taskId)
+  return apiFetch<Subtask[]>(`/tasks/${taskId}/subtasks`)
+}
+
+export async function createSubtask(taskId: string, title: string): Promise<Subtask> {
+  if (!isDemo) {
+    return apiFetch<Subtask>(`/tasks/${taskId}/subtasks`, {
+      method: 'POST', body: JSON.stringify({ title }),
+    })
+  }
+  const todos = demoStore.getSubtasks()
+  const paso: Subtask = {
+    id: demoStore.uid(),
+    task_id: taskId,
+    title: title.trim(),
+    done: false,
+    position: todos.filter((p) => p.task_id === taskId).length,
+  }
+  demoStore.saveSubtasks([...todos, paso])
+  return paso
+}
+
+export async function updateSubtask(id: string, patch: Partial<Subtask>): Promise<Subtask> {
+  if (!isDemo) {
+    return apiFetch<Subtask>(`/subtasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
+  }
+  const todos = demoStore.getSubtasks()
+  const i = todos.findIndex((p) => p.id === id)
+  if (i === -1) throw new Error('Ese paso no existe')
+  todos[i] = { ...todos[i], ...patch }
+  demoStore.saveSubtasks(todos)
+  return todos[i]
+}
+
+export async function deleteSubtask(id: string): Promise<void> {
+  if (!isDemo) {
+    await apiFetch(`/subtasks/${id}`, { method: 'DELETE' })
+    return
+  }
+  demoStore.saveSubtasks(demoStore.getSubtasks().filter((p) => p.id !== id))
 }
 
 // ─── Estados de las tareas ───────────────────────────────────────────
