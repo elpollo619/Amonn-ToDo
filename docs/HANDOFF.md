@@ -43,6 +43,53 @@
 - Valores 🔴 del compose (contraseña BD, `JWT_SECRET`, `WA_API_KEY`, y ahora `GEMINI_API_KEY`, `SMTP_PASS`): los tiene Cris; **no van en este archivo**.
 - Cris mencionó "una API con Google que ya juntamos con el OpenWA": no es visible desde aquí (está en su NAS/Gateway); Amonn necesita su propia clave en `GEMINI_API_KEY` (puede ser la misma clave si es de Google AI Studio).
 
+## 🖥️ Sesión LOCAL en el PC de Cris (misma red que el NAS) — instrucciones para Claude Code
+
+Cris tiene Claude Code instalado en su PC de casa. Desde ahí SÍ se llega al NAS
+(`192.168.1.9`). Objetivo de la sesión local: **operar el NAS directamente sin
+pedir capturas a Cris**. Cris es no técnico y escribe en español: hablarle en
+español, un paso cada vez, y hacer uno mismo todo lo que se pueda por consola.
+
+### 1. Preparar el repo
+```
+git clone https://github.com/elpollo619/Amonn-ToDo
+cd Amonn-ToDo
+git checkout claude/job-list-app-whatsapp-av9rwl
+```
+Leer este archivo entero antes de tocar nada.
+
+### 2. Acceso al NAS por SSH
+- Si `ssh` no entra: en UGOS (navegador) → Systemsteuerung / Panel de control → **Terminal** → activar **SSH** (puerto 22). Usuario = el administrador de UGOS (Cris lo sabe). Docker requiere `sudo`.
+- Comprobar: `ssh USUARIO@192.168.1.9 'sudo docker ps'` → deben verse `amonn-server`, `amonn-db-1`, `amonn-watchtower`, `openwa-api`.
+- Compose de Amonn en el NAS: carpeta compartida `docker` → probablemente `/volume1/docker/docker-compose.yaml` (contiene los secretos reales; **no copiarlo al repo**). El proyecto se creó desde la GUI de UGOS con nombre `amonn`; si se recrea por CLI usar `sudo docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d`.
+- Sin SSH, alternativa peor: la GUI de UGOS (Docker → Container → Terminal) — `amonn-server` es Alpine (`/bin/sh`), `openwa-api` tiene `/bin/bash`.
+
+### 3. Comandos de diagnóstico
+```
+curl -s http://192.168.1.9:8080/api/version          # versión que corre (SHA corto)
+ssh USUARIO@192.168.1.9 'sudo docker logs --tail 80 amonn-server'
+ssh USUARIO@192.168.1.9 'sudo docker logs --tail 40 openwa-api'
+ssh USUARIO@192.168.1.9 'sudo docker logs --tail 20 amonn-watchtower'
+```
+Estado bueno en `amonn-server`: `[wa] sesión seleccionada: 8baec4ba-…` y
+`[wa] tiempo real suscrito a ["message.received"]`. Estado malo (problema
+abierto al cerrar esta sesión): bucle `el Gateway devolvió UNAUTHORIZED: API
+key is no longer valid` → ver Gotchas (carrera del Gateway). La clave
+`WA_API_KEY` ES válida (verificado en `api_keys` de `/app/data/main.sqlite`
+del contenedor `openwa-api`: activa, sin caducidad, sin IPs).
+
+### 4. Problema abierto y cómo seguir
+1. Confirmar con `docker logs amonn-server` si tras `ede447f` (espera 2 s → 4 → 8 → 15 s antes de suscribirse) llega a `tiempo real suscrito`. Cris dijo "sigue lo mismo" pero sin captura: verificar.
+2. Si sigue fallando incluso con 15 s: mirar en `docker logs openwa-api` si ahora "Client connected" aparece ANTES de "Client disconnected" (entonces NO es la carrera: `validateApiKey` lanza en la ruta WebSocket; comparar `resolveClientIp` de `events.gateway.js` con `getClientIp` de `api-key.guard.js`, y probar a quitar `extraHeaders` dejando solo `auth.apiKey`, o al revés).
+3. Prueba directa del canal desde el NAS (sin Amonn): un script Node con `socket.io-client` dentro de `amonn-server` (`docker exec -it amonn-server sh`, `node -e ...` con `/app/node_modules`) que conecte a `http://openwa-api:2785/events`, espere N s y envíe el subscribe; ver qué responde.
+4. Plan B si el tiempo real no es fiable: sondeo (polling) por REST cada 10 s de los mensajes recientes de la sesión (el Gateway tiene `GET /api/sessions/:id/messages/:chatId/history`; ver `/app/dist/modules` para un listado global) o webhook a un nombre no privado (el Gateway bloquea destinos internos por SSRF: "Destination address is not allowed").
+5. Después: probar el asistente escribiendo «hola» al número desde el móvil de Cris; crear tarea por WhatsApp; comprobar aviso al asignar.
+
+### 5. Cambios de configuración en el NAS
+- Imagen: automática (Watchtower cada 5 min tras cada push a la rama; CI publica `latest`).
+- Variables (`GEMINI_API_KEY`, `SMTP_USER`, `SMTP_PASS`, `APP_URL`, `WA_API_KEY`…): editar el compose del NAS y recrear: `sudo docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d` (la GUI de UGOS con "Neu bereitstellen" NO aplicó cambios de entorno). Los datos están en `./data/pgdata` junto al compose: no borrar.
+- Claves que faltan y debe conseguir Cris: Gemini (https://aistudio.google.com/apikey) y contraseña de aplicación de Gmail para `elpollotue@gmail.com`.
+
 ## Red doméstica (cambió el 2026-09-02)
 
 - Router nuevo: **UniFi Cloud Gateway Max (UCG Max)** en `192.168.1.1`, conectado directo al módem de internet. NAS ("NasBiaundCris", UGREEN NASync DXP6800 Pro) en el puerto 4 (2.5 GbE).
