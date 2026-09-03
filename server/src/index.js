@@ -12,7 +12,12 @@ import { tasksRouter } from './routes/tasks.js'
 import { profilesRouter } from './routes/profiles.js'
 import { webhookRouter } from './routes/webhook.js'
 import { scheduleReminders, runReminders } from './reminders.js'
-import { resolveSession, ensureWebhookRegistered, getSessionStatus } from './whatsapp.js'
+import {
+  resolveSession,
+  ensureWebhookRegistered,
+  getSessionStatus,
+  startSessionWatch,
+} from './whatsapp.js'
 import { connectRealtime, realtimeConnected } from './realtime.js'
 import { mailEnabled } from './mailer.js'
 import { errorHandler } from './util.js'
@@ -129,6 +134,8 @@ async function setupWhatsApp(attempt = 1) {
   }
   // Tiempo real (recomendado): recibe los mensajes por Socket.IO.
   connectRealtime()
+  // Vigila que el teléfono siga vinculado y avisa en cuanto deje de estarlo.
+  startSessionWatch()
   // Webhook (opcional y alternativo): solo si se configura una URL de destino.
   // Su fallo no afecta al tiempo real.
   if (config.whatsapp.webhookUrl) {

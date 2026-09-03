@@ -76,16 +76,71 @@ export async function resolveSession() {
   }
   const list = asList(await res.json())
   if (list.length === 0) throw new Error('El Gateway no tiene ninguna sesión')
-  const connected = list.find((s) =>
-    /connect|working|authenticated|ready|online/i.test(String(s.status ?? s.state ?? '')),
-  )
+  const connected = list.find((s) => isConnectedStatus(s.status ?? s.state))
+  // Si NINGUNA sesión está conectada seguimos con la primera para poder
+  // arrancar, pero hay que decirlo bien alto: una sesión 'failed' o 'qr_ready'
+  // no recibe ni envía nada, y antes se registraba igual que una sana (así
+  // estuvo WhatsApp caído semanas sin que el Protokoll lo delatara).
   const chosen = connected ?? list[0]
   waState.sessionId = chosen.id ?? chosen.sessionId ?? chosen.name ?? chosen.session
-  console.log(`[wa] sesión seleccionada: ${waState.sessionId}`)
+  const status = String(chosen.status ?? chosen.state ?? 'desconocido')
+  console.log(`[wa] sesión seleccionada: ${waState.sessionId} (estado: ${status})`)
+  lastKnownConnected = Boolean(connected)
+  if (!connected) warnSessionNotConnected(status)
   return waState.sessionId
 }
 
+// Último estado conocido (conectada / no conectada). Lo comparte el aviso de
+// arranque con el vigilante, para no repetir el mismo mensaje dos veces.
+let lastKnownConnected = null
+
+/** Aviso claro y accionable cuando la sesión de WhatsApp no está vinculada. */
+function warnSessionNotConnected(status) {
+  lastKnownConnected = false
+  console.error(
+    `[wa] ⚠️ LA SESIÓN DE WHATSAPP NO ESTÁ CONECTADA (estado: ${status}). ` +
+      'No se recibirán ni enviarán mensajes hasta volver a vincular el teléfono: ' +
+      'abre el panel del Gateway y escanea el código QR ' +
+      `(o GET ${config.whatsapp.apiUrl}/api/sessions/${waState.sessionId}/qr).`,
+  )
+}
+
+let sessionWatchTimer = null
+
+/**
+ * Vigila el estado de la sesión y avisa SOLO cuando cambia (conectada ↔ caída).
+ * Sin esto, que WhatsApp se desvincule es un fallo totalmente silencioso.
+ */
+export function startSessionWatch(intervalMs = 5 * 60_000) {
+  if (sessionWatchTimer || !config.whatsapp.enabled) return
+  const check = async () => {
+    try {
+      const { status, connected } = await getSessionStatus()
+      if (connected === lastKnownConnected) return
+      lastKnownConnected = connected
+      if (connected) console.log(`[wa] la sesión de WhatsApp está conectada (estado: ${status})`)
+      else warnSessionNotConnected(status)
+    } catch (err) {
+      console.error(`[wa] no pude comprobar el estado de la sesión: ${err.message}`)
+    }
+  }
+  void check()
+  sessionWatchTimer = setInterval(check, intervalMs)
+  sessionWatchTimer.unref?.()
+}
+
+// ⚠️ Ojo con las subcadenas: 'qr_ready' CONTIENE 'ready', y 'disconnected'
+// contiene 'connect'. Por eso se descartan primero los estados de avería o de
+// espera; antes, una sesión esperando el QR se daba por conectada.
+const NOT_CONNECTED_RE = /qr|pair|fail|error|initiali|starting|stopp|closed|logout|logged_out|disconnect/i
 const CONNECTED_RE = /connect|working|authenticated|ready|online|open/i
+
+/** ¿Este estado del Gateway significa "teléfono vinculado y operativo"? */
+export function isConnectedStatus(status) {
+  const s = String(status ?? '')
+  if (NOT_CONNECTED_RE.test(s)) return false
+  return CONNECTED_RE.test(s)
+}
 
 /**
  * Estado actual de la sesión de WhatsApp en el Gateway (¿el número sigue
@@ -101,7 +156,7 @@ export async function getSessionStatus() {
   return {
     sessionId: waState.sessionId,
     status,
-    connected: CONNECTED_RE.test(status) && !/disconnect|closed|logout|logged_out/i.test(status),
+    connected: isConnectedStatus(status),
     phone: s.phone ?? s.phoneNumber ?? s.me?.id ?? null,
   }
 }

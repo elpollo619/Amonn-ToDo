@@ -32,6 +32,7 @@ let lastErrorCode = null
 let reconnectDelay = 10_000 // espera actual para reconectar (crece si falla)
 let reconnectTimer = null
 let subscribeTimer = null
+let ackTimer = null // espera del acuse del Gateway al 'subscribe'
 let subscribeDelay = 2_000 // espera tras conectar antes de suscribirse (ver abajo)
 
 const MIN_DELAY = 10_000
@@ -39,6 +40,7 @@ const MAX_DELAY = 120_000
 const RATE_LIMIT_DELAY = 65_000 // el límite es 10/min: esperamos > 60s
 const SUBSCRIBE_DELAY_MIN = 2_000
 const SUBSCRIBE_DELAY_MAX = 15_000
+const ACK_TIMEOUT = 10_000 // si el Gateway no acusa la suscripción, reintentamos
 
 // ⚠️ Carrera en el Gateway (events.gateway.ts, handleConnection): al conectar,
 // valida la API key en su base de datos con `await` y SOLO DESPUÉS guarda la
@@ -49,13 +51,32 @@ const SUBSCRIBE_DELAY_MAX = 15_000
 // unos segundos tras conectar antes de suscribirnos, y si aun así ocurre,
 // reintentamos esperando más.
 
+// ⚠️ El Gateway es NestJS: handleSubscribe hace `return {type:'subscribed'}`.
+// En NestJS ese valor NO se emite, viaja por el CALLBACK DE ACUSE de Socket.IO.
+// Si emitimos sin callback, la confirmación —y los errores de la suscripción,
+// como UNAUTHORIZED o FORBIDDEN_SESSION— se pierden en silencio y parece que
+// no pasa nada. Por eso pasamos siempre callback y además vigilamos que llegue.
 function subscribe() {
-  socket.emit('message', {
-    type: 'subscribe',
-    sessionId: waState.sessionId,
-    events: ['message.received'],
-    requestId: `amonn-${Date.now()}`,
-  })
+  clearTimeout(ackTimer)
+  ackTimer = setTimeout(() => {
+    console.error(
+      `[wa] tiempo real: el Gateway no confirmó la suscripción en ${Math.round(ACK_TIMEOUT / 1000)}s; reintento`,
+    )
+    if (socket?.connected) subscribe()
+  }, ACK_TIMEOUT)
+  socket.emit(
+    'message',
+    {
+      type: 'subscribe',
+      sessionId: waState.sessionId,
+      events: ['message.received'],
+      requestId: `amonn-${Date.now()}`,
+    },
+    (ack) => {
+      clearTimeout(ackTimer)
+      handleGatewayMessage(ack)
+    },
+  )
 }
 
 function scheduleReconnect(reason) {
@@ -72,6 +93,63 @@ function scheduleReconnect(reason) {
   }, delay)
   // Siguiente espera más larga (hasta el tope), por si vuelve a fallar.
   if (lastErrorCode !== 'SUBSCRIBE_RACE') reconnectDelay = Math.min(MAX_DELAY, reconnectDelay * 2)
+}
+
+/**
+ * Procesa un mensaje del Gateway. Se usa DOS veces: para los mensajes que el
+ * Gateway empuja (`socket.on('message')`, por donde llegan los eventos reales
+ * y los avisos de expulsión) y para el acuse del `subscribe`, que en NestJS
+ * llega por el callback y no por un emit.
+ */
+function handleGatewayMessage(msg) {
+  try {
+    if (!msg || typeof msg !== 'object') return
+    switch (msg.type) {
+      case 'event': {
+        if (!msg.payload) return
+        const { event, data } = msg.payload
+        if (event && !String(event).toLowerCase().includes('message')) return
+        handleInbound(data).catch((e) =>
+          console.error('[wa] error procesando mensaje en tiempo real:', e.message),
+        )
+        return
+      }
+      case 'subscribed': {
+        console.log(
+          `[wa] tiempo real suscrito a ${JSON.stringify(msg.events ?? [])} (sesión ${msg.sessionId})`,
+        )
+        reconnectDelay = MIN_DELAY // todo bien: reiniciamos las esperas
+        subscribeDelay = SUBSCRIBE_DELAY_MIN
+        return
+      }
+      case 'error': {
+        lastErrorCode = msg.code ?? null
+        console.error(`[wa] tiempo real: el Gateway devolvió ${msg.code}: ${msg.message}`)
+        if (msg.code === 'UNAUTHORIZED' && /no longer valid/i.test(msg.message ?? '')) {
+          // Casi seguro la carrera descrita arriba (la clave sí es válida:
+          // el propio Gateway aceptó la conexión). Reintentar esperando más.
+          subscribeDelay = Math.min(SUBSCRIBE_DELAY_MAX, subscribeDelay * 2)
+          lastErrorCode = 'SUBSCRIBE_RACE'
+          console.error(
+            `[wa] el Gateway aún no había terminado de validar la clave al recibir la suscripción; ` +
+              `reintento esperando ${Math.round(subscribeDelay / 1000)}s tras conectar`,
+          )
+        } else if (msg.code === 'UNAUTHORIZED') {
+          console.error('[wa] revisa WA_API_KEY: el Gateway no acepta la clave para el tiempo real')
+        } else if (msg.code === 'FORBIDDEN_SESSION') {
+          console.error(
+            `[wa] la API key no tiene permiso para la sesión ${waState.sessionId}; ` +
+              'en el Gateway, permite esa sesión (o todas) para esta clave',
+          )
+        }
+        return
+      }
+      default:
+        return
+    }
+  } catch (e) {
+    console.error('[wa] error en evento de tiempo real:', e.message)
+  }
 }
 
 export function connectRealtime() {
@@ -102,56 +180,7 @@ export function connectRealtime() {
     }, subscribeDelay)
   })
 
-  socket.on('message', (msg) => {
-    try {
-      if (!msg || typeof msg !== 'object') return
-      switch (msg.type) {
-        case 'event': {
-          if (!msg.payload) return
-          const { event, data } = msg.payload
-          if (event && !String(event).toLowerCase().includes('message')) return
-          handleInbound(data).catch((e) =>
-            console.error('[wa] error procesando mensaje en tiempo real:', e.message),
-          )
-          return
-        }
-        case 'subscribed': {
-          console.log(
-            `[wa] tiempo real suscrito a ${JSON.stringify(msg.events ?? [])} (sesión ${msg.sessionId})`,
-          )
-          reconnectDelay = MIN_DELAY // todo bien: reiniciamos las esperas
-          subscribeDelay = SUBSCRIBE_DELAY_MIN
-          return
-        }
-        case 'error': {
-          lastErrorCode = msg.code ?? null
-          console.error(`[wa] tiempo real: el Gateway devolvió ${msg.code}: ${msg.message}`)
-          if (msg.code === 'UNAUTHORIZED' && /no longer valid/i.test(msg.message ?? '')) {
-            // Casi seguro la carrera descrita arriba (la clave sí es válida:
-            // el propio Gateway aceptó la conexión). Reintentar esperando más.
-            subscribeDelay = Math.min(SUBSCRIBE_DELAY_MAX, subscribeDelay * 2)
-            lastErrorCode = 'SUBSCRIBE_RACE'
-            console.error(
-              `[wa] el Gateway aún no había terminado de validar la clave al recibir la suscripción; ` +
-                `reintento esperando ${Math.round(subscribeDelay / 1000)}s tras conectar`,
-            )
-          } else if (msg.code === 'UNAUTHORIZED') {
-            console.error('[wa] revisa WA_API_KEY: el Gateway no acepta la clave para el tiempo real')
-          } else if (msg.code === 'FORBIDDEN_SESSION') {
-            console.error(
-              `[wa] la API key no tiene permiso para la sesión ${waState.sessionId}; ` +
-                'en el Gateway, permite esa sesión (o todas) para esta clave',
-            )
-          }
-          return
-        }
-        default:
-          return
-      }
-    } catch (e) {
-      console.error('[wa] error en evento de tiempo real:', e.message)
-    }
-  })
+  socket.on('message', handleGatewayMessage)
 
   socket.on('connect_error', (err) => {
     console.error('[wa] tiempo real: error de conexión:', err.message)
@@ -159,6 +188,7 @@ export function connectRealtime() {
 
   socket.on('disconnect', (reason) => {
     clearTimeout(subscribeTimer)
+    clearTimeout(ackTimer)
     console.log(`[wa] tiempo real desconectado (${reason})`)
     // Cuando es el SERVIDOR (el Gateway) quien cierra, socket.io-client NO
     // reconecta solo: lo hacemos nosotros, con espera creciente y respetando
