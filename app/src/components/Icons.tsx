@@ -139,3 +139,13 @@ export function IconBoard({ size = 20 }: { size?: number }) {
     </svg>
   )
 }
+
+/** Línea de tiempo (barras de distinta longitud). */
+export function IconTimeline({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M3 6h11M3 12h17M3 18h8" />
+    </svg>
+  )
+}

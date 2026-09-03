@@ -78,6 +78,39 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Línea de tiempo — paso 4 HECHO (2026-09-03)
+
+- **Sin cambios de servidor**: se apoya entera en los plazos del paso 1.
+- **`app/src/lib/timeline.ts`** tiene TODA la aritmética separada de la
+  pantalla (recortar barras que se salen de la ventana, repartir las que se
+  solapan en carriles, contar solo días laborables) para poder probarla sin
+  navegador. **`app/src/pages/Timeline.tsx`** solo pinta. Ruta `/tiempo`.
+- **Solo días laborables**: el taller no trabaja el fin de semana, y dedicarle
+  dos columnas de siete a algo siempre vacío desperdicia la mitad del ancho.
+  Una tarea que empieza en sábado se engancha al lunes siguiente; una que
+  acaba en domingo, al viernes anterior.
+- Barras recortadas en los bordes de la ventana, con el lado cortado en línea
+  discontinua y sin esquina redondeada para que se vea que la tarea sigue.
+- Reparto en carriles voraz (primer carril libre). Fila extra para lo que no
+  tiene responsable, que es lo que suele quedarse olvidado. Aviso al pie con
+  las tareas abiertas **sin fecha de fin**, que por definición no pueden salir.
+- Navegación por semanas, botón «Hoy», y 2 o 4 semanas a la vista. En el móvil
+  se desplaza a lo ancho: comprimir dos semanas en 390 px dejaría las barras
+  ilegibles.
+- ⚠️ Las guías verticales son el **fondo** de la fila, no elementos de la
+  rejilla: como elementos alteraban la altura de las filas y aplastaban las
+  barras.
+- ⚠️ Tercera vez que aparece: `text-transform: capitalize` en español produce
+  "Agosto De 2026". La mayúscula inicial se pone en JS.
+
+Pruebas: 22 en `app/test/timeline.test.ts`. Se ejecutan con `npm test` dentro
+de `app/` (se compila con esbuild vía npx y se corre con node; el proyecto no
+tiene runner de tests de frontend).
+
+### Siguiente en el orden acordado
+5. Comentarios y fotos (la más pesada: guardar ficheros en el NAS y bajar las
+   imágenes que llegan por WhatsApp).
+
 ## Subtareas / pasos — paso 3 HECHO (2026-09-03)
 
 - **Tabla `subtasks`** + `subtasks.service.js` + `/api/tasks/:id/subtasks` y

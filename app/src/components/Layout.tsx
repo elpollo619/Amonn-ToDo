@@ -1,12 +1,13 @@
 import { NavLink, Outlet, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Avatar } from './Avatar'
-import { IconBoard, IconCalendar, IconLogout, IconTasks, IconUser, IconUsers } from './Icons'
+import { IconBoard, IconTimeline, IconCalendar, IconLogout, IconTasks, IconUser, IconUsers } from './Icons'
 import './Layout.css'
 
 const links = [
   { to: '/', label: 'Hoy', Icon: IconTasks, end: true },
   { to: '/tablero', label: 'Tablero', Icon: IconBoard, end: false },
+  { to: '/tiempo', label: 'Tiempo', Icon: IconTimeline, end: false },
   { to: '/calendario', label: 'Calendario', Icon: IconCalendar, end: false },
   { to: '/equipo', label: 'Equipo', Icon: IconUsers, end: false },
   { to: '/perfil', label: 'Perfil', Icon: IconUser, end: false },
