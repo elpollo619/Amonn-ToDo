@@ -78,7 +78,7 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
-## Comentarios y fotos — paso 5 (2026-09-03) — TEXTO HECHO, FOTOS A FALTA DE UN VOLUMEN
+## Comentarios y fotos — paso 5 HECHO (2026-09-03)
 
 - **`comments` y `attachments`** + `comments.service.js` + rutas
   `/api/tasks/:id/comments`, `/api/comments/:id`,
@@ -88,7 +88,20 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
   («comenta en la caldera: falta el diferencial», también `kommentiere zu…` y
   `comenta em…`). Cada comentario guarda su origen ('app'/'whatsapp') y se
   enseña en la app.
-- ⚠️ **LOS ADJUNTOS ESTÁN DESACTIVADOS A PROPÓSITO Y ESTO ES LO IMPORTANTE.**
+- ✅ **ALMACENAMIENTO YA CONFIGURADO EN EL NAS (2026-09-03).** Con permiso de
+  Cris se añadió al compose (`/volume1/docker/docker-compose.yaml`, servicio
+  `server`): `UPLOAD_DIR: /srv/uploads` y el volumen
+  `./data/uploads:/srv/uploads`; copia de seguridad en
+  `docker-compose.yaml.bak-antes-uploads`. Recreado con
+  `docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d`.
+  ⚠️ El **servicio** se llama `server`, no `amonn-server` (ese es el
+  container_name): `--force-recreate amonn-server` falla con "no such service".
+  ⚠️ El usuario `Cris` NO puede crear directorios en `/volume1/docker` (hace
+  falta root); no importa, Docker crea solo el origen del bind mount.
+  **Verificado de verdad**: se escribió un fichero, se recreó el contenedor
+  (id distinto) y el fichero seguía ahí. `storageStatus()` devuelve
+  `{"ok":true,"dir":"/srv/uploads"}`.
+- ⚠️ **Por qué los adjuntos siguen estando condicionados en el código:**
   `amonn-server` **no tiene NINGÚN volumen** (comprobado con `docker inspect`),
   así que cualquier fichero escrito dentro se pierde cuando Watchtower recrea
   el contenedor, o sea, **en cada despliegue**. Guardar fotos ahí sería perder
