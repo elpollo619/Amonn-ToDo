@@ -78,6 +78,48 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Fotos entrantes por WhatsApp — NO HECHO, pero el terreno ya está explorado
+
+Es lo único que falta del paso 5. El almacenamiento de Amonn ya está resuelto
+(ver arriba); lo que falta es sacar los bytes de la foto del Gateway.
+
+**Lo averiguado (2026-09-03), para no repetir el camino:**
+
+- El Gateway **no tiene ninguna ruta REST de descarga de medios**. En
+  `/app/dist/modules/message/message.controller.js` la única ruta con media es
+  `POST send-image` (para enviar). Nada de `download`, `file` ni `media`.
+- Sus datos viven en un **volumen Docker con nombre**:
+  `openwa_openwa-data` → `/app/data` (origen real:
+  `/volume1/@docker/volumes/openwa_openwa-data/_data`). Dentro hay un
+  directorio `media/`, **pero está VACÍO (0 ficheros)**.
+- `STORAGE_TYPE` y `STORAGE_LOCAL_PATH` existen como variables del Gateway
+  pero **están sin definir**. Sospecha principal: el Gateway no guarda los
+  medios por defecto y hay que activarlo con esas variables.
+- En el código del Gateway el campo que aparece en los payloads de mensaje es
+  `mimetype` (26 apariciones en `modules/message` y `modules/events`). No se
+  vio ningún `mediaUrl`, `mediaId`, `hasMedia` ni similar.
+- `better-sqlite3` NO está en `/app/node_modules` (la sesión anterior usó
+  `sqlite3`); para mirar `openwa.sqlite` hay que usar ese.
+
+**El siguiente paso concreto, y es el más rápido:** que Cris envíe UNA foto al
+número de Amonn y capturar el payload crudo del evento `message.received`. Con
+eso se sabe de golpe si la foto viene incrustada (base64), por una referencia
+a fichero, o si no viene nada y hace falta configurar `STORAGE_TYPE`. Se puede
+capturar con una sonda de `socket.io-client` dentro de `amonn-server` (el
+patrón está en la sección del tiempo real de este mismo archivo) imprimiendo
+el evento entero, o añadiendo temporalmente un `console.log` del payload en
+`realtime.js`.
+
+**Tres caminos posibles según lo que se vea**, de mejor a peor:
+1. La foto llega en el propio evento → guardarla con `createAttachment()` y
+   listo (todo lo demás ya está hecho).
+2. El Gateway la guarda en su volumen → montar `openwa_openwa-data` en
+   `amonn-server` **en solo lectura** y copiar el fichero. Requiere otro
+   cambio de compose.
+3. No guarda nada → activar `STORAGE_TYPE`/`STORAGE_LOCAL_PATH` en el compose
+   del Gateway (`/volume1/docker/OpenWA-main/docker-compose.yml`) y recrearlo.
+   Ojo: eso es tocar el Gateway, no Amonn.
+
 ## Comentarios y fotos — paso 5 HECHO (2026-09-03)
 
 - **`comments` y `attachments`** + `comments.service.js` + rutas
