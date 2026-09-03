@@ -19,7 +19,7 @@ import {
   createTask, completeTask, openTasksFor, openTasksAll, listUsers,
 } from './tasks.service.js'
 import { firstName, taskSummary } from './notify.js'
-import { describeDue, parseDateAnyLang, saysNoDate, todayKey, normalize } from './dates.js'
+import { describeRange, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
 import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
 import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
@@ -75,7 +75,7 @@ function listText(lang, titulo, tasks, today) {
   const lines = tasks.slice(0, 15).map((task, i) => {
     const who = task.assignee_name ? ` · ${task.assignee_name.split(' ')[0]}` : ''
     const prio = task.priority === 'high' ? ' 🔴' : ''
-    return `${i + 1}. ${task.title}${prio} · ${describeDue(task.due_date, today, lang, t)}${who}`
+    return `${i + 1}. ${task.title}${prio} · ${describeRange(task.start_date, task.due_date, today, lang, t)}${who}`
   })
   const more = tasks.length > 15 ? t(lang, 'list_more', { resto: tasks.length - 15 }) : ''
   return `${t(lang, 'list_header', { titulo, total: tasks.length })}\n${lines.join('\n')}${more}`
@@ -135,7 +135,14 @@ async function avanzarBorrador(phone, user, lang, draft, users, today) {
   if (draft.preguntado && !draft.confirmado) {
     await setPending(phone, user.id, { ...draft, esperando: 'confirm' })
     const resumen = taskSummary(
-      { title: draft.title, description: draft.description, due_date: draft.due, priority: draft.priority ?? 'medium' },
+      {
+        title: draft.title,
+        description: draft.description,
+        due_date: draft.due,
+        start_date: draft.start,
+        work_days: draft.work_days,
+        priority: draft.priority ?? 'medium',
+      },
       lang,
     )
     return t(lang, 'confirm', { resumen })
@@ -152,6 +159,8 @@ async function crearTarea(user, lang, draft, users, today) {
       description: draft.description || null,
       assignee_id: assignee?.id ?? null,
       due_date: draft.due || null,
+      start_date: draft.start || null,
+      work_days: draft.work_days ?? null,
       priority: draft.priority || 'medium',
     },
     user.id,
@@ -271,10 +280,18 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
     }
 
     case 'when': {
-      if (saysNoDate(texto, lang)) draft.due = null
-      else {
-        const d = parseDateAnyLang(texto, today, lang)
-        draft.due = d ? d.key : null
+      if (saysNoDate(texto, lang)) {
+        draft.due = null
+      } else {
+        // También aquí se admite un plazo entero: "del lunes al jueves".
+        const rango = parseRange(texto, today, lang)
+        if (rango) {
+          draft.start = rango.start
+          draft.due = rango.end
+        } else {
+          const d = parseDateAnyLang(texto, today, lang)
+          draft.due = d ? d.key : null
+        }
       }
       break
     }
@@ -386,6 +403,8 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         title: String(intent.title ?? '').trim() || null,
         description: intent.description || null,
         due: intent.due ?? undefined, // undefined = no se dijo → se preguntará
+        start: intent.start ?? null,
+        work_days: intent.work_days ?? null,
         priority: intent.priority || 'medium',
         preguntado: false,
       }

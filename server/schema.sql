@@ -77,3 +77,12 @@ create table if not exists aliases (
   unique (kind, phrase)
 );
 create index if not exists aliases_kind_phrase_idx on aliases (kind, phrase);
+
+-- ─── Plazos de inicio a fin (paso 1 del rediseño) ─────────────────────
+-- due_date pasa a significar la fecha de FIN. start_date es cuándo empieza
+-- (si está vacío, la tarea es de un solo día: el de due_date).
+-- work_days son los días de trabajo que lleva, que es como se mide la carga
+-- del equipo: siete tareas de media hora no son siete de dos días.
+alter table tasks add column if not exists start_date date;
+alter table tasks add column if not exists work_days  numeric(4,1);
+create index if not exists tasks_start_idx on tasks(start_date);

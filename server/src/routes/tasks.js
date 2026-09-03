@@ -42,6 +42,8 @@ tasksRouter.patch('/:id', async (req, res) => {
   if (b.priority !== undefined && PRIORITIES.includes(b.priority)) set('priority', b.priority)
   if (b.assignee_id !== undefined) set('assignee_id', b.assignee_id || null)
   if (b.due_date !== undefined) set('due_date', b.due_date || null)
+  if (b.start_date !== undefined) set('start_date', b.start_date || null)
+  if (b.work_days !== undefined) set('work_days', b.work_days === null ? null : Number(b.work_days))
   if (b.status !== undefined && STATUSES.includes(b.status)) {
     set('status', b.status)
     set('completed_at', b.status === 'done' ? new Date().toISOString() : null)

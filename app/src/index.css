@@ -1,62 +1,70 @@
 :root {
-  --bg: #f4f5fa;
+  /* Paleta del rediseño: papel cálido, tinta casi negra y un solo acento
+     verde. Los colores de urgencia (rojo vencida, ámbar hoy) comparten
+     luminosidad para que ninguno grite más que el otro, y todos los textos
+     pasan el contraste AA (comprobado). */
+  --bg: #fbfaf7;
   --surface: #ffffff;
-  --surface-2: #f0f2f8;
-  --surface-3: #e9ecf5;
-  --border: #e4e7ef;
-  --border-strong: #d3d7e3;
-  --text: #111827;
-  --text-soft: #5b6275;
-  --text-muted: #9aa1b4;
-  --primary: #5b5bd6;
-  --primary-dark: #4747c4;
-  --primary-soft: #ecedfd;
-  --primary-ink: #3b3bb0;
-  --success: #15803d;
-  --success-soft: #e6f6ec;
-  --warning: #b45309;
-  --warning-soft: #fdf1dc;
-  --danger: #dc2626;
-  --danger-soft: #fdeaea;
-  --info: #0369a1;
-  --info-soft: #e3f2fc;
-  --radius-lg: 18px;
-  --radius: 14px;
+  --surface-2: #f4f1ea;
+  --surface-3: #eae6de;
+  --border: #e8e4dc;
+  --border-strong: #d8d4cc;
+  --text: #16181c;
+  --text-soft: #4d5058;
+  --text-muted: #5f636b;
+  --primary: oklch(52% 0.13 155);
+  --primary-dark: oklch(45% 0.13 155);
+  --primary-soft: oklch(52% 0.13 155 / 0.09);
+  --primary-ink: oklch(42% 0.13 155);
+  --success: oklch(45% 0.13 155);
+  --success-soft: oklch(52% 0.13 155 / 0.1);
+  --warning: oklch(45% 0.13 70);
+  --warning-soft: oklch(58% 0.13 70 / 0.11);
+  --danger: oklch(45% 0.17 27);
+  --danger-strong: oklch(52% 0.17 27);
+  --danger-soft: oklch(52% 0.17 27 / 0.08);
+  --info: oklch(45% 0.13 250);
+  --info-soft: oklch(52% 0.13 250 / 0.1);
+  --radius-lg: 16px;
+  --radius: 12px;
   --radius-sm: 10px;
   --radius-xs: 8px;
-  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.05);
-  --shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 6px 20px rgba(17, 24, 39, 0.06);
-  --shadow-lg: 0 16px 48px rgba(17, 24, 39, 0.2);
+  --shadow-sm: 0 1px 2px rgba(20, 22, 26, 0.04);
+  --shadow: 0 1px 2px rgba(20, 22, 26, 0.04), 0 6px 20px rgba(20, 22, 26, 0.05);
+  --shadow-lg: 0 16px 48px rgba(20, 22, 26, 0.18);
   --nav-h: 64px;
   --tap: 44px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+  --font-titulo: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1117;
-    --surface: #171a23;
-    --surface-2: #1e222d;
-    --surface-3: #262b38;
-    --border: #2a2f3d;
+    --bg: #12141a;
+    --surface: #1b1e26;
+    --surface-2: #23262f;
+    --surface-3: #2b2f3a;
+    --border: #23262f;
     --border-strong: #3a4052;
-    --text: #eef0f6;
-    --text-soft: #a3a9bc;
-    --text-muted: #6f7691;
-    --primary: #7b7bf0;
-    --primary-dark: #6a6ae6;
-    --primary-soft: #23244a;
-    --primary-ink: #b9b9ff;
-    --success: #4ade80;
-    --success-soft: #133021;
-    --warning: #fbbf24;
-    --warning-soft: #3a2a0c;
-    --danger: #f87171;
-    --danger-soft: #3b1a1a;
-    --info: #60a5fa;
-    --info-soft: #14283e;
+    --text: #eceae5;
+    --text-soft: #c3bfb7;
+    --text-muted: #a8adb8;
+    --primary: oklch(72% 0.13 155);
+    --primary-dark: oklch(64% 0.13 155);
+    --primary-soft: oklch(72% 0.13 155 / 0.14);
+    --primary-ink: oklch(80% 0.12 155);
+    --success: oklch(74% 0.13 155);
+    --success-soft: oklch(72% 0.13 155 / 0.14);
+    --warning: oklch(80% 0.13 70);
+    --warning-soft: oklch(70% 0.13 70 / 0.15);
+    --danger: oklch(72% 0.16 27);
+    --danger-strong: oklch(64% 0.17 27);
+    --danger-soft: oklch(60% 0.17 27 / 0.16);
+    --info: oklch(76% 0.11 250);
+    --info-soft: oklch(70% 0.12 250 / 0.15);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
@@ -73,7 +81,7 @@ body {
   font-size: 15px;
   line-height: 1.45;
 }
-h1, h2, h3 { letter-spacing: -0.02em; line-height: 1.2; }
+h1, h2, h3 { font-family: var(--font-titulo); letter-spacing: -0.025em; line-height: 1.15; }
 button { font-family: inherit; cursor: pointer; color: inherit; }
 input, select, textarea { font-family: inherit; font-size: 16px; } /* 16px evita el zoom en iOS */
 a { color: inherit; text-decoration: none; }

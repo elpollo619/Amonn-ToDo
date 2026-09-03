@@ -78,6 +78,46 @@ idioma, autodetección, caducidad, y el idioma de los avisos.
    propósito: **no funcionará bien hasta que haya meses de historial**, y hoy
    la base de datos está casi vacía. No adelantarla.
 
+## Rediseño — dirección elegida y paso 1 HECHO (2026-09-03)
+
+Cris eligió una **mezcla de la A y la B**, y pidió además: plazos con **inicio
+y fin**, **línea de tiempo**, **subtareas**, **comentarios con fotos** y
+**estados propios del taller** (mencionó Jira como referencia de ideas; NO se
+copia su interfaz). Diseño completo en el lienzo, página «La mezcla A+B».
+
+**Orden acordado con Cris** (cada paso deja algo usable):
+1. ✅ **Plazos + pantalla de inicio nueva** — HECHO, ver abajo.
+2. Estados propios del taller.
+3. Subtareas.
+4. Línea de tiempo (necesita los plazos, ya están).
+5. Comentarios y fotos (la más pesada: guardar ficheros en el NAS y bajar las
+   imágenes que llegan por WhatsApp).
+
+### Paso 1, lo que ya está
+
+- **`tasks.start_date` y `tasks.work_days`.** `due_date` pasa a significar la
+  fecha de FIN. Si no hay `start_date`, la tarea es de un solo día.
+  `work_days` son los días de trabajo, y es lo que mide la carga real: siete
+  tareas de media hora no son siete de dos días.
+- **El asistente entiende plazos**: "del lunes al jueves", "vom Montag bis
+  Donnerstag", "de segunda a quinta", y duraciones ("3 días de trabajo").
+  `parseRange()` en `dates.js` no usa una gramática por idioma: busca la
+  primera fecha y, si tras ella hay una palabra de unión, busca una segunda.
+- **Pantalla de inicio nueva** (`app/src/pages/Today.tsx`), que es ya la
+  portada; el tablero antiguo se movió a `/tablero` y sigue funcionando.
+  Estructura por URGENCIA (vencidas / hoy / esta semana / más adelante), tres
+  cifras arriba, carga del equipo **en días** con aviso de sobrecarga, y una
+  línea para apuntar en segundos con la sintaxis `@persona /plazo !`
+  (`app/src/lib/quickAdd.ts`, resuelto en el navegador, sin ida y vuelta).
+- **Paleta y tipografías del rediseño aplicadas a toda la app**
+  (`index.css`): papel cálido, tinta casi negra, un solo acento verde,
+  Instrument Sans + IBM Plex Sans/Mono. Todos los textos pasan contraste AA.
+  Claro y oscuro.
+- `TaskModal` gana los campos «Empieza» y «Días de trabajo».
+
+Pruebas: `npm test` (fechas + asistente) y `npm run test:db`
+(diálogo + vocabulario + plazos).
+
 ## Vocabulario del equipo — Entrega 2 HECHA (2026-09-03)
 
 - **`aliases` (tabla nueva) + `server/src/aliases.js`.** Dos tipos:

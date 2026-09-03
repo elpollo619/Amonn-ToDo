@@ -26,7 +26,12 @@ export interface Task {
   priority: TaskPriority
   assignee_id: string | null
   created_by: string | null
-  due_date: string | null // YYYY-MM-DD
+  /** Fecha de FIN del plazo (YYYY-MM-DD). */
+  due_date: string | null
+  /** Fecha de inicio del plazo. Si falta, la tarea es de un solo día. */
+  start_date?: string | null
+  /** Días de trabajo que lleva. Es lo que mide la carga real del equipo. */
+  work_days?: number | string | null
   completed_at: string | null
   last_reminder_at: string | null
   created_at: string
@@ -40,4 +45,6 @@ export interface TaskInput {
   priority?: TaskPriority
   assignee_id?: string | null
   due_date?: string | null
+  start_date?: string | null
+  work_days?: number | null
 }

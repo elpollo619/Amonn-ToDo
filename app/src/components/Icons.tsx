@@ -127,3 +127,15 @@ export function IconMail({ size = 20 }: { size?: number }) {
     </svg>
   )
 }
+
+/** Tablero por columnas (kanban). */
+export function IconBoard({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="5.5" height="16" rx="1.6" />
+      <rect x="9.75" y="4" width="5.5" height="11" rx="1.6" />
+      <rect x="16.5" y="4" width="4.5" height="7" rx="1.6" />
+    </svg>
+  )
+}

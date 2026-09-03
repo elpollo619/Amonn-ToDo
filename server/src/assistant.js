@@ -10,7 +10,7 @@
 // o si Gemini falla, usa reglas en español que cubren los casos habituales.
 // ============================================================
 import { config } from './config.js'
-import { normalize, parseDateAnyLang, todayKey, weekdayOf } from './dates.js'
+import { normalize, parseDateAnyLang, parseRange, parseWorkDays, todayKey, weekdayOf } from './dates.js'
 import { interpretReply } from './whatsapp.js'
 import { resolvePerson, resolveTask } from './aliases.js'
 
@@ -170,8 +170,21 @@ function parseInLang(text, ctx, lang) {
     let rest = t.replace(cfg.create, '')
     const priority = extractPriority(rest, cfg)
     rest = stripPriority(rest, cfg)
-    const due = parseDateAnyLang(rest, ctx.today, lang)
-    if (due) rest = rest.replace(due.match, ' ')
+    // Primero el PLAZO ("del lunes al jueves"); si no hay, una sola fecha.
+    const rango = parseRange(rest, ctx.today, lang)
+    let inicio = null
+    let due = null
+    if (rango) {
+      inicio = rango.start
+      due = { key: rango.end }
+      for (const m of rango.matches) rest = rest.replace(m, ' ')
+    } else {
+      due = parseDateAnyLang(rest, ctx.today, lang)
+      if (due) rest = rest.replace(due.match, ' ')
+    }
+    // Y después la duración ("3 días de trabajo"), que es otra cosa distinta.
+    const trabajo = parseWorkDays(rest)
+    if (trabajo) rest = rest.replace(trabajo.match, ' ')
     let assignee = null
     const sepRe = new RegExp(`^${cfg.prep} ([a-z]+(?: [a-z]+)?)\\s*${cfg.sep}?\\s*`)
     const m = rest.match(sepRe)
@@ -195,7 +208,16 @@ function parseInLang(text, ctx, lang) {
       }
     }
     const title = restoreCase(cleanTitle(rest, lang), raw)
-    return { action: 'create_task', title, assignee, due: due?.key ?? null, priority, description: null }
+    return {
+      action: 'create_task',
+      title,
+      assignee,
+      due: due?.key ?? null,
+      start: inicio,
+      work_days: trabajo?.days ?? null,
+      priority,
+      description: null,
+    }
   }
 
   const done = t.match(cfg.done)
@@ -223,13 +245,26 @@ function parseInLang(text, ctx, lang) {
     if (r.user) {
       let rest = ask[2]
       const priority = extractPriority(rest, cfg); rest = stripPriority(rest, cfg)
-      const due = parseDateAnyLang(rest, ctx.today, lang)
-      if (due) rest = rest.replace(due.match, ' ')
+      const rango2 = parseRange(rest, ctx.today, lang)
+      let inicio2 = null
+      let due2 = null
+      if (rango2) {
+        inicio2 = rango2.start
+        due2 = { key: rango2.end }
+        for (const m of rango2.matches) rest = rest.replace(m, ' ')
+      } else {
+        due2 = parseDateAnyLang(rest, ctx.today, lang)
+        if (due2) rest = rest.replace(due2.match, ' ')
+      }
+      const trabajo2 = parseWorkDays(rest)
+      if (trabajo2) rest = rest.replace(trabajo2.match, ' ')
       return {
         action: 'create_task',
         title: restoreCase(cleanTitle(rest, lang), raw),
         assignee: ask[1],
-        due: due?.key ?? null,
+        due: due2?.key ?? null,
+        start: inicio2,
+        work_days: trabajo2?.days ?? null,
         priority,
         description: null,
       }

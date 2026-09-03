@@ -4,6 +4,7 @@ import { DataProvider } from './context/DataContext'
 import { ToastProvider } from './context/ToastContext'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
+import { Today } from './pages/Today'
 import { Board } from './pages/Board'
 import { Calendar } from './pages/Calendar'
 import { Team } from './pages/Team'
@@ -26,7 +27,8 @@ function AppRoutes() {
     <DataProvider>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<Board />} />
+          <Route index element={<Today />} />
+          <Route path="tablero" element={<Board />} />
           <Route path="calendario" element={<Calendar />} />
           <Route path="equipo" element={<Team />} />
           <Route path="perfil" element={<Profile />} />

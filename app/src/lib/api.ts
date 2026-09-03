@@ -35,6 +35,8 @@ export async function createTask(
     assignee_id: input.assignee_id ?? null,
     created_by: createdBy,
     due_date: input.due_date ?? null,
+    start_date: input.start_date ?? null,
+    work_days: input.work_days ?? null,
     completed_at: null,
     last_reminder_at: null,
     created_at: now,

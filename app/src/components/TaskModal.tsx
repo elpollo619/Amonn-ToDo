@@ -26,6 +26,10 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
   const [priority, setPriority] = useState<TaskPriority>(task?.priority ?? 'medium')
   const [assignee, setAssignee] = useState<string>(task?.assignee_id ?? '')
   const [dueDate, setDueDate] = useState<string>(task?.due_date ?? defaultDate ?? '')
+  const [startDate, setStartDate] = useState<string>(task?.start_date ?? '')
+  const [workDays, setWorkDays] = useState<string>(
+    task?.work_days === null || task?.work_days === undefined ? '' : String(Number(task.work_days)),
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,6 +52,8 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
         status, priority,
         assignee_id: assignee || null,
         due_date: dueDate || null,
+        start_date: startDate || null,
+        work_days: workDays.trim() === '' ? null : Number(workDays.replace(',', '.')),
       }
       if (editing && task) { await editTask(task.id, payload); show('Tarea guardada', 'success') }
       else { await addTask(payload); show('Tarea creada', 'success') }
@@ -100,8 +106,30 @@ export function TaskModal({ task, defaultDate, onClose }: Props) {
                 </select>
               </div>
               <div className="field">
-                <label>Fecha</label>
-                <input type="date" className="input" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                <label htmlFor="tm-fin">Fecha de fin</label>
+                <input id="tm-fin" type="date" className="input" value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Plazo: una tarea puede ocupar varios días, no solo vencer uno.
+                Es lo que alimenta la carga en días y la línea de tiempo. */}
+            <div className="form-row">
+              <div className="field">
+                <label htmlFor="tm-inicio">
+                  Empieza <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span>
+                </label>
+                <input id="tm-inicio" type="date" className="input" value={startDate}
+                  max={dueDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className="field">
+                <label htmlFor="tm-dias">
+                  Días de trabajo <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span>
+                </label>
+                <input id="tm-dias" type="number" step="0.5" min="0" className="input"
+                  placeholder="p. ej. 2" value={workDays}
+                  onChange={(e) => setWorkDays(e.target.value)} />
               </div>
             </div>
 

@@ -25,8 +25,9 @@ export async function createTask(input, createdBy, { source = 'app' } = {}) {
   const status = STATUSES.includes(input.status) ? input.status : 'open'
   const priority = PRIORITIES.includes(input.priority) ? input.priority : 'medium'
   const { rows } = await query(
-    `insert into tasks (title, description, status, priority, assignee_id, created_by, due_date, source)
-     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+    `insert into tasks (title, description, status, priority, assignee_id, created_by,
+                        due_date, start_date, work_days, source)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning *`,
     [
       title,
       input.description?.trim?.() || null,
@@ -35,6 +36,8 @@ export async function createTask(input, createdBy, { source = 'app' } = {}) {
       input.assignee_id || null,
       createdBy || null,
       input.due_date || null,
+      input.start_date || null,
+      input.work_days ?? null,
       source,
     ],
   )
@@ -63,7 +66,7 @@ export async function openTasksFor(userId) {
   const { rows } = await query(
     `select * from tasks
       where assignee_id = $1 and status in ('open','in_progress')
-      order by due_date asc nulls last, created_at asc`,
+      order by due_date asc nulls last, start_date asc nulls last, created_at asc`,
     [userId],
   )
   return rows
@@ -75,7 +78,7 @@ export async function openTasksAll() {
     `select t.*, u.full_name as assignee_name
        from tasks t left join users u on u.id = t.assignee_id
       where t.status in ('open','in_progress')
-      order by t.due_date asc nulls last, t.created_at asc`,
+      order by t.due_date asc nulls last, t.start_date asc nulls last, t.created_at asc`,
   )
   return rows
 }

@@ -7,7 +7,7 @@
 import { config } from './config.js'
 import { sendWhatsApp } from './whatsapp.js'
 import { sendEmail, mailEnabled } from './mailer.js'
-import { describeDue } from './dates.js'
+import { describeRange } from './dates.js'
 import { t, safeLang } from './i18n.js'
 
 const PRIORITY_LABEL = { low: 'baja', medium: 'media', high: 'ALTA 🔴' }
@@ -20,7 +20,10 @@ export function firstName(user) {
 export function taskSummary(task, lang = 'es') {
   const lines = [`📌 ${task.title}`]
   if (task.description) lines.push(`📝 ${task.description}`)
-  lines.push(t(lang, 'summary_due', { fecha: describeDue(task.due_date, undefined, lang, t) }))
+  lines.push(t(lang, 'summary_due', {
+    fecha: describeRange(task.start_date, task.due_date, undefined, lang, t),
+  }))
+  if (task.work_days) lines.push(t(lang, 'summary_work', { dias: task.work_days }))
   if (task.priority && task.priority !== 'medium') {
     lines.push(t(lang, 'summary_priority', { prioridad: t(lang, `prio_${task.priority}`) }))
   }

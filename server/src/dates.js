@@ -225,3 +225,57 @@ function defaultTexts(lang, key, vars = {}) {
   }
   return (M[lang] ?? M.es)[key]
 }
+
+// ─── Plazos: de cuándo a cuándo ───────────────────────────────────────
+
+// Palabras que unen dos fechas en los tres idiomas ("del lunes AL jueves").
+const UNE = /\b(al|a|hasta el|hasta|bis zum|bis|ate|até|a\s)\b/
+
+/**
+ * Busca un PLAZO (dos fechas) en el texto: "del lunes al jueves",
+ * "de mañana hasta el viernes", "vom Montag bis Donnerstag".
+ * Devuelve { start, end, matches: [texto1, texto2] } o null.
+ *
+ * Estrategia deliberadamente sencilla y a prueba de idiomas: se busca la
+ * primera fecha, y en lo que queda a su derecha se busca una segunda. Si hay
+ * dos y la segunda no es anterior, es un plazo. Así no hace falta una
+ * gramática por idioma para cada forma de decir "de… a…".
+ */
+export function parseRange(text, today = todayKey(), lang = 'es') {
+  const t = normalize(text)
+  const primera = parseDate(t, today, lang) ?? parseDateAnyLang(t, today, lang)
+  if (!primera) return null
+  const corte = t.indexOf(primera.match) + primera.match.length
+  const resto = t.slice(corte)
+  if (!UNE.test(resto)) return null
+  const segunda = parseDate(resto, today, lang) ?? parseDateAnyLang(resto, today, lang)
+  if (!segunda || segunda.key < primera.key) return null
+  return { start: primera.key, end: segunda.key, matches: [primera.match, segunda.match] }
+}
+
+// "3 días", "3 Tage", "3 dias" — cuánto TRABAJO lleva, no cuándo vence.
+const DURACION = /\b(\d{1,2}(?:[.,]5)?)\s*(dias?|tagen?|tage|jornadas?)\b/
+
+/** Días de trabajo mencionados en el texto, o null. */
+export function parseWorkDays(text) {
+  const m = normalize(text).match(DURACION)
+  if (!m) return null
+  const n = Number(m[1].replace(',', '.'))
+  if (!Number.isFinite(n) || n <= 0 || n > 60) return null
+  return { days: n, match: m[0] }
+}
+
+/**
+ * Texto del plazo de una tarea: "lun 1 → mié 3" si dura varios días, y el
+ * texto de siempre si es de un solo día. Es lo que se enseña en la app y en
+ * los mensajes de WhatsApp.
+ */
+export function describeRange(start, end, today = todayKey(), lang = 'es', t = null) {
+  if (!start || start === end) return describeDue(end, today, lang, t)
+  const cortos = CORTOS[lang] ?? CORTOS.es
+  const etiqueta = (key) => {
+    const d = toDate(key)
+    return `${cortos.dias[d.getUTCDay()]} ${d.getUTCDate()} ${cortos.meses[d.getUTCMonth()]}`
+  }
+  return `${etiqueta(start)} → ${etiqueta(end)}`
+}
