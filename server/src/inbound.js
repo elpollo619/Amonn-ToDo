@@ -37,7 +37,7 @@ import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
   extraerFoto, pareceAdjunto, describirForma, motivoRechazo,
-  guardarPendiente, leerPendiente, borrarPendiente,
+  guardarPendiente, leerPendiente, borrarPendiente, archivarRecibo,
 } from './media.js'
 
 /**
@@ -257,6 +257,11 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
 
   // "¿Cuál de estas?" tras no saber a qué tarea se refería. No es un
   // borrador de tarea, así que se resuelve aparte.
+  if (pending.esperando === 'gasto_datos') {
+    const r = await intentarGasto(phone, user, lang, texto, today, pending)
+    if (r) return r
+  }
+
   if (pending.esperando === 'which_task') {
     const todas = await openTasksAll()
     const candidatas = todas.filter((x) => (pending.ids ?? []).includes(x.id))
@@ -485,6 +490,22 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
   if (rechazo === 'tamaño') return t(lang, 'photo_too_big')
 
   const pista = String(texto ?? '').trim()
+
+  // Un recibo no es una foto de obra: va al Spesen, no a una tarea. Se
+  // reconoce porque es un PDF (nadie manda planos por WhatsApp) o porque
+  // quien lo manda lo dice.
+  const esPdf = foto.mime === 'application/pdf'
+  const loDice = /\b(gasto|spesen|spese|recibo|beleg|quittung|ticket|factura|rechnung|despesa)\b/i.test(pista)
+  if (esPdf || loDice) {
+    const idRecibo = guardarPendiente(foto.buffer, foto.mime)
+    if (!idRecibo) return t(lang, 'photo_no_storage', { motivo: 'no hay dónde guardarlo' })
+    await setPending(phone, user.id, { esperando: 'gasto_datos', foto_id: idRecibo, mime: foto.mime })
+    // Si el mensaje ya traía los datos, se aprovechan y no se pregunta.
+    const yaEstan = await intentarGasto(phone, user, lang, pista, today, { foto_id: idRecibo, mime: foto.mime }, true)
+    if (yaEstan) return yaEstan
+    return t(lang, 'exp_receipt_saved', { codigos: Object.keys(CODIGOS).slice(0, 5).join(', ') })
+  }
+
   const openTasks = await openTasksFor(user.id)
   let task = pickTaskByHint(pista, openTasks, aliases)
   if (!task) task = pickTaskByHint(pista, await openTasksAll(), aliases)
@@ -593,6 +614,52 @@ function cuandoBasura(fecha, today, lang) {
   if (fecha === today) return t(lang, 'waste_today')
   if (fecha === masDias(today, 1)) return t(lang, 'waste_tomorrow_word')
   return describeRange(null, fecha, today, lang, t)
+}
+
+/**
+ * Lee "37.90 hoy A14 Landi Kabelbinder" y apunta el gasto, archivando el
+ * recibo con el nombre de la casa. Devuelve null si falta algo — así el
+ * mismo código sirve para aprovechar los datos que ya venían con el PDF y
+ * para la respuesta posterior.
+ */
+async function intentarGasto(phone, user, lang, texto, today, pend, silencioso = false) {
+  const t0 = String(texto ?? '').trim()
+  const imp = t0.match(/(\d{1,5})[.,](\d{2})\b/)
+  if (!imp) return silencioso ? null : t(lang, 'exp_receipt_need_more', { que: 'el importe' })
+
+  const codigo = Object.keys(CODIGOS).find((c) => new RegExp(`\\b${c}\\b`, 'i').test(t0))
+  if (!codigo) return silencioso ? null : t(lang, 'exp_receipt_need_more', { que: 'la propiedad' })
+
+  const fecha = parseDateAnyLang(t0, today, lang)
+  const dia = fecha?.key ?? today
+
+  const concepto = t0
+    .replace(/\d{1,5}[.,]\d{2}/, ' ')
+    .replace(new RegExp(`\\b${codigo}\\b`, 'ig'), ' ')
+    .replace(fecha?.match ?? '', ' ')
+    .replace(/\bchf\b/ig, ' ')
+    .replace(/\s{2,}/g, ' ').trim()
+  if (!concepto) return silencioso ? null : t(lang, 'exp_receipt_need_more', { que: 'qué se compró' })
+
+  const catKey = proponerCategoria(concepto, codigo) ?? categoriasDe(codigo)[0]?.key
+  const cat = porKey(catKey)
+  const ext = (MIMES[pend.mime] ?? 'pdf')
+  const nombre = nombreDeArchivo({ codigo, fecha: dia, concepto, ext })
+  const ruta = pend.foto_id ? archivarRecibo(pend.foto_id, nombre) : null
+
+  const g = await addGasto({
+    code: codigo, spentOn: dia, concept: concepto, amountCents: Math.round(Number(`${imp[1]}.${imp[2]}`) * 100),
+    vat: cat?.iva?.length ? cat.iva[cat.iva.length - 1] : null,
+    category: catKey, personId: user.id, receiptPath: ruta, receiptName: nombre,
+  })
+  await clearPending(phone)
+  const mios = await gastosAbiertos(user.id)
+  return t(lang, 'exp_receipt_done', {
+    code: g.code, fecha: String(g.spent_on).slice(0, 10).split('-').reverse().join('/'),
+    concepto: g.concept, importe: chf(g.amount_cents),
+    columna: cat?.col ?? '—', cuenta: g.account ?? '—', archivo: nombre,
+    saldo: chf(mios.reduce((n, x) => n + x.amount_cents, 0)),
+  })
 }
 
 async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {

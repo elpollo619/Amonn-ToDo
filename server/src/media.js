@@ -129,6 +129,32 @@ export function leerPendiente(id) {
   }
 }
 
+/**
+ * Archiva un recibo con el nombre de la casa («HAAG 250429 Coop ... .pdf»),
+ * en uploads/spesen/AAAA-MM/. Devuelve la ruta relativa, o null si no se
+ * pudo. Nunca borra el pendiente si el archivado falla: primero se copia y
+ * solo después se limpia.
+ */
+export function archivarRecibo(id, nombre) {
+  const guardado = leerPendiente(id)
+  if (!guardado || !config.uploadDir) return null
+  // Carpeta por año y mes con el mismo formato que ya se usa en Drive
+  // ("21.01", "26.09"), para que copiarlo a la carpeta de la empresa sea
+  // arrastrar y soltar, sin renombrar nada.
+  const mes = nombre.match(/\s(\d{2})(\d{2})(\d{2})\s/)
+  const carpeta = mes ? `${mes[1]}.${mes[2]}` : new Date().toISOString().slice(2, 7).replace('-', '.')
+  const dir = path.join(config.uploadDir, 'spesen', carpeta)
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, nombre), guardado.buffer)
+    borrarPendiente(id)
+    return path.join('spesen', carpeta, nombre)
+  } catch (err) {
+    console.error(`[spesen] no pude archivar el recibo: ${err.message}`)
+    return null
+  }
+}
+
 export function borrarPendiente(id) {
   const dir = dirPendientes()
   if (!dir || !id) return

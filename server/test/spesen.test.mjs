@@ -71,11 +71,37 @@ const abiertos = await gastosAbiertos()
 checkIgual('quedan tres gastos apuntados', abiertos.length, 3)
 check('el resumen suma bien', await processMessage(CRIS, 'qué se me debe'), ['Gastos pendientes', 'Total: CHF 59.95'])
 
+console.log('\n6. SUBIR EL RECIBO Y QUE PREGUNTE LO QUE FALTA')
+import fs2 from 'node:fs'
+import path2 from 'node:path'
+import { config as cfg2 } from '../src/config.js'
+import { extraerFoto } from '../src/media.js'
+const dir2 = fs2.mkdtempSync('/tmp/amonn-spesen-')
+cfg2.uploadDir = dir2
+const PDF = Buffer.from('%PDF-1.4 fake').toString('base64')
+const chatId2 = `${CRIS.replace('+','')}@c.us`
+const { handleInbound } = await import('../src/inbound.js')
+await handleInbound({ from: chatId2, type: 'document', body: '',
+  metadata: { media: { mimetype: 'application/pdf', data: PDF } } })
+const pend2 = (await query('select pending from wa_conversations where phone = $1', [CRIS])).rows[0]?.pending
+check('el PDF se trata como recibo', JSON.stringify(pend2 ?? {}), 'gasto_datos')
+check('y pide los datos que faltan', await processMessage(CRIS, 'hola'), ['Me falta'])
+const hecho = check('con los datos, lo apunta y lo archiva',
+  await processMessage(CRIS, '45.20 hoy A14 Migros Reinigungsmittel'),
+  ['Apuntado y archivado', 'A14', '45.20'])
+check('con el nombre de la casa', hecho, ['A14 26'])
+const archivados = fs2.readdirSync(path2.join(dir2, 'spesen'))
+checkIgual('en carpeta con el formato de Drive (AA.MM)', /^\d{2}\.\d{2}$/.test(archivados[0] ?? ''), true)
+const dentro = fs2.readdirSync(path2.join(dir2, 'spesen', archivados[0]))
+check('el fichero está dentro', dentro.join(','), '.pdf')
+checkIgual('y ya no queda pendiente', fs2.readdirSync(path2.join(dir2, 'pendientes')).filter((f) => !f.endsWith('.mime')).length, 0)
+fs2.rmSync(dir2, { recursive: true, force: true })
+
 console.log('\n6. EXPORTAR PARA EL EXCEL')
 const csv = exportarCsv(await gastosAbiertos())
 check('lleva las columnas del Spesen', csv, ['Code;Datum;Bemerkung;Betrag CHF;Spalte;Konto;MwSt'])
 check('y las filas con su cuenta', csv, ['HAAG', 'Landi Kabelbinder', '37.90', '6100'])
-checkIgual('una cabecera y tres filas', csv.trim().split('\r\n').length, 4)
+checkIgual('una fila por gasto más la cabecera', csv.trim().split('\r\n').length, (await gastosAbiertos()).length + 1)
 
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de Spesen pasan\n' : `\n❌ ${fallos} fallo(s)\n`)
