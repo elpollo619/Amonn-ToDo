@@ -10,7 +10,7 @@ import { initDb, query, pool } from '../src/db.js'
 import { processMessage, handleInbound } from '../src/inbound.js'
 import { config } from '../src/config.js'
 import { listComments } from '../src/comments.service.js'
-import { extraerFoto, pareceFoto } from '../src/media.js'
+import { extraerFoto, pareceFoto, pareceAudio } from '../src/media.js'
 
 const CRIS = '+41765683445'
 let fallos = 0
@@ -111,6 +111,23 @@ check('avisa de que no hay tareas', await processMessage(CRIS, '', { foto: extra
   ['He guardado la foto', 'no tienes ninguna tarea abierta'])
 const despues = fs.readdirSync(path.join(dir, 'pendientes')).filter((f) => !f.endsWith('.mime')).length
 checkIgual('pero la guarda igualmente', despues, antes + 1)
+
+console.log('\n6. NOTAS DE VOZ')
+// Una nota de voz llega por el mismo camino que la foto: mismo mensaje,
+// otro mimetype. Debe guardarse igual y responder hablando de voz, no de foto.
+await query('delete from attachments')
+const OGG = Buffer.from('T2dnUwACAAAAAAAAAAA=', 'base64').toString('base64')
+const mensajeAudio = (texto) => ({
+  from: chatId, type: 'audio', body: texto ?? '',
+  metadata: { media: { mimetype: 'audio/ogg; codecs=opus', data: OGG } },
+})
+await processMessage(CRIS, 'crea una tarea a Cris: revisar el tejado, para el viernes')
+const audio = extraerFoto(mensajeAudio('nota sobre el tejado'))
+check('reconoce el audio', String(pareceAudio(mensajeAudio(''))), 'true')
+checkIgual('saca el tipo de audio', audio?.mime, 'audio/ogg')
+check('lo pega a la tarea y habla de voz',
+  await processMessage(CRIS, 'nota del tejado', { foto: extraerFoto(mensajeAudio('nota del tejado')) }),
+  ['Nota de voz añadida', 'tejado'])
 
 fs.rmSync(dir, { recursive: true, force: true })
 await pool.end()

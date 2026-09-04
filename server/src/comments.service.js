@@ -24,6 +24,13 @@ export const MIMES = {
   'image/webp': 'webp',
   'image/heic': 'heic',
   'application/pdf': 'pdf',
+  // Notas de voz de WhatsApp: llegan como ogg/opus. Se guardan como adjunto
+  // igual que una foto, así queda la voz original junto a la tarea.
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/aac': 'aac',
+  'audio/amr': 'amr',
 }
 export const MAX_BYTES = 12 * 1024 * 1024
 

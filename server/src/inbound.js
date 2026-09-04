@@ -27,9 +27,9 @@ import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
 import { listComments } from './comments.service.js'
-import { createComment, createAttachment, storageStatus } from './comments.service.js'
+import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
-  extraerFoto, pareceFoto, describirForma, motivoRechazo,
+  extraerFoto, pareceAdjunto, describirForma, motivoRechazo,
   guardarPendiente, leerPendiente, borrarPendiente,
 } from './media.js'
 
@@ -48,10 +48,10 @@ export async function handleInbound(msg) {
   // Una foto SIN pie de foto es un mensaje sin texto: antes se descartaba aquí
   // mismo y se perdía. Ahora el mensaje sigue adelante si trae imagen.
   const foto = extraerFoto(msg)
-  if (!foto && pareceFoto(msg)) {
+  if (!foto && pareceAdjunto(msg)) {
     // Parece una foto pero no encontramos los bytes. Dejamos constancia de la
     // FORMA del mensaje (nunca su contenido) para saber dónde mirar.
-    console.warn(`[wa] llega algo que parece foto pero sin datos; forma: ${describirForma(msg).join(' ')}`)
+    console.warn(`[wa] llega algo que parece foto o audio pero sin datos; forma: ${describirForma(msg).join(' ')}`)
   }
   if (!text && !foto) return
 
@@ -449,6 +449,11 @@ export async function processMessage(phone, text, { foto = null } = {}) {
  * una foto de obra perdida no se recupera.
  */
 async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
+  // Una nota de voz viaja igual que una foto y se guarda igual; lo único que
+  // cambia es cómo se llama en la respuesta.
+  const esAudio = String(foto.mime ?? '').startsWith('audio/')
+  const kAñadido = esAudio ? 'audio_added' : 'photo_added'
+  const kPregunta = esAudio ? 'audio_which_task' : 'photo_which_task'
   const estado = storageStatus()
   if (!estado.ok) return t(lang, 'photo_no_storage', { motivo: estado.reason })
 
@@ -461,7 +466,7 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
   let task = pickTaskByHint(pista, openTasks, aliases)
   if (!task) task = pickTaskByHint(pista, await openTasksAll(), aliases)
 
-  const nombre = `whatsapp.${foto.mime.split('/')[1] ?? 'jpg'}`
+  const nombre = `whatsapp.${MIMES[foto.mime] ?? 'bin'}`
 
   if (task) {
     let commentId = null
@@ -474,7 +479,7 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
       buffer: foto.buffer, mime: foto.mime, filename: nombre, userId: user.id, commentId,
     })
     if (pista) void touch('task', pista)
-    return t(lang, 'photo_added', { titulo: task.title })
+    return t(lang, kAñadido, { titulo: task.title })
   }
 
   // No sabemos a qué tarea va: se guarda PRIMERO y se pregunta después.
@@ -498,7 +503,7 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
     ids: candidatas.map((x) => x.id),
     foto_id: fotoId,
   })
-  return t(lang, 'photo_which_task', {
+  return t(lang, kPregunta, {
     lista: candidatas.map((x, i) => `${i + 1}. ${x.title}`).join('\n'),
   })
 }

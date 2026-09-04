@@ -34,6 +34,18 @@ export function pareceFoto(msg) {
   return RUTAS.some((r) => String(r(msg)?.mimetype ?? '').startsWith('image/'))
 }
 
+/** ¿Es una nota de voz o un audio? Viaja por el mismo sitio que la foto. */
+export function pareceAudio(msg) {
+  const tipo = String(msg?.type ?? msg?.messageType ?? '').toLowerCase()
+  if (tipo === 'audio' || tipo === 'voice' || tipo === 'ptt') return true
+  return RUTAS.some((r) => String(r(msg)?.mimetype ?? '').startsWith('audio/'))
+}
+
+/** ¿Trae algún fichero adjunto que sepamos guardar? */
+export function pareceAdjunto(msg) {
+  return pareceFoto(msg) || pareceAudio(msg)
+}
+
 /**
  * Saca la foto del mensaje. Devuelve { buffer, mime } o null si no viene.
  * No lanza: un mensaje raro no debe tumbar el procesado del texto.
