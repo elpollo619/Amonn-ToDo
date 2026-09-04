@@ -17,6 +17,8 @@ import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
 import { calendarRouter } from './routes/calendar.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura } from './reminders.js'
+import cron from 'node-cron'
+import { revisarCorreo, correoConfigurado } from './correo.js'
 import {
   resolveSession,
   ensureWebhookRegistered,
@@ -121,6 +123,13 @@ async function start() {
   await initDb()
   scheduleReminders()
   scheduleAvisoBasura()
+  // Vigilante del buzón: cada 15 minutos, y solo si está configurado.
+  if (correoConfigurado()) {
+    cron.schedule('*/15 * * * *', () => {
+      revisarCorreo().catch((e) => console.error('[correo]', e.message))
+    }, { timezone: config.reminderTimezone })
+    console.log('[correo] vigilante del buzón activo (cada 15 min)')
+  }
   app.listen(config.port, () => {
     console.log(`[amonn] servidor escuchando en el puerto ${config.port}`)
     console.log(`[amonn] WhatsApp ${config.whatsapp.enabled ? 'activado' : 'desactivado'}`)

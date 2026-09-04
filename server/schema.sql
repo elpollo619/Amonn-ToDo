@@ -243,3 +243,12 @@ create table if not exists expenses (
 );
 create index if not exists expenses_abiertos on expenses (status, spent_on);
 create index if not exists expenses_persona on expenses (person_id, status);
+
+-- Correos ya procesados por el vigilante. Se recuerdan aquí para no tocar el
+-- buzón de nadie: nada se marca como leído ni se mueve de sitio.
+create table if not exists seen_mails (
+  message_id  text primary key,
+  kind        text,
+  task_id     uuid references tasks(id) on delete set null,
+  seen_at     timestamptz not null default now()
+);

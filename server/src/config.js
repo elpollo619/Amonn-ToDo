@@ -50,6 +50,15 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? '',
   // Whisper en el NAS para las notas de voz. Vacío = sin transcripción.
   whisperUrl: (process.env.WHISPER_URL ?? '').replace(/\/$/, ''),
+  // Vigilante del buzón. Sin estos datos, simplemente no se activa.
+  mailWatch: {
+    host: process.env.MAIL_HOST ?? '',
+    port: Number(process.env.MAIL_PORT ?? 993),
+    user: process.env.MAIL_USER ?? '',
+    pass: process.env.MAIL_PASS ?? '',
+    buzon: process.env.MAIL_BOX ?? 'INBOX',
+    avisarA: process.env.MAIL_NOTIFY_TO ?? '',
+  },
 
   // ─── Asistente (entiende los mensajes de WhatsApp en lenguaje normal) ───
   // Con GEMINI_API_KEY usa Google Gemini para interpretar "crea una tarea a
