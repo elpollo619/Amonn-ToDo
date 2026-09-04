@@ -98,6 +98,27 @@ que ninguna VPN lo arregla). Sí puede entrar por el panel web del NAS. Si hace
 falta acceso remoto de verdad, lo que toca es **instalar Tailscale en el NAS**;
 Cris ya lo usa en sus otros equipos.
 
+## 4b. Lo añadido el 4 de septiembre (tarde)
+
+- **Citas (Termine)** + **calendario suscribible**: `/calendar/<CALENDAR_TOKEN>.ics`
+  con las citas (aviso 1 h antes) y las tareas con plazo (día completo).
+  Google Calendar / iPhone / Outlook se suscriben una vez. Se eligió esto en
+  lugar de OAuth con Google: sin permisos que caducan. Google refresca cuando
+  quiere (horas), así que no vale para cambios de último minuto.
+- **Contactos de obra**: 34 importados de la carpeta `06 Kunden` de Drive
+  (Adressliste + Kontaktliste 770-lds Seewer), con BKP, obra y **estado de
+  oferta**. `server/scripts/importar-contactos.mjs` se puede repetir sin
+  duplicar. ⚠️ NO se escribe en los Excel originales a propósito: si alguien
+  los tiene abiertos, se pisan los cambios.
+- **Residuos de Muri** (`entsorgung.js`) y **lista de la compra**
+  (`compras.js`), ambos consultables por WhatsApp.
+- **Notas de voz** transcritas con Whisper en el NAS (contenedor `whisper`,
+  `WHISPER_URL=http://whisper:9000`, modelo base, ~2,5x tiempo real).
+
+Variables nuevas en el compose del NAS: `WHISPER_URL`, `ENTSORGUNG_TO`,
+`CALENDAR_TOKEN`. ⚠️ `create table if not exists` NO añade columnas a una
+tabla que ya existe: usa `alter table ... add column if not exists`.
+
 ## 5. Pruebas
 
 ```bash
