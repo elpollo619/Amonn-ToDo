@@ -107,6 +107,13 @@ const REGLAS = {
     // "falta café" · "hay que comprar folios" · "apunta en la compra: leche"
     compraAdd: /^(?:falta(?:n)?|se acabo|se ha acabado|hay que comprar|necesitamos|compra(?:r)?|apunta en la (?:compra|lista)|anade a la (?:compra|lista))\s*[:,-]?\s*(.+)$/,
     compraList: /^(?:que (?:falta|hay que comprar|necesitamos)|lista de (?:la )?compra|la compra|compras)\b\??$/,
+    // "cita con Baumgartner el martes a las 14:00 en la obra G60"
+    citaAdd: /^(?:cita|reunion|visita|termin|agenda(?:r)?)\s*(?:con\s+)?(.*)$/,
+    citaList: /^(?:que citas|mis citas|proximas citas|agenda|citas)\b\??$/,
+    // "teléfono de Baumgartner" · "contacto del gipser"
+    contactoBuscar: /^(?:(?:el\s+)?(?:telefono|numero|mail|email|correo|contacto|datos)\s+(?:de|del|de la)\s+|quien es\s+|buscar?\s+(?:contacto\s+)?)(.+?)\??$/,
+    // "guarda contacto: Reto Baumgartner, R. Baumgartner AG, +41 79 938 50 71"
+    contactoAdd: /^(?:guarda(?:r)?|anade|anadir|agrega(?:r)?|nuevo)\s+(?:el\s+)?contacto\s*[:,-]?\s*(.+)$/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
   },
 
@@ -143,6 +150,10 @@ const REGLAS = {
     basura: /\b(wann|welcher tag|nachste)\b.{0,20}\b(abfall|kehricht|papier|karton|glas|metall|kunststoff|gruengut|deponie|entsorgung|container)\b/,
     compraAdd: /^(?:es fehlt|es fehlen|fehlt|ist aus|wir brauchen|einkaufen|kaufen|auf die (?:einkaufsliste|liste))\s*[:,-]?\s*(.+)$/,
     compraList: /^(?:was (?:fehlt|brauchen wir|müssen wir kaufen)|einkaufsliste|einkauf)\b\??$/,
+    citaAdd: /^(?:termin|besprechung|sitzung|besuch)\s*(?:mit\s+)?(.*)$/,
+    citaList: /^(?:welche termine|meine termine|nachste termine|agenda|termine)\b\??$/,
+    contactoBuscar: /^(?:(?:die\s+)?(?:telefon|nummer|mail|email|kontakt|daten)\s+(?:von|vom)\s+|wer ist\s+|such(?:e)?\s+(?:kontakt\s+)?)(.+?)\??$/,
+    contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
   },
 
@@ -179,6 +190,10 @@ const REGLAS = {
     basura: /\b(quando|que dia|proxima)\b.{0,20}\b(lixo|papel|cartao|vidro|metal|plastico|verdes?|entulho|reciclagem|contentor)\b/,
     compraAdd: /^(?:falta(?:m)?|acabou|precisamos de|precisamos|comprar|apontar na (?:compra|lista))\s*[:,-]?\s*(.+)$/,
     compraList: /^(?:o que (?:falta|precisamos)|lista de compras|compras)\b\??$/,
+    citaAdd: /^(?:reuniao|encontro|visita|marcacao|agendar)\s*(?:com\s+)?(.*)$/,
+    citaList: /^(?:que reunioes|minhas reunioes|proximas reunioes|agenda)\b\??$/,
+    contactoBuscar: /^(?:(?:o\s+)?(?:telefone|numero|mail|email|contacto|dados)\s+(?:de|do|da)\s+|quem e\s+|procura(?:r)?\s+(?:contacto\s+)?)(.+?)\??$/,
+    contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
   },
 }
@@ -215,6 +230,35 @@ function parseInLang(text, ctx, lang) {
 
   // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene
   // nada que ver con las tareas y así no compite con "crea una tarea".
+  const contactoNuevo = cfg.contactoAdd ? t.match(cfg.contactoAdd) : null
+  if (contactoNuevo) {
+    // Aquí hace falta el texto TAL CUAL se escribió: restoreCase sirve para
+    // títulos de tarea, pero a un contacto le rompe el nombre ("Serge gerber"),
+    // se come las diéresis y capitaliza el correo, que deja de ser válido.
+    const enCrudo = raw.match(/(?:contacto|kontakt|kontakte)\s*[:,-]?\s*(.+)$/i)
+    const texto = (enCrudo ? enCrudo[1] : contactoNuevo[1]).trim()
+    return { action: 'contacto_add', texto }
+  }
+  const contactoBusca = cfg.contactoBuscar ? t.match(cfg.contactoBuscar) : null
+  if (contactoBusca) return { action: 'contacto_buscar', que: contactoBusca[1].trim() }
+
+  if (cfg.citaList && cfg.citaList.test(t)) return { action: 'cita_list' }
+  const citaNueva = cfg.citaAdd ? t.match(cfg.citaAdd) : null
+  if (citaNueva) {
+    const resto = citaNueva[1].trim()
+    // Una cita necesita HORA; si no la lleva, no es una cita sino otra cosa
+    // (y así "cita" suelto no se traga la frase).
+    const hora = resto.match(/\b(?:a las|um|as|@)?\s*(\d{1,2})[:.h](\d{2})?\b/)
+    // Sin hora sigue siendo una cita: se pregunta la hora en vez de
+    // responder "no te he entendido", que no ayuda a nadie.
+    if (resto) {
+      return {
+        action: 'cita_add',
+        texto: restoreCase(resto, raw),
+        hora: hora ? `${String(hora[1]).padStart(2, '0')}:${hora[2] ?? '00'}` : null,
+      }
+    }
+  }
   if (cfg.compraList && cfg.compraList.test(t)) return { action: 'compra_list' }
   const compraHecha = cfg.compraDone ? t.match(cfg.compraDone) : null
   if (compraHecha) {

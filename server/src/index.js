@@ -15,6 +15,7 @@ import { statesRouter } from './routes/states.js'
 import { subtasksRouter } from './routes/subtasks.js'
 import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
+import { calendarRouter } from './routes/calendar.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura } from './reminders.js'
 import {
   resolveSession,
@@ -59,6 +60,9 @@ app.use('/api', commentsRouter)
 
 // OpenWA envía aquí las respuestas entrantes (webhook, sin auth de usuario).
 app.use('/api/whatsapp/webhook', webhookRouter)
+// Calendario suscribible (iCalendar). Va fuera de /api porque lo consumen
+// Google Calendar y el iPhone, no la app.
+app.use('/calendar', calendarRouter)
 
 // Tiempo real (SSE): el navegador se suscribe a los cambios de tareas.
 app.get('/api/events', requireAuth, (req, res) => {

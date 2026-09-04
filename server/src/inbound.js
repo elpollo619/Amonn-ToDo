@@ -29,6 +29,8 @@ import { createSubtask, listSubtasks } from './subtasks.service.js'
 import { transcribir, transcripcionDisponible } from './transcribe.js'
 import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entsorgung.js'
 import { addCompra, listCompras, markComprado } from './compras.js'
+import { createAppointment, listAppointments } from './agenda.js'
+import { addContact, buscarContactos, formatContacto } from './contactos.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
@@ -744,6 +746,81 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       const lista = proximas(today, 5)
       return t(lang, 'waste_next', {
         lista: lista.map((x) => `• ${nombres[x.tipo]} — ${cuandoBasura(x.fecha, today, lang)}`).join('\n'),
+      })
+    }
+
+    case 'contacto_buscar': {
+      const encontrados = await buscarContactos(intent.que, 5)
+      if (encontrados.length === 0) return t(lang, 'contact_none', { que: intent.que })
+      if (encontrados.length === 1) return t(lang, 'contact_found', { ficha: formatContacto(encontrados[0]) })
+      return t(lang, 'contact_many', {
+        total: encontrados.length,
+        lista: encontrados.map(formatContacto).join('\n\n'),
+      })
+    }
+
+    case 'contacto_add': {
+      // Formato libre separado por comas: nombre, empresa, teléfono, correo.
+      // Se reconoce cada trozo por su forma, no por su posición: así da igual
+      // el orden en que se escriban.
+      const trozos = String(intent.texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+      if (trozos.length === 0) return t(lang, 'contact_need_name')
+      const datos = { name: null, company: null, phone: null, email: null }
+      for (const tr of trozos) {
+        if (/@/.test(tr) && !datos.email) { datos.email = tr; continue }
+        if (/^\+?[\d\s().-]{7,}$/.test(tr) && !datos.phone) { datos.phone = tr.replace(/\s+/g, ' '); continue }
+        if (!datos.name) { datos.name = tr; continue }
+        if (!datos.company) { datos.company = tr; continue }
+      }
+      if (!datos.name) return t(lang, 'contact_need_name')
+      const c = await addContact({ ...datos, mobile: datos.phone })
+      return t(lang, 'contact_added', { ficha: formatContacto(c) })
+    }
+
+    case 'cita_add': {
+      const texto = String(intent.texto ?? '')
+      if (!intent.hora) return t(lang, 'appt_no_time')
+      const fecha = parseDateAnyLang(texto, today, lang)
+      if (!fecha) return t(lang, 'appt_no_date')
+      // El título es lo que queda al quitar la fecha y la hora.
+      let titulo = texto
+        .replace(/\b(?:a las|um|as|@)?\s*\d{1,2}[:.h]\d{0,2}\b/, ' ')
+        .replace(fecha.match ?? '', ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+      // "en la obra G60" / "en Kerzers" es el sitio.
+      let donde = null
+      const m = titulo.match(/\b(?:en|in|em)\s+(?:la\s+|el\s+|die\s+|der\s+)?(.+)$/i)
+      if (m) {
+        donde = m[1].trim()
+        titulo = titulo.slice(0, m.index).trim()
+      }
+      titulo = titulo.replace(/^(?:con|mit|com)\s+/i, '').replace(/[,;-]+$/, '').trim()
+      if (!titulo) titulo = t(lang, 'appt_list').split(':')[0]
+
+      const startsAt = new Date(`${fecha.key}T${intent.hora}:00`)
+      const cita = await createAppointment({
+        title: titulo, withWhom: titulo, place: donde,
+        startsAt: startsAt.toISOString(), createdBy: user.id, attendeeId: user.id,
+        source: 'whatsapp',
+      })
+      return t(lang, 'appt_added', {
+        titulo: cita.title,
+        cuando: `${describeRange(null, fecha.key, today, lang, t)} · ${intent.hora}`,
+        donde: donde ? t(lang, 'appt_where', { donde }) : '',
+      })
+    }
+
+    case 'cita_list': {
+      const lista = await listAppointments(new Date().toISOString(), 8)
+      if (lista.length === 0) return t(lang, 'appt_none')
+      return t(lang, 'appt_list', {
+        lista: lista.map((c) => {
+          const d = new Date(c.starts_at)
+          const dia = describeRange(null, d.toISOString().slice(0, 10), today, lang, t)
+          const hora = d.toISOString().slice(11, 16)
+          return `• ${dia} ${hora} — ${c.title}${c.place ? ` (${c.place})` : ''}`
+        }).join('\n'),
       })
     }
 

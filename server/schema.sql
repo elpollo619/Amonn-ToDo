@@ -179,3 +179,46 @@ create table if not exists shopping_items (
   created_at   timestamptz not null default now()
 );
 create index if not exists shopping_items_pendientes on shopping_items (bought_at, created_at);
+
+-- Citas (Termine): tienen HORA, a diferencia de las tareas, que tienen plazo.
+create table if not exists appointments (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null,
+  with_whom   text,                      -- cliente, empresa o persona
+  place       text,
+  starts_at   timestamptz not null,
+  minutes     integer not null default 60,
+  notes       text,
+  created_by  uuid references users(id) on delete set null,
+  attendee_id uuid references users(id) on delete set null,
+  source      text not null default 'app',
+  created_at  timestamptz not null default now()
+);
+create index if not exists appointments_por_fecha on appointments (starts_at);
+
+-- Contactos de obra: quién es quién en cada proyecto (de la Adressliste).
+create table if not exists contacts (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  company     text,
+  role        text,                      -- Arbeitsgattung: gipser, holzbau...
+  bkp         text,                      -- código de partida suizo
+  project     text,                      -- G60 Muri, 770 Bremgarten...
+  phone       text,
+  mobile      text,
+  email       text,
+  address     text,
+  -- Estado de la oferta: adjudicado, oferta recibida, sin respuesta... Es el
+  -- seguimiento de licitación que hoy vive en la Kontaktliste.
+  status      text,
+  notes       text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists contacts_busqueda on contacts (lower(name));
+create index if not exists contacts_empresa on contacts (lower(company));
+
+-- Migración: en bases donde la tabla ya existía, `create table if not exists`
+-- no añade columnas nuevas. Hay que pedirlas explícitamente.
+alter table contacts add column if not exists status text;
+alter table contacts add column if not exists notes text;
+create index if not exists contacts_status on contacts (lower(coalesce(status,'')));
