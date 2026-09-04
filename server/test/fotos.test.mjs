@@ -101,6 +101,17 @@ checkIgual('el mensaje sin texto llegó y se guardó', enEspera, 1)
 llamado = true
 checkIgual('la prueba se ejecutó', llamado, true)
 
+console.log('\n5. SIN NINGUNA TAREA, LA FOTO NO SE PIERDE')
+// El caso que fallaba en producción: con la base recién creada no hay ninguna
+// tarea, y la foto se descartaba tras responder amablemente.
+await query('delete from attachments')
+await query('delete from tasks')
+const antes = fs.readdirSync(path.join(dir, 'pendientes')).filter((f) => !f.endsWith('.mime')).length
+check('avisa de que no hay tareas', await processMessage(CRIS, '', { foto: extraerFoto(mensajeFoto('')) }),
+  ['He guardado la foto', 'no tienes ninguna tarea abierta'])
+const despues = fs.readdirSync(path.join(dir, 'pendientes')).filter((f) => !f.endsWith('.mime')).length
+checkIgual('pero la guarda igualmente', despues, antes + 1)
+
 fs.rmSync(dir, { recursive: true, force: true })
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de fotos pasan\n' : `\n❌ ${fallos} fallo(s)\n`)

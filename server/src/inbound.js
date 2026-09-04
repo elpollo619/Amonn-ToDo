@@ -475,12 +475,21 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
     return t(lang, 'photo_added', { titulo: task.title })
   }
 
-  // No sabemos a qué tarea va: se guarda primero y se pregunta después.
-  const candidatas = (openTasks.length ? openTasks : await openTasksAll()).slice(0, 8)
-  if (candidatas.length === 0) return t(lang, 'photo_no_tasks')
-
+  // No sabemos a qué tarea va: se guarda PRIMERO y se pregunta después.
+  // El orden importa. Guardar antes de preguntar es lo que garantiza que la
+  // foto sobreviva aunque nadie conteste, aunque no haya ninguna tarea, o
+  // aunque el servidor se reinicie entre medias.
   const fotoId = guardarPendiente(foto.buffer, foto.mime)
   if (!fotoId) return t(lang, 'photo_no_storage', { motivo: 'no hay dónde guardarla' })
+
+  const candidatas = (openTasks.length ? openTasks : await openTasksAll()).slice(0, 8)
+  // Sin ninguna tarea abierta no hay lista que ofrecer, pero la foto YA está
+  // guardada: se avisa de dónde queda en vez de descartarla en silencio.
+  if (candidatas.length === 0) {
+    console.warn(`[wa] foto guardada sin tarea a la que asociar: uploads/pendientes/${fotoId}`)
+    return t(lang, 'photo_no_tasks')
+  }
+
   await setPending(phone, user.id, {
     esperando: 'which_task',
     hint: pista,
