@@ -168,3 +168,14 @@ create table if not exists attachments (
   created_at timestamptz not null default now()
 );
 create index if not exists attachments_task_idx on attachments(task_id, created_at);
+
+-- Lista de la compra de la oficina: compartida, no una por persona.
+create table if not exists shopping_items (
+  id           uuid primary key default gen_random_uuid(),
+  title        text not null,
+  requested_by uuid references users(id) on delete set null,
+  bought_by    uuid references users(id) on delete set null,
+  bought_at    timestamptz,
+  created_at   timestamptz not null default now()
+);
+create index if not exists shopping_items_pendientes on shopping_items (bought_at, created_at);

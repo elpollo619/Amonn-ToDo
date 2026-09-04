@@ -4,6 +4,9 @@ import { config } from './config.js'
 import { notifyUser, firstName, taskSummary } from './notify.js'
 import { mailEnabled } from './mailer.js'
 import { t as tr, safeLang } from './i18n.js'
+import { NOMBRES as BASURA_NOMBRES, recogidasDe, masDias } from './entsorgung.js'
+import { sendWhatsApp } from './whatsapp.js'
+import { todayKey } from './dates.js'
 
 // Un ÚNICO aviso diario por persona, en lugar de un mensaje por tarea.
 //
@@ -101,4 +104,50 @@ export function scheduleReminders() {
     runReminders().catch((e) => console.error('[reminders]', e.message))
   }, { timezone: config.timezone })
   console.log(`[reminders] programados con "${config.reminderCron}" (${config.timezone})`)
+}
+
+
+// ============================================================
+// Aviso de la recogida de residuos, la tarde anterior.
+//
+// El folleto dice que hay que sacarlo antes de las 7:00 y como pronto la
+// tarde de antes: avisar por la mañana no serviría de nada. Va solo a los
+// teléfonos de ENTSORGUNG_TO (separados por comas) — no a todo el equipo,
+// porque a quien no está en la oficina esto le sobra.
+// ============================================================
+export async function runAvisoBasura(hoy = todayKey()) {
+  const destinos = (process.env.ENTSORGUNG_TO ?? '')
+    .split(',').map((x) => x.trim()).filter(Boolean)
+  if (destinos.length === 0) return { tipos: [], enviados: 0 }
+
+  const mañana = masDias(hoy, 1)
+  const tipos = recogidasDe(mañana)
+  if (tipos.length === 0) return { tipos: [], enviados: 0 }
+
+  let enviados = 0
+  for (const phone of destinos) {
+    const { rows } = await query('select language from users where phone = $1', [phone])
+    const lang = safeLang(rows[0]?.language ?? 'de')
+    const nombres = BASURA_NOMBRES[lang] ?? BASURA_NOMBRES.de
+    const texto = tipos.map((x) => nombres[x]).join(' + ')
+    try {
+      await sendWhatsApp(phone, tr(lang, 'waste_tomorrow', { tipo: texto }))
+      enviados++
+    } catch (err) {
+      console.error(`[basura] no se pudo avisar a ${phone}: ${err.message}`)
+    }
+  }
+  console.log(`[basura] mañana ${mañana}: ${tipos.join(', ')} · avisados: ${enviados}`)
+  return { tipos, enviados }
+}
+
+export function scheduleAvisoBasura() {
+  const expr = process.env.ENTSORGUNG_CRON ?? '0 18 * * *'
+  if (!cron.validate(expr)) {
+    console.error(`[basura] cron inválido: ${expr}`)
+    return
+  }
+  cron.schedule(expr, () => { runAvisoBasura().catch((e) => console.error('[basura]', e.message)) },
+    { timezone: config.reminderTimezone })
+  console.log(`[basura] aviso programado con "${expr}"`)
 }

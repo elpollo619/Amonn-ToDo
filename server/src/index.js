@@ -15,7 +15,7 @@ import { statesRouter } from './routes/states.js'
 import { subtasksRouter } from './routes/subtasks.js'
 import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
-import { scheduleReminders, runReminders } from './reminders.js'
+import { scheduleReminders, runReminders , scheduleAvisoBasura } from './reminders.js'
 import {
   resolveSession,
   ensureWebhookRegistered,
@@ -116,6 +116,7 @@ app.use(errorHandler)
 async function start() {
   await initDb()
   scheduleReminders()
+  scheduleAvisoBasura()
   app.listen(config.port, () => {
     console.log(`[amonn] servidor escuchando en el puerto ${config.port}`)
     console.log(`[amonn] WhatsApp ${config.whatsapp.enabled ? 'activado' : 'desactivado'}`)

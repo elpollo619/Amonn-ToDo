@@ -102,6 +102,12 @@ const REGLAS = {
     listState: /^(?:que|cuales|cuantas)\s+(?:tareas\s+)?(?:hay|tenemos|estan|hay ahora)?\s*(?:en|con estado)\s+(.+?)\??$/,
     // "¿qué vence esta semana?"
     listDue: /^(?:que|cuales|cuantas)\s+(?:tareas\s+)?(?:vence(?:n)?|caduca(?:n)?|hay para|tenemos para)\s+(.+?)\??$/,
+    // "¿cuándo sacan el papel?" · "cuándo es la basura"
+    basura: /\b(cuando|que dia|proxima)\b.{0,20}\b(basura|kehricht|papel|carton|vidrio|metal|plastico|verdes?|gruengut|escombros|reciclaje|entsorgung|contenedor)\b/,
+    // "falta café" · "hay que comprar folios" · "apunta en la compra: leche"
+    compraAdd: /^(?:falta(?:n)?|se acabo|se ha acabado|hay que comprar|necesitamos|compra(?:r)?|apunta en la (?:compra|lista)|anade a la (?:compra|lista))\s*[:,-]?\s*(.+)$/,
+    compraList: /^(?:que (?:falta|hay que comprar|necesitamos)|lista de (?:la )?compra|la compra|compras)\b\??$/,
+    compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
   },
 
   de: {
@@ -134,6 +140,10 @@ const REGLAS = {
     detail: /^(?:wie (?:steht|lauft|ist)(?: es um)?|status von|details? (?:zu|von)|infos? (?:zu|von)|zeig(?:e|mir)?|zeige mir)\s+(?:die |der |das )?(.+?)\??$/,
     listState: /^(?:was|welche|wie viele)\s+(?:aufgaben\s+)?(?:gibt es|haben wir|ist|sind)?\s*(?:in|im|auf|mit status)\s+(.+?)\??$/,
     listDue: /^(?:was|welche|wie viele)\s+(?:aufgaben\s+)?(?:lauft ab|lauf(?:en)? ab|ist fallig|sind fallig|haben wir fur|gibt es fur)\s+(.+?)\??$/,
+    basura: /\b(wann|welcher tag|nachste)\b.{0,20}\b(abfall|kehricht|papier|karton|glas|metall|kunststoff|gruengut|deponie|entsorgung|container)\b/,
+    compraAdd: /^(?:es fehlt|es fehlen|fehlt|ist aus|wir brauchen|einkaufen|kaufen|auf die (?:einkaufsliste|liste))\s*[:,-]?\s*(.+)$/,
+    compraList: /^(?:was (?:fehlt|brauchen wir|müssen wir kaufen)|einkaufsliste|einkauf)\b\??$/,
+    compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
   },
 
   pt: {
@@ -166,6 +176,10 @@ const REGLAS = {
     detail: /^(?:como (?:vai|esta)|detalhe(?:s)? de|informacao de|info de|estado de|mostra(?:me)?|ve)\s+(?:a |o )?(.+?)\??$/,
     listState: /^(?:que|quais|quantas)\s+(?:tarefas\s+)?(?:ha|temos|estao|esta)?\s*(?:em|no|na|com estado)\s+(.+?)\??$/,
     listDue: /^(?:que|quais|quantas)\s+(?:tarefas\s+)?(?:vence(?:m)?|expira(?:m)?|ha para|temos para)\s+(.+?)\??$/,
+    basura: /\b(quando|que dia|proxima)\b.{0,20}\b(lixo|papel|cartao|vidro|metal|plastico|verdes?|entulho|reciclagem|contentor)\b/,
+    compraAdd: /^(?:falta(?:m)?|acabou|precisamos de|precisamos|comprar|apontar na (?:compra|lista))\s*[:,-]?\s*(.+)$/,
+    compraList: /^(?:o que (?:falta|precisamos)|lista de compras|compras)\b\??$/,
+    compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
   },
 }
 
@@ -192,6 +206,30 @@ function parseInLang(text, ctx, lang) {
   if (!t) return { action: 'unknown' }
 
   if (cfg.help.test(t) && t.split(' ').length <= 3) return { action: 'help' }
+
+  // "¿cuándo sacan el papel?" — no tiene nada que ver con las tareas, así que
+  // se resuelve pronto y no compite con ninguna otra regla.
+  if (cfg.basura && cfg.basura.test(t)) {
+    return { action: 'entsorgung', texto: t }
+  }
+
+  // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene
+  // nada que ver con las tareas y así no compite con "crea una tarea".
+  if (cfg.compraList && cfg.compraList.test(t)) return { action: 'compra_list' }
+  const compraHecha = cfg.compraDone ? t.match(cfg.compraDone) : null
+  if (compraHecha) {
+    return { action: 'compra_done', que: limpiaArticulos(restoreCase((compraHecha[1] ?? '').trim(), raw)) }
+  }
+  const compraNueva = cfg.compraAdd ? t.match(cfg.compraAdd) : null
+  if (compraNueva) {
+    // El texto viene normalizado (sin tildes y en minúsculas). Para la lista
+    // hay que devolverle su forma original: nadie quiere leer "cafe".
+    const que = limpiaArticulos(restoreCase(compraNueva[1].trim(), raw))
+    // "falta pintar la ventana" es una tarea, no la compra. Si la frase
+    // parece una acción, se deja pasar a las reglas de tareas.
+    const pareceTarea = /^(?:que |de )?(?:hacer|pintar|revisar|llamar|mandar|enviar|arreglar|limpiar|montar|terminar)\b/i.test(que)
+    if (que && !pareceTarea) return { action: 'compra_add', que }
+  }
 
   // Respuesta corta a un recordatorio ("sí", "no", "ja", "sim", "erledigt")
   if (t.split(' ').length <= 2) {
@@ -486,6 +524,11 @@ function cleanTitle(s, lang = 'es') {
  * (el análisis se hace sobre texto normalizado). Palabras nuevas (p. ej. el
  * infinitivo) se dejan tal cual.
  */
+/** Quita el artículo del principio: "el café" y "café" son lo mismo. */
+function limpiaArticulos(s) {
+  return String(s ?? '').replace(/^(?:el|la|los|las|un|una|unos|unas|o|a|os|as|der|die|das|den|dem)\s+/i, '').trim()
+}
+
 function restoreCase(title, raw) {
   if (!title) return ''
   const rawWords = String(raw).split(/\s+/)

@@ -27,6 +27,8 @@ import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
 import { transcribir, transcripcionDisponible } from './transcribe.js'
+import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entsorgung.js'
+import { addCompra, listCompras, markComprado } from './compras.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
@@ -582,6 +584,13 @@ async function detalleTarea(lang, task, today) {
   return out
 }
 
+/** "hoy", "mañana" o la fecha larga de siempre. */
+function cuandoBasura(fecha, today, lang) {
+  if (fecha === today) return t(lang, 'waste_today')
+  if (fecha === masDias(today, 1)) return t(lang, 'waste_tomorrow_word')
+  return describeRange(null, fecha, today, lang, t)
+}
+
 async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {
   const openTasks = await openTasksFor(user.id)
   const estados = await listStates()
@@ -712,6 +721,58 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         fecha: cuandoTexto,
         lista: lista.map((x) => `• ${x.title}${x.assignee_name ? ` — ${x.assignee_name}` : ''}`).join('\n'),
       })
+    }
+
+    case 'entsorgung': {
+      const nombres = BASURA_NOMBRES[lang] ?? BASURA_NOMBRES.es
+      const texto = String(intent.texto ?? '')
+      // ¿Pregunta por un tipo concreto o por todo?
+      const PALABRAS = {
+        papier_muri: /papel|papier|cartao|carton|karton/,
+        glas: /vidrio|glas|vidro/,
+        metall: /metal/,
+        kunststoff: /plastico|kunststoff|plastik/,
+        deponie: /escombros|deponie|entulho/,
+        gruengut: /verde|gruengut|grungut/,
+      }
+      const tipo = Object.keys(PALABRAS).find((k) => PALABRAS[k].test(texto))
+      if (tipo) {
+        const f = proximaDe(tipo, today)
+        if (!f) return t(lang, 'waste_none', { tipo: nombres[tipo] })
+        return t(lang, 'waste_one', { tipo: nombres[tipo], cuando: cuandoBasura(f, today, lang) })
+      }
+      const lista = proximas(today, 5)
+      return t(lang, 'waste_next', {
+        lista: lista.map((x) => `• ${nombres[x.tipo]} — ${cuandoBasura(x.fecha, today, lang)}`).join('\n'),
+      })
+    }
+
+    case 'compra_add': {
+      const { item, repetido } = await addCompra(intent.que, user.id)
+      if (repetido) {
+        const quien = item.requested_by === user.id ? firstName(user) : (users.find((u) => u.id === item.requested_by)?.full_name ?? '—')
+        return t(lang, 'shop_repeated', { que: item.title, quien })
+      }
+      const total = (await listCompras()).length
+      return t(lang, 'shop_added', { que: item.title, total })
+    }
+
+    case 'compra_list': {
+      const lista = await listCompras()
+      if (lista.length === 0) return t(lang, 'shop_empty')
+      return t(lang, 'shop_list', {
+        lista: lista.map((x) => `• ${x.title}${x.requested_by_name ? ` (${x.requested_by_name.split(' ')[0]})` : ''}`).join('\n'),
+      })
+    }
+
+    case 'compra_done': {
+      const hechas = await markComprado(intent.que, user.id)
+      if (hechas.length === 0) {
+        return intent.que ? t(lang, 'shop_not_found', { que: intent.que }) : t(lang, 'shop_empty')
+      }
+      return intent.que
+        ? t(lang, 'shop_bought_some', { lista: hechas.map((x) => x.title).join(', ') })
+        : t(lang, 'shop_bought_all', { total: hechas.length })
     }
 
     case 'add_comment': {
