@@ -48,6 +48,8 @@ export const config = {
   // se define, los adjuntos quedan desactivados a propósito (los
   // comentarios de texto siguen funcionando).
   uploadDir: process.env.UPLOAD_DIR ?? '',
+  // Whisper en el NAS para las notas de voz. Vacío = sin transcripción.
+  whisperUrl: (process.env.WHISPER_URL ?? '').replace(/\/$/, ''),
 
   // ─── Asistente (entiende los mensajes de WhatsApp en lenguaje normal) ───
   // Con GEMINI_API_KEY usa Google Gemini para interpretar "crea una tarea a

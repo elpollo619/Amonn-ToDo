@@ -26,6 +26,7 @@ import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
+import { transcribir, transcripcionDisponible } from './transcribe.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
@@ -56,9 +57,25 @@ export async function handleInbound(msg) {
   if (!text && !foto) return
 
   const phone = chatIdToPhone(from)
+
+  // Una nota de voz se intenta convertir en texto. Si sale, se trata como si
+  // se hubiera escrito: así se puede crear una tarea hablando. Si no sale
+  // —servicio caído, audio ininteligible—, el audio se guarda como adjunto,
+  // que es lo que se hacía antes: la transcripción mejora, no condiciona.
+  let transcripcion = null
+  const esNotaDeVoz = foto && String(foto.mime ?? '').startsWith('audio/')
+  if (esNotaDeVoz && !text && transcripcionDisponible()) {
+    transcripcion = await transcribir(foto.buffer, foto.mime)
+    if (transcripcion) console.log(`[voz] transcrito (${transcripcion.length} caracteres)`)
+  }
+
   let reply
   try {
-    reply = await processMessage(phone, text, { foto })
+    reply = transcripcion
+      // Se enseña SIEMPRE lo que se entendió: si la transcripción falla en una
+      // palabra, quien la lee lo ve al momento en vez de descubrirlo luego.
+      ? `🎤 «${transcripcion}»\n\n${await processMessage(phone, transcripcion)}`
+      : await processMessage(phone, text, { foto })
   } catch (err) {
     console.error('[asistente] error procesando el mensaje:', err.message)
     // Aún sin saber quién es, respondemos en el idioma que parezca.
