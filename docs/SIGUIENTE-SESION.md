@@ -15,46 +15,60 @@ git checkout claude/job-list-app-whatsapp-av9rwl
 Lee **`docs/HANDOFF.md` entero** antes de tocar nada. Este fichero solo te
 dice dónde seguir; el detalle y los gotchas están allí.
 
-## 2. Acceso al NAS (funciona, sin contraseña)
+## 2. Acceso al NAS — por Tailscale, desde cualquier sitio
 
 ```bash
-ssh -i ~/.ssh/id_ed25519_kali Cris@192.168.1.9
+ssh -i ~/.ssh/id_ed25519_kali Cris@100.77.9.60      # nas-amonn
 ```
+
+⚠️ **No uses 192.168.1.9.** Esa IP solo se ve estando en la red del NAS, y
+Cris trabaja desde la oficina, su casa y casa de sus padres — varias de esas
+redes usan también el rango 192.168.1.x, así que ninguna VPN lo arreglaba. Se
+perdió mucho tiempo en tres sesiones por esto. Desde el 4 sep 2026 el NAS está
+en la tailnet como **`nas-amonn` = 100.77.9.60** (contenedor `tailscale`,
+`network_mode: host`, estado en el volumen `tailscale-state`).
+
+El contenedor anuncia la ruta `192.168.1.0/24`, pero **hay que aprobarla en la
+consola de Tailscale** para llegar al resto de la red de la oficina; hará falta
+para el Netzlaufwerk.
 
 El usuario `Cris` está en el grupo `docker`: **`docker …` va sin `sudo`**.
 
-- App: `http://192.168.1.9:8080` · versión: `curl -s http://192.168.1.9:8080/api/version`
-- Panel del Gateway de WhatsApp: `http://192.168.1.9:2785`
-  (⚠️ **sale en blanco** abierto por IP: usa `crypto.randomUUID`, que no existe
-  en contexto no seguro. El túnel SSH no vale: el NAS bloquea el reenvío de
-  puertos.)
+- App: `http://100.77.9.60:8080` · versión: `curl -s http://100.77.9.60:8080/api/version`
+- Gateway de WhatsApp: `http://100.77.9.60:2785` (el panel sale en blanco por
+  IP: usa `crypto.randomUUID`, que no existe en contexto no seguro).
 - Compose de Amonn: `/volume1/docker/docker-compose.yaml` — **contiene los
   secretos reales, no lo imprimas ni lo copies al repo.**
   ⚠️ El **servicio** se llama `server`, NO `amonn-server` (ese es el
-  `container_name`): `--force-recreate amonn-server` falla con "no such service".
+  `container_name`).
 - **Desplegar = `git push`.** CI publica `latest` y Watchtower lo aplica en
-  ≤5 min. Solo hay que recrear el proyecto si cambian variables o volúmenes:
-  `cd /volume1/docker && docker compose -p amonn -f /volume1/docker/docker-compose.yaml up -d`
+  ≤5 min.
+- ⚠️ Cris NO puede escribir en `/volume1/docker/data` (permisos). Usa su home
+  `/home/Cris` o volúmenes Docker con nombre.
 
-## 3. Estado actual (2026-09-03)
+## 3. Estado actual (4 sep 2026)
 
-Rediseño acordado con Cris: mezcla de las direcciones **A y B** (lienzo:
-https://claude.ai/code/artifact/471f85da-75d0-4ea2-806e-1a6f26ae1c1c).
-Cinco pasos acordados; **los cinco están hechos y desplegados** salvo un
-trozo:
+Los cinco pasos del rediseño están **hechos, desplegados y verificados**,
+incluidas las fotos entrantes por WhatsApp (probadas con fotos reales de Cris).
 
-| Paso | Estado |
-|---|---|
-| 1. Plazos (inicio→fin) + pantalla de inicio nueva | ✅ |
-| 2. Estados propios del taller | ✅ |
-| 3. Subtareas / pasos | ✅ |
-| 4. Línea de tiempo | ✅ |
-| 5. Comentarios y fotos | ✅ texto y fotos desde la app · ❌ **fotos entrantes por WhatsApp** |
+Además, ese mismo día:
 
-Antes de eso, en la misma sesión, se arregló el tiempo real de WhatsApp y se
-revinculó la sesión (Cris escaneó el QR). El asistente habla **español, alemán
-y portugués**, aprende apodos y correcciones, y entiende plazos, estados,
-pasos y comentarios por mensaje.
+- **Los 7 trabajadores están dados de alta** con teléfono, correo, color e
+  idioma. Contraseña bloqueada a propósito: existen para tareas y WhatsApp,
+  pero no pueden entrar a la app hasta que se les dé una.
+  ⚠️ Había **dos Cristian Amaya** (uno vacío, con el correo de empresa); por eso
+  "crea tarea a cris" preguntaba cuál. Se fusionaron. Si vuelve a pasar con
+  otro nombre, mira primero si hay duplicados antes de tocar el código.
+- **Cuatro órdenes nuevas** sobre tareas existentes: cambiar plazo, reasignar,
+  ver detalle y listar por estado o vencimiento (`test/ordenes.test.mjs`).
+- **Notas de voz**: se guardan como adjunto de la tarea. Falta transcribir.
+- **Aviso diario agrupado**: un mensaje por persona con atrasadas / hoy /
+  mañana, en vez de un mensaje por tarea (`test/avisos.test.mjs`).
+
+⚠️ **La base de datos apareció vacía** el 3 de septiembre (0 tareas, 0
+vocabulario; el contenedor `amonn-db-1` se recreó a las 06:01). No se ha
+averiguado por qué. Conviene entenderlo antes de cargar datos de verdad.
+Hay un respaldo en `/home/Cris/amonn-backup-20260904-0850.sql`.
 
 ## 4. LO ÚNICO QUE FALTA: probar las fotos con una foto de verdad
 
