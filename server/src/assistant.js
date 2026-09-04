@@ -114,6 +114,9 @@ const REGLAS = {
     contactoBuscar: /^(?:(?:el\s+)?(?:telefono|numero|mail|email|correo|contacto|datos)\s+(?:de|del|de la)\s+|quien es\s+|buscar?\s+(?:contacto\s+)?)(.+?)\??$/,
     // "guarda contacto: Reto Baumgartner, R. Baumgartner AG, +41 79 938 50 71"
     contactoAdd: /^(?:guarda(?:r)?|anade|anadir|agrega(?:r)?|nuevo)\s+(?:el\s+)?contacto\s*[:,-]?\s*(.+)$/,
+    // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
+    gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
+    gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
   },
 
@@ -154,6 +157,8 @@ const REGLAS = {
     citaList: /^(?:welche termine|meine termine|nachste termine|agenda|termine)\b\??$/,
     contactoBuscar: /^(?:(?:die\s+)?(?:telefon|nummer|mail|email|kontakt|daten)\s+(?:von|vom)\s+|wer ist\s+|such(?:e)?\s+(?:kontakt\s+)?)(.+?)\??$/,
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
+    gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
+    gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
   },
 
@@ -194,6 +199,8 @@ const REGLAS = {
     citaList: /^(?:que reunioes|minhas reunioes|proximas reunioes|agenda)\b\??$/,
     contactoBuscar: /^(?:(?:o\s+)?(?:telefone|numero|mail|email|contacto|dados)\s+(?:de|do|da)\s+|quem e\s+|procura(?:r)?\s+(?:contacto\s+)?)(.+?)\??$/,
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
+    gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
+    gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
   },
 }
@@ -230,6 +237,19 @@ function parseInLang(text, ctx, lang) {
 
   // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene
   // nada que ver con las tareas y así no compite con "crea una tarea".
+  if (cfg.gastoList && cfg.gastoList.test(t)) return { action: 'gasto_list' }
+  const gastoNuevo = cfg.gastoAdd ? t.match(cfg.gastoAdd) : null
+  if (gastoNuevo) {
+    const resto = gastoNuevo[1].trim()
+    // Un gasto necesita IMPORTE. Sin él no hay nada que apuntar.
+    const imp = resto.match(/(\d{1,5})[.,](\d{2})\b/) ?? resto.match(/\b(\d{1,5})\b(?!\s*[:.h]\d)/)
+    return {
+      action: 'gasto_add',
+      texto: restoreCase(resto, raw),
+      importe: imp ? Number(`${imp[1]}.${imp[2] ?? '00'}`) : null,
+    }
+  }
+
   const contactoNuevo = cfg.contactoAdd ? t.match(cfg.contactoAdd) : null
   if (contactoNuevo) {
     // Aquí hace falta el texto TAL CUAL se escribió: restoreCase sirve para

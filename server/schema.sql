@@ -222,3 +222,24 @@ create index if not exists contacts_empresa on contacts (lower(company));
 alter table contacts add column if not exists status text;
 alter table contacts add column if not exists notes text;
 create index if not exists contacts_status on contacts (lower(coalesce(status,'')));
+
+-- Spesen: gastos adelantados que hay que devolver a quien los pagó.
+-- Una fila aquí = una fila en el Excel de Spesen.
+create table if not exists expenses (
+  id            uuid primary key default gen_random_uuid(),
+  code          text not null,              -- HAAG · A14 · B22 · A4 · CR · SWE
+  spent_on      date not null,
+  merchant      text,                       -- Coop, Migros, Bauhaus...
+  concept       text not null,              -- lo que va en Bemerkung
+  amount_cents  integer not null,
+  vat           text,                       -- '2.6' | '8.1' | null
+  category      text not null,              -- clave del catálogo
+  account       text,                       -- cuenta contable de esa columna
+  person_id     uuid references users(id) on delete set null,  -- a quién se le debe
+  receipt_path  text,                       -- fichero guardado en uploads
+  receipt_name  text,                       -- nombre según la convención de la casa
+  status        text not null default 'open',   -- open | exported | reimbursed
+  created_at    timestamptz not null default now()
+);
+create index if not exists expenses_abiertos on expenses (status, spent_on);
+create index if not exists expenses_persona on expenses (person_id, status);

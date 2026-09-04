@@ -31,6 +31,8 @@ import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entso
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
+import { addGasto, gastosAbiertos, saldos, chf } from './gastos.js'
+import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
 import {
@@ -747,6 +749,64 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return t(lang, 'waste_next', {
         lista: lista.map((x) => `• ${nombres[x.tipo]} — ${cuandoBasura(x.fecha, today, lang)}`).join('\n'),
       })
+    }
+
+    case 'gasto_add': {
+      if (!intent.importe) return t(lang, 'exp_need_amount')
+      const texto = String(intent.texto ?? '')
+      // El código del edificio puede venir escrito ("gasto a14 45.20 Migros").
+      const codigo = Object.keys(CODIGOS).find((c) => new RegExp(`\\b${c}\\b`, 'i').test(texto)) ?? 'HAAG'
+      // El concepto es lo que queda al quitar importe y código.
+      const concepto = texto
+        .replace(/\d{1,5}[.,]\d{2}/, ' ')
+        .replace(new RegExp(`\\b${codigo}\\b`, 'ig'), ' ')
+        .replace(/\bchf\b/ig, ' ')
+        .replace(/\s{2,}/g, ' ').trim()
+      if (!concepto) return t(lang, 'exp_need_amount')
+
+      const catKey = proponerCategoria(concepto, codigo) ?? categoriasDe(codigo)[0]?.key
+      const cat = porKey(catKey)
+      const cents = Math.round(intent.importe * 100)
+      const g = await addGasto({
+        code: codigo, spentOn: today, concept: concepto, amountCents: cents,
+        vat: cat?.iva?.length ? cat.iva[cat.iva.length - 1] : null,
+        category: catKey, personId: user.id,
+        receiptName: nombreDeArchivo({ codigo, fecha: today, concepto }),
+      })
+      const mios = await gastosAbiertos(user.id)
+      const total = mios.reduce((n, x) => n + x.amount_cents, 0)
+      let out = t(lang, 'exp_added', {
+        code: g.code,
+        fecha: String(g.spent_on).slice(0, 10).split('-').reverse().join('/'),
+        concepto: g.concept, importe: chf(g.amount_cents),
+        columna: cat?.col ?? '—', cuenta: g.account ?? '—',
+        iva: g.vat ? t(lang, 'exp_vat', { iva: g.vat }) : '',
+        saldo: chf(total),
+      })
+      // La columna es lo que más se falla, así que se enseñan las demás.
+      const otras = categoriasDe(codigo).filter((c) => c.key !== catKey).slice(0, 6)
+      if (otras.length) out += t(lang, 'exp_guessed', { lista: otras.map((c) => `• ${c.col}`).join('\n') })
+      return out
+    }
+
+    case 'gasto_list': {
+      const abiertos = await gastosAbiertos()
+      if (abiertos.length === 0) return t(lang, 'exp_empty')
+      const total = abiertos.reduce((n, x) => n + x.amount_cents, 0)
+      let out = t(lang, 'exp_list', {
+        total: chf(total),
+        lista: abiertos.slice(0, 12).map((g) => {
+          const f = String(g.spent_on).slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+          return `• ${f} ${g.code} ${g.concept} — CHF ${chf(g.amount_cents)}`
+        }).join('\n'),
+      })
+      const porPersona = await saldos()
+      if (porPersona.length > 1) {
+        out += t(lang, 'exp_saldos', {
+          lista: porPersona.map((p) => `• ${p.full_name}: CHF ${chf(Number(p.total_cents))}`).join('\n'),
+        })
+      }
+      return out
     }
 
     case 'contacto_buscar': {
