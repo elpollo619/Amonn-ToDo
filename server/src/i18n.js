@@ -66,7 +66,9 @@ const TEXTOS = {
       '• "Crea una tarea a Luis: revisar la caldera, para el viernes"\n' +
       '• "Necesito que Ana prepare el presupuesto Gómez mañana, urgente"\n' +
       '• "¿Qué tengo abierto?" o "Tareas de Luis" o "Tareas del equipo"\n' +
-      '• "Hecha la de la caldera"\n\n' +
+      '• "Hecha la de la caldera"\n' +
+      '• "¿Cómo va la caldera?" o "Pásale la caldera a Rayna"\n' +
+      '• "Cambia el plazo de la caldera al viernes"\n\n' +
       'Puedo hablar español, alemán y portugués: dime "habla en alemán" cuando quieras.',
     unknown_user:
       'No te reconozco en Amonn 🤔. Pon este número (con prefijo, p. ej. +41) en "Mi perfil" dentro de la app y vuelve a escribirme.',
@@ -107,7 +109,9 @@ const TEXTOS = {
       'No te he entendido 🤔. Prueba con algo como:\n' +
       '• "Crea una tarea a Luis: revisar la caldera, para el viernes"\n' +
       '• "¿Qué tengo abierto?"\n' +
-      '• "Hecha la de la caldera"\n\n' +
+      '• "Hecha la de la caldera"\n' +
+      '• "¿Cómo va la caldera?" o "Pásale la caldera a Rayna"\n' +
+      '• "Cambia el plazo de la caldera al viernes"\n\n' +
       'Escribe "ayuda" para ver más ejemplos.',
     teach_ok: 'Anotado: a partir de ahora «{frase}» es {nombre} 👍',
     teach_unknown: 'No encuentro a "{nombre}" en el equipo, así que no lo anoto. Personas: {lista}.',
@@ -123,6 +127,21 @@ const TEXTOS = {
     steps_progress: 'Pasos: {hechos}/{total}',
     comment_added: '💬 Anotado en «{titulo}»: {texto}',
     photo_added: '📷 Foto añadida a «{titulo}».',
+    due_changed: '📅 Plazo de «{titulo}» cambiado a {fecha}.',
+    due_removed: '📅 Plazo de «{titulo}» quitado.',
+    due_not_understood: '📅 No he entendido la fecha «{fecha}». Prueba con «el viernes», «mañana» o «15/10».',
+    reassigned: '👤 «{titulo}» ahora es de {nombre}.',
+    detail_state: '\n📊 Estado: {estado}',
+    detail_assignee: '\n👤 Responsable: {nombre}',
+    detail_due: '\n📅 Plazo: {fecha}',
+    detail_no_due: '\n📅 Plazo: sin fecha',
+    detail_priority: '\n🔴 Urgente',
+    detail_steps: '\n\n✅ Pasos ({hechos}/{total}):\n{lista}',
+    detail_comments: '\n\n💬 Últimos comentarios:\n{lista}',
+    list_by_state: '📊 En «{estado}» ({total}):\n{lista}',
+    list_by_state_empty: '📊 No hay nada en «{estado}».',
+    list_due: '📅 Vence hasta {fecha} ({total}):\n{lista}',
+    list_due_empty: '📅 No vence nada hasta {fecha}.',
     photo_which_task: '📷 He guardado la foto. ¿A qué tarea la pongo?\n{lista}\n\nContesta con el número.',
     photo_no_tasks: '📷 He guardado la foto, pero no tienes ninguna tarea abierta donde ponerla. Crea la tarea y vuelve a mandármela, y la coloco.',
     photo_no_storage: '📷 He recibido la foto, pero ahora mismo no puedo guardarla: {motivo}',
@@ -210,6 +229,21 @@ const TEXTOS = {
     steps_progress: 'Schritte: {hechos}/{total}',
     comment_added: '💬 Zu «{titulo}» notiert: {texto}',
     photo_added: '📷 Foto zu «{titulo}» hinzugefügt.',
+    due_changed: '📅 Frist von «{titulo}» auf {fecha} geändert.',
+    due_removed: '📅 Frist von «{titulo}» entfernt.',
+    due_not_understood: '📅 Ich habe das Datum «{fecha}» nicht verstanden. Versuch «Freitag», «morgen» oder «15.10.».',
+    reassigned: '👤 «{titulo}» gehört jetzt {nombre}.',
+    detail_state: '\n📊 Status: {estado}',
+    detail_assignee: '\n👤 Zuständig: {nombre}',
+    detail_due: '\n📅 Frist: {fecha}',
+    detail_no_due: '\n📅 Frist: keine',
+    detail_priority: '\n🔴 Dringend',
+    detail_steps: '\n\n✅ Schritte ({hechos}/{total}):\n{lista}',
+    detail_comments: '\n\n💬 Letzte Kommentare:\n{lista}',
+    list_by_state: '📊 In «{estado}» ({total}):\n{lista}',
+    list_by_state_empty: '📊 Nichts in «{estado}».',
+    list_due: '📅 Fällig bis {fecha} ({total}):\n{lista}',
+    list_due_empty: '📅 Nichts fällig bis {fecha}.',
     photo_which_task: '📷 Ich habe das Foto gespeichert. Zu welcher Aufgabe gehört es?\n{lista}\n\nAntworte mit der Nummer.',
     photo_no_tasks: '📷 Ich habe das Foto gespeichert, aber du hast keine offene Aufgabe dafür. Leg die Aufgabe an und schick es mir nochmal, dann ordne ich es zu.',
     photo_no_storage: '📷 Ich habe das Foto bekommen, kann es aber gerade nicht speichern: {motivo}',
@@ -297,6 +331,21 @@ const TEXTOS = {
     steps_progress: 'Passos: {hechos}/{total}',
     comment_added: '💬 Anotado em «{titulo}»: {texto}',
     photo_added: '📷 Foto adicionada a «{titulo}».',
+    due_changed: '📅 Prazo de «{titulo}» mudado para {fecha}.',
+    due_removed: '📅 Prazo de «{titulo}» retirado.',
+    due_not_understood: '📅 Não percebi a data «{fecha}». Tenta «sexta-feira», «amanhã» ou «15/10».',
+    reassigned: '👤 «{titulo}» agora é de {nombre}.',
+    detail_state: '\n📊 Estado: {estado}',
+    detail_assignee: '\n👤 Responsável: {nombre}',
+    detail_due: '\n📅 Prazo: {fecha}',
+    detail_no_due: '\n📅 Prazo: sem data',
+    detail_priority: '\n🔴 Urgente',
+    detail_steps: '\n\n✅ Passos ({hechos}/{total}):\n{lista}',
+    detail_comments: '\n\n💬 Últimos comentários:\n{lista}',
+    list_by_state: '📊 Em «{estado}» ({total}):\n{lista}',
+    list_by_state_empty: '📊 Não há nada em «{estado}».',
+    list_due: '📅 Vence até {fecha} ({total}):\n{lista}',
+    list_due_empty: '📅 Não vence nada até {fecha}.',
     photo_which_task: '📷 Guardei a foto. A que tarefa a ponho?\n{lista}\n\nResponde com o número.',
     photo_no_tasks: '📷 Guardei a foto, mas não tens nenhuma tarefa aberta onde a pôr. Cria a tarefa e manda-ma outra vez, que eu coloco-a.',
     photo_no_storage: '📷 Recebi a foto, mas agora não a consigo guardar: {motivo}',

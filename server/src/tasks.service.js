@@ -126,3 +126,97 @@ export async function openTasksAll() {
   )
   return rows
 }
+
+// ============================================================
+// Cambios sueltos sobre una tarea que ya existe (plazo, responsable,
+// prioridad) y consultas más finas. Todo esto se puede pedir por WhatsApp:
+// antes había que entrar en la app para cualquier retoque.
+// ============================================================
+
+/**
+ * Cambia el plazo. `due` es 'YYYY-MM-DD' o null para quitarlo.
+ * Si la tarea tenía fecha de inicio posterior al nuevo plazo, se arrastra:
+ * un trabajo no puede empezar después de su propia entrega.
+ */
+export async function setDue(id, due) {
+  const { rows } = await query(
+    `update tasks
+        set due_date = $2,
+            start_date = case
+              when $2::date is not null and start_date is not null and start_date > $2::date
+              then $2::date else start_date end,
+            updated_at = now()
+      where id = $1 returning *`,
+    [id, due],
+  )
+  broadcast()
+  return rows[0] ?? null
+}
+
+/** Cambia el responsable. */
+export async function reassignTask(id, userId) {
+  const { rows } = await query(
+    'update tasks set assignee_id = $2, updated_at = now() where id = $1 returning *',
+    [id, userId],
+  )
+  broadcast()
+  return rows[0] ?? null
+}
+
+/** Cambia la prioridad ('low' | 'medium' | 'high'). */
+export async function setPriority(id, priority) {
+  const { rows } = await query(
+    'update tasks set priority = $2, updated_at = now() where id = $1 returning *',
+    [id, priority],
+  )
+  broadcast()
+  return rows[0] ?? null
+}
+
+/** Una tarea con su estado y el nombre de su responsable. */
+export async function getTask(id) {
+  const { rows } = await query(
+    `select t.*, u.full_name as assignee_name,
+            s.name as state_name, s.kind as state_kind
+       from tasks t
+       left join users u on u.id = t.assignee_id
+       left join task_states s on s.id = t.state_id
+      where t.id = $1`,
+    [id],
+  )
+  return rows[0] ?? null
+}
+
+/** Tareas abiertas que están en un estado concreto del taller. */
+export async function openTasksByState(stateId) {
+  const { rows } = await query(
+    `select t.*, u.full_name as assignee_name, s.name as state_name
+       from tasks t
+       left join users u on u.id = t.assignee_id
+       left join task_states s on s.id = t.state_id
+      where t.state_id = $1 and t.status in ('open','in_progress')
+      order by t.due_date asc nulls last, t.created_at asc`,
+    [stateId],
+  )
+  return rows
+}
+
+/**
+ * Tareas abiertas que vencen hasta una fecha (incluida). Las que no tienen
+ * plazo quedan fuera a propósito: si preguntas qué vence esta semana, una
+ * tarea sin fecha no vence esta semana.
+ */
+export async function openTasksDueBy(fecha, userId = null) {
+  const { rows } = await query(
+    `select t.*, u.full_name as assignee_name, s.name as state_name
+       from tasks t
+       left join users u on u.id = t.assignee_id
+       left join task_states s on s.id = t.state_id
+      where t.status in ('open','in_progress')
+        and t.due_date is not null and t.due_date <= $1::date
+        and ($2::uuid is null or t.assignee_id = $2::uuid)
+      order by t.due_date asc, t.created_at asc`,
+    [fecha, userId],
+  )
+  return rows
+}

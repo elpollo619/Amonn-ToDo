@@ -91,7 +91,17 @@ const REGLAS = {
     createNoun: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar|crea|crear|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar)\s+(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)\b/,
     addComment: /^(?:comenta|comentar|anota\s+en|nota\s+en|apunta\s+en|di\s+en)\s+(?:en\s+)?(?:la |el |lo )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:anade|anadir|agrega|agregar|apunta|apuntar|suma|sumar)\s+(?:a|en)\s+(?:la |el |lo )?(.+?)\s*[:,-]\s*(.+)$/,
-    setState: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar)\s+(?:la |el |lo )?(.+?)\s+(?:a|en|como|al estado)\s+(.+)$/,
+    setState: /^(?:pon|ponme|poner|pasa|pasar|cambia|cambiar|mueve|mover|marca|marcar)\s+(?:la |el |lo )?(.+?)\s+(?:al estado|al|a|en|como)\s+(.+)$/,
+    // "cambia el plazo de la caldera al viernes"
+    setDue: /^(?:cambia(?:le)?|cambiar|pon(?:le)?|poner|mueve|mover|aplaza|aplazar|adelanta|adelantar)?\s*(?:el |la )?(?:plazo|fecha|entrega|vencimiento)\s+(?:de\s+)?(?:la |el )?(.+?)\s+(?:a|al|para)\s+(.+)$/,
+    // "pásale la caldera a Rayna"
+    reassign: /^(?:pasa(?:le|sela)?|pasar|reasigna(?:le)?|reasignar|asigna(?:le)?|asignar|dale|encarga(?:le)?)\s+(?:la |el |lo )?(.+?)\s+(?:a|para)\s+([a-z]+)$/,
+    // "¿cómo va la caldera?"
+    detail: /^(?:como (?:va|esta|anda)|que tal (?:va |esta )?|detalle(?:s)? de|informacion de|info de|estado de|ver|muestra(?:me)?|dame)\s+(?:la |el |lo )?(.+?)\??$/,
+    // "¿qué hay en esperando material?"
+    listState: /^(?:que|cuales|cuantas)\s+(?:tareas\s+)?(?:hay|tenemos|estan|hay ahora)?\s*(?:en|con estado)\s+(.+?)\??$/,
+    // "¿qué vence esta semana?"
+    listDue: /^(?:que|cuales|cuantas)\s+(?:tareas\s+)?(?:vence(?:n)?|caduca(?:n)?|hay para|tenemos para)\s+(.+?)\??$/,
   },
 
   de: {
@@ -119,6 +129,11 @@ const REGLAS = {
     addComment: /^(?:kommentiere|kommentar\s+zu|notiere\s+zu|vermerke)\s+(?:zu\s+)?(?:die |der |das )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:fuge|fuege|hinzufugen|erganze|erganzen)\s+(?:zu|bei)\s+(?:die |der |das )?(.+?)\s*[:,-]\s*(.+)$/,
     setState: /^(?:setze|stelle|andere|verschiebe|markiere)\s+(?:die |der |das )?(.+?)\s+(?:auf|zu|als)\s+(.+)$/,
+    setDue: /^(?:andere|andern|verschiebe|setze|verlangere)?\s*(?:die |den |das )?(?:frist|termin|datum|abgabe)\s+(?:von\s+)?(?:die |der |das )?(.+?)\s+(?:auf|zu)\s+(.+)$/,
+    reassign: /^(?:gib|ubergib|ubergebe|ubertrage|weise|zuweisen)\s+(?:die |der |das )?(.+?)\s+(?:an|zu)\s+([a-z]+)$/,
+    detail: /^(?:wie (?:steht|lauft|ist)(?: es um)?|status von|details? (?:zu|von)|infos? (?:zu|von)|zeig(?:e|mir)?|zeige mir)\s+(?:die |der |das )?(.+?)\??$/,
+    listState: /^(?:was|welche|wie viele)\s+(?:aufgaben\s+)?(?:gibt es|haben wir|ist|sind)?\s*(?:in|im|auf|mit status)\s+(.+?)\??$/,
+    listDue: /^(?:was|welche|wie viele)\s+(?:aufgaben\s+)?(?:lauft ab|lauf(?:en)? ab|ist fallig|sind fallig|haben wir fur|gibt es fur)\s+(.+?)\??$/,
   },
 
   pt: {
@@ -145,7 +160,12 @@ const REGLAS = {
     createNoun: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar|cria|criar|adiciona|anota)\s+(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)\b/,
     addComment: /^(?:comenta|comentar|nota\s+em|apontar\s+em)\s+(?:em\s+|n[ao]\s+)?(?:a |o )?(.+?)\s*[:,-]\s*(.+)$/,
     addStep: /^(?:adiciona|adicionar|acrescenta|acrescentar|junta)\s+(?:a|ao|em)\s+(?:a |o )?(.+?)\s*[:,-]\s*(.+)$/,
-    setState: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar)\s+(?:a |o )?(.+?)\s+(?:para|em|como)\s+(.+)$/,
+    setState: /^(?:poe|poem|passa|passar|muda|mudar|move|mover|marca|marcar)\s+(?:a |o )?(.+?)\s+(?:para|ao|em|no|na|como)\s+(.+)$/,
+    setDue: /^(?:muda|mudar|poe|por|adia|adiar|antecipa)?\s*(?:o |a )?(?:prazo|data|entrega|vencimento)\s+(?:de\s+|da\s+|do\s+)?(?:a |o )?(.+?)\s+(?:para|a)\s+(.+)$/,
+    reassign: /^(?:passa|passar|reatribui|reatribuir|atribui|atribuir|da|entrega)\s+(?:a |o )?(.+?)\s+(?:para|ao|a)\s+([a-z]+)$/,
+    detail: /^(?:como (?:vai|esta)|detalhe(?:s)? de|informacao de|info de|estado de|mostra(?:me)?|ve)\s+(?:a |o )?(.+?)\??$/,
+    listState: /^(?:que|quais|quantas)\s+(?:tarefas\s+)?(?:ha|temos|estao|esta)?\s*(?:em|no|na|com estado)\s+(.+?)\??$/,
+    listDue: /^(?:que|quais|quantas)\s+(?:tarefas\s+)?(?:vence(?:m)?|expira(?:m)?|ha para|temos para)\s+(.+?)\??$/,
   },
 }
 
@@ -215,7 +235,9 @@ function parseInLang(text, ctx, lang) {
   // tarea a Isma: revisar la caldera" se interpretaría como un cambio de
   // estado, y con ella la decisión es determinista y no hay solapamiento.
   const est = cfg.setState ? t.match(cfg.setState) : null
-  if (est && !cfg.createNoun.test(t)) {
+  // Si la frase menciona el plazo, es un cambio de plazo y se resuelve más
+  // abajo: esa regla es más específica y tiene preferencia.
+  if (est && !cfg.createNoun.test(t) && !(cfg.setDue && cfg.setDue.test(t))) {
     const pista = est[1].trim()
     const pedido = est[2].trim()
     const estados = Array.isArray(ctx.states) ? ctx.states : []
@@ -230,6 +252,60 @@ function parseInLang(text, ctx, lang) {
     if (pista && (m.state || m.candidates.length > 0 || señalaTarea)) {
       return { action: 'set_state', task_hint: pista, state: pedido }
     }
+  }
+
+  // ---- Retoques sobre una tarea que YA existe -------------------------
+  //
+  // Todas estas reglas comparten verbos con "crear" ("pon", "pasa", "cambia",
+  // "asigna"), así que ninguna decide por sí sola: TODAS exigen que la pista
+  // señale una tarea existente. Sin esa condición, "asigna una tarea a Rayna:
+  // pintar" se leería como una reasignación. Con ella la decisión es
+  // determinista y no hay solapamiento — la misma lección que con los estados.
+  const tareasVivas = ctx.allOpenTasks ?? ctx.openTasks ?? []
+  const señala = (pista) => Boolean(pista && pickTaskByHint(pista, tareasVivas, ctx.aliases))
+
+  // "cambia el plazo de la caldera al viernes"
+  const plazo = cfg.setDue ? t.match(cfg.setDue) : null
+  if (plazo && !cfg.createNoun.test(t)) {
+    const pista = plazo[1].trim()
+    const cuando = plazo[2].trim()
+    if (señala(pista) && cuando) {
+      return { action: 'set_due', task_hint: pista, due: cuando }
+    }
+  }
+
+  // "pásale la caldera a Rayna"
+  const reasig = cfg.reassign ? t.match(cfg.reassign) : null
+  if (reasig && !cfg.createNoun.test(t)) {
+    const pista = reasig[1].trim()
+    const quien = reasig[2].trim()
+    // Doble condición: la tarea existe Y el destinatario es alguien conocido.
+    if (señala(pista) && quien) {
+      return { action: 'reassign', task_hint: pista, assignee: quien }
+    }
+  }
+
+  // "¿cómo va la caldera?"
+  const det = cfg.detail ? t.match(cfg.detail) : null
+  if (det && !cfg.createNoun.test(t)) {
+    const pista = det[1].trim()
+    if (señala(pista)) return { action: 'task_detail', task_hint: pista }
+  }
+
+  // "¿qué hay en esperando material?"
+  const porEstado = cfg.listState ? t.match(cfg.listState) : null
+  if (porEstado) {
+    const pedido = porEstado[1].trim()
+    const estados = Array.isArray(ctx.states) ? ctx.states : []
+    const m = matchStateByName(estados, pedido)
+    if (m.state) return { action: 'list_by_state', state: pedido }
+  }
+
+  // "¿qué vence esta semana?"
+  const porFecha = cfg.listDue ? t.match(cfg.listDue) : null
+  if (porFecha) {
+    const cuando = porFecha[1].trim()
+    if (cuando) return { action: 'list_due', due: cuando }
   }
 
   if (cfg.create.test(t)) {

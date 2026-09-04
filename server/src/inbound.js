@@ -17,6 +17,7 @@ import { sendWhatsApp, chatIdToPhone, interpretReply } from './whatsapp.js'
 import { interpret, matchUser, pickTaskByHint, parseWithRules } from './assistant.js'
 import {
   createTask, completeTask, setTaskState, openTasksFor, openTasksAll, listUsers,
+  setDue, reassignTask, getTask, openTasksByState, openTasksDueBy,
 } from './tasks.service.js'
 import { firstName, taskSummary } from './notify.js'
 import { describeRange, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
@@ -25,6 +26,7 @@ import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
+import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus } from './comments.service.js'
 import {
   extraerFoto, pareceFoto, describirForma, motivoRechazo,
@@ -501,6 +503,63 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
   })
 }
 
+/**
+ * Cambia el plazo de una tarea a partir de lo que se escribió ("el viernes",
+ * "mañana", "15/10"). Si no se entiende la fecha, se dice — nunca se pone una
+ * fecha inventada en un plazo de obra.
+ */
+async function cambiarPlazo(lang, task, cuando, today, pista) {
+  const fecha = parseDateAnyLang(cuando, today, lang)
+  if (!fecha) {
+    // "sin fecha" / "quítale el plazo" es una petición válida, no un error.
+    if (saysNoDate(cuando, lang)) {
+      await setDue(task.id, null)
+      void touch('task', pista)
+      return t(lang, 'due_removed', { titulo: task.title })
+    }
+    return t(lang, 'due_not_understood', { fecha: cuando })
+  }
+  await setDue(task.id, fecha.key)
+  void touch('task', pista)
+  return t(lang, 'due_changed', {
+    titulo: task.title,
+    fecha: describeRange(null, fecha.key, today, lang, t),
+  })
+}
+
+/** Ficha completa de una tarea: estado, responsable, plazo, pasos y comentarios. */
+async function detalleTarea(lang, task, today) {
+  const completa = (await getTask(task.id)) ?? task
+  const pasos = await listSubtasks(task.id)
+  const { comments } = await listComments(task.id)
+
+  let out = `📌 ${completa.title}`
+  if (completa.state_name) out += t(lang, 'detail_state', { estado: completa.state_name })
+  if (completa.assignee_name) out += t(lang, 'detail_assignee', { nombre: completa.assignee_name })
+  out += completa.due_date
+    ? t(lang, 'detail_due', {
+        fecha: describeRange(completa.start_date ?? null, completa.due_date, today, lang, t),
+      })
+    : t(lang, 'detail_no_due')
+  if (completa.priority === 'high') out += t(lang, 'detail_priority')
+
+  if (pasos.length) {
+    const hechos = pasos.filter((x) => x.done).length
+    out += t(lang, 'detail_steps', {
+      hechos, total: pasos.length,
+      lista: pasos.map((x) => `${x.done ? '✅' : '⬜'} ${x.title}`).join('\n'),
+    })
+  }
+  // Solo los tres últimos: una ficha por WhatsApp que hay que desplazar deja
+  // de ser un resumen.
+  if (comments.length) {
+    out += t(lang, 'detail_comments', {
+      lista: comments.slice(-3).map((c) => `• ${c.body}`).join('\n'),
+    })
+  }
+  return out
+}
+
 async function procesarNuevo(phone, user, lang, text, users, today, aliases = []) {
   const openTasks = await openTasksFor(user.id)
   const estados = await listStates()
@@ -563,6 +622,76 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return avanzarBorrador(phone, user, lang, draft, users, today)
     }
 
+    // ---- Retoques sobre una tarea existente ----------------------------
+
+    case 'set_due': {
+      const pista = String(intent.task_hint ?? '').trim()
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, todasAbiertas, aliases)
+      if (!task) return t(lang, 'complete_not_found', { pista })
+      return cambiarPlazo(lang, task, String(intent.due ?? '').trim(), today, pista)
+    }
+
+    case 'reassign': {
+      const pista = String(intent.task_hint ?? '').trim()
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, todasAbiertas, aliases)
+      if (!task) return t(lang, 'complete_not_found', { pista })
+      const m = matchUser(String(intent.assignee ?? '').trim(), users, user, aliases)
+      if (!m.user) {
+        // Mismo criterio que al crear: si hay varios, se pregunta en vez de
+        // elegir por nosotros.
+        const lista = users.map((u) => u.full_name).join(', ')
+        return m.candidates?.length
+          ? t(lang, 'person_ambiguous', {
+              nombre: intent.assignee,
+              lista: m.candidates.map((c) => c.full_name).join(', '),
+            })
+          : t(lang, 'person_not_found', { nombre: intent.assignee, lista })
+      }
+      await reassignTask(task.id, m.user.id)
+      void touch('task', pista)
+      return t(lang, 'reassigned', { titulo: task.title, nombre: firstName(m.user) })
+    }
+
+    case 'task_detail': {
+      const pista = String(intent.task_hint ?? '').trim()
+      let task = pickTaskByHint(pista, openTasks, aliases)
+      if (!task) task = pickTaskByHint(pista, todasAbiertas, aliases)
+      if (!task) return t(lang, 'complete_not_found', { pista })
+      void touch('task', pista)
+      return detalleTarea(lang, task, today)
+    }
+
+    case 'list_by_state': {
+      const pedido = String(intent.state ?? '').trim()
+      const m = matchStateByName(estados, pedido)
+      if (!m.state) {
+        return t(lang, 'state_not_found', { estado: pedido, lista: estados.map((e) => e.name).join(', ') })
+      }
+      const lista = await openTasksByState(m.state.id)
+      if (lista.length === 0) return t(lang, 'list_by_state_empty', { estado: m.state.name })
+      return t(lang, 'list_by_state', {
+        estado: m.state.name,
+        total: lista.length,
+        lista: lista.map((x) => `• ${x.title}${x.assignee_name ? ` — ${x.assignee_name}` : ''}`).join('\n'),
+      })
+    }
+
+    case 'list_due': {
+      const cuando = String(intent.due ?? '').trim()
+      const fecha = parseDateAnyLang(cuando, today, lang)
+      if (!fecha) return t(lang, 'due_not_understood', { fecha: cuando })
+      const lista = await openTasksDueBy(fecha.key)
+      const cuandoTexto = describeRange(null, fecha.key, today, lang, t)
+      if (lista.length === 0) return t(lang, 'list_due_empty', { fecha: cuandoTexto })
+      return t(lang, 'list_due', {
+        total: lista.length,
+        fecha: cuandoTexto,
+        lista: lista.map((x) => `• ${x.title}${x.assignee_name ? ` — ${x.assignee_name}` : ''}`).join('\n'),
+      })
+    }
+
     case 'add_comment': {
       const pista = String(intent.task_hint ?? '').trim()
       const texto = String(intent.comment ?? '').trim()
@@ -601,6 +730,14 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         return t(lang, 'state_ambiguous', { estado: pedido, lista: m.candidates.map((e) => e.name).join(', ') })
       }
       if (!m.state) {
+        // "mueve la caldera al viernes" se dice igual que un cambio de estado.
+        // Si lo pedido no es un estado pero sí una fecha, era un plazo.
+        const comoFecha = parseDateAnyLang(pedido, today, lang)
+        if (comoFecha) {
+          let tarea = pickTaskByHint(pista, openTasks, aliases)
+          if (!tarea) tarea = pickTaskByHint(pista, await openTasksAll(), aliases)
+          if (tarea) return cambiarPlazo(lang, tarea, pedido, today, pista)
+        }
         return t(lang, 'state_not_found', { estado: pedido, lista: estados.map((e) => e.name).join(', ') })
       }
       let task = pickTaskByHint(pista, openTasks, aliases)
