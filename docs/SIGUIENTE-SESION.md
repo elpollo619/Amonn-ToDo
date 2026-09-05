@@ -11,8 +11,9 @@ git clone https://github.com/elpollo619/Amonn-ToDo
 cd Amonn-ToDo && git checkout claude/job-list-app-whatsapp-av9rwl
 ```
 
-Lee después `docs/HANDOFF.md` (detalle técnico) y `docs/IDEAS.md` (todo lo
-hablado y lo pendiente).
+Lee después `docs/HANDOFF.md` (detalle técnico), `docs/IDEAS.md` (todo lo
+hablado y lo pendiente) y `docs/INVESTIGACION-2026-09.md` (qué integrar
+después, con APIs y librerías ya investigadas y vetadas).
 
 ## 2. Acceso al NAS — por Tailscale, desde cualquier sitio
 
