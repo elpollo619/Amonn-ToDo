@@ -33,12 +33,22 @@ console.log('\n3. LO QUE FALTA SE DICE')
 const f = parseContrato('Max Muster', HOY, 'es')
 eq('faltan tres cosas', f.faltan, ['habitacion', 'alquiler', 'desde'])
 
-console.log('\n4. LOS HUECOS DE LA PLANTILLA')
+console.log('\n4. LOS HUECOS SON LOS MERGEFIELD DE LA EMPRESA')
 const campos = camposDePlantilla(
   { nombre: 'Max Muster', habitacion: '204', alquiler: '850', desde: '2026-10-01' }, HOY)
-eq('nombre tal cual', campos['{{NAME}}'], 'Max Muster')
-eq('fecha de inicio en formato suizo', campos['{{BEGINN}}'], '01.10.2026')
-eq('fecha del día', campos['{{DATUM}}'], '03.09.2026')
+eq('nombre de pila → M1VName', campos['{{M1VName}}'], 'Max')
+eq('apellido → M1Name', campos['{{M1Name}}'], 'Muster')
+eq('el objeto se escribe como en sus contratos', campos['{{Objekt}}'], 'Zimmer Nr. 204')
+eq('inicio en formato suizo → Mbeginn', campos['{{Mbeginn}}'], '01.10.2026')
+eq('fecha del día → Datum', campos['{{Datum}}'], '03.09.2026')
+eq('fianza por defecto 500 (práctica Longstay)', campos['{{Depot}}'], '500')
+const conKaution = camposDePlantilla(
+  { nombre: 'Max Muster', habitacion: '204', alquiler: '850', desde: '2026-10-01', deposito: '300' }, HOY)
+eq('la fianza dicha manda', conKaution['{{Depot}}'], '300')
+
+console.log('\n4b. LA FIANZA SE ENTIENDE EN LA FRASE')
+const g = parseContrato('Max Muster, habitación 204, 850, desde el 1 de octubre, kaution 300', HOY, 'es')
+eq('kaution 300', g.deposito, '300')
 
 console.log('\n5. SIN CREDENCIALES, DESACTIVADO')
 eq('no configurado por defecto', contratosConfigurados(), false)

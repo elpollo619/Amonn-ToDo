@@ -127,6 +127,17 @@ check('el nombre conserva mayúsculas', 'contrato para Max Muster, habitación 2
 check('"crea una tarea" sigue creando tareas', 'crea una tarea a Isma: revisar la caldera, para el viernes', 'es',
   { action: 'create_task' })
 
+console.log('\nPRECIOS — sin pisar a la regla del hotel')
+check('precios a secas', 'precios', 'es', { action: 'precios', objetivo: null })
+check('¿subo o bajo?', '¿subo o bajo los precios?', 'es', { action: 'precios' })
+check('"precios del hotel" NO es la acción hotel', 'precios del hotel', 'es',
+  { action: 'precios', objetivo: 'hotel' })
+check('de casa reto', 'precios de casa reto', 'es', { action: 'precios', objetivo: 'casa' })
+check('en alemán', 'wie stehen die preise', 'de', { action: 'precios' })
+check('en portugués', 'preços', 'pt', { action: 'precios' })
+check('"¿cuántos llegan hoy?" sigue siendo hotel', '¿cuántos llegan hoy al hotel?', 'es',
+  { action: 'hotel' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

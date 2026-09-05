@@ -55,7 +55,9 @@ Todo esto está **desplegado y probado con datos reales**:
 | Aviso de citas | 1 h antes de cada cita, WhatsApp automático a quien va (cron cada 5 min) |
 | Ausencias | «Rayna de vacaciones del 10.10 al 15.10» → sin avisos diarios esos días + advertencia al asignarle tareas |
 | Contadores | «Luz 204: 4521» apunta la lectura y enseña la diferencia con la anterior; «lecturas de la 204» |
-| Contratos | «Contrato para Max Muster, habitación 204, 850, desde el 1 de octubre» → Google Doc + PDF (⚠️ falta conectar Google, ver abajo) |
+| Contratos | «Contrato para Max Muster, habitación 204, 850, desde el 1 de octubre» → Google Doc + PDF con los MERGEFIELD reales de la empresa (⚠️ falta conectar Google, ver abajo) |
+| Precios | «Precios» / «¿subo o bajo los precios?» → informe de Casa Reto desde PreisPilot (Supabase) con consejos; el hotel espera a Apaleo |
+| Secretaria | Gemini ACTIVO (clave en el NAS desde 05.09.2026): cuando las reglas no entienden, responde preguntas libres con el dossier de la empresa (`server/src/empresa.js`) |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
@@ -97,9 +99,18 @@ chat; no están en el repo).
    **206 y 207** llevan desde el 31.08.2026 con fuga de agua.
 6. **Aviso del día 25** de alquileres impagados (los contratos exigen pago
    antes del 28 para renovarse). 503 contratos en `Liste Mietvertrag neu.xlsx`.
-7. **Clave de Gemini** (`GEMINI_API_KEY`, aistudio.google.com/apikey). Ya está
-   enchufado como RESPALDO: las reglas responden primero y Gemini solo entra
-   cuando no entienden.
+7. ~~Clave de Gemini~~ **HECHO** (05.09.2026): `GEMINI_API_KEY` metida en el
+   compose del NAS (hay copia en `docker-compose.yaml.bak-gemini`). Las
+   reglas siguen yendo primero; Gemini entra de secretaria cuando no
+   entienden, con el dossier de `server/src/empresa.js` (mantenerlo al día;
+   ahí NO van secretos).
+   ⚠️ Cómo se hicieron los contratos de verdad (estudiado en el Drive):
+   mail-merge Word contra `Immobilien/01 Mietverträge/Liste Mietvertrag
+   neu.xlsx` (hoja `Liste aktuell`, 58 columnas = MERGEFIELD), plantillas
+   «01 Maske MV Longstay.docx» etc., archivo por inquilino en
+   `<Edificio>/01 Mieter/<nº> <Nombre>`, firmado = `MV <Nombre> unt.pdf`.
+   La plantilla Longstay convertida a Google Docs está en
+   `docs/plantillas/mietvertrag-longstay.md`.
 8. **OCR de recibos** (Tesseract en el NAS, como Whisper) y **el tablero web
    desde fuera** (`cloudflared` ya está instalado en el NAS).
 9. **Variables nuevas opcionales** en el compose del NAS: `RESUMEN_TO`

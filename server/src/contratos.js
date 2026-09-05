@@ -5,11 +5,20 @@
 // se copia la plantilla, se rellenan los huecos {{...}} y se contesta con el
 // enlace al documento y a su PDF. Solo queda imprimir y firmar.
 //
-// La plantilla vive en Google Docs y debe tener estos huecos, escritos tal
-// cual: {{NAME}}, {{ZIMMER}}, {{MIETE}}, {{BEGINN}} y {{DATUM}} (el día en
-// que se genera). Se accede con una cuenta de servicio de Google Cloud a la
-// que hay que COMPARTIR la plantilla y la carpeta de contratos (como a una
-// persona más, con su correo ...@...iam.gserviceaccount.com).
+// CÓMO LO HACE LA EMPRESA (estudiado en su Drive, sept 2026): plantillas
+// Word «Maske MV …» con campos MERGEFIELD combinados contra el Excel
+// maestro Liste Mietvertrag neu.xlsx; el PDF se guarda en la carpeta del
+// inquilino (<Edificio>/01 Mieter/<nº> <Nombre>) como «MV <Nombre>.pdf» y,
+// firmado, «MV <Nombre> unt.pdf». Aquí se replica lo mismo con Google Docs:
+// los huecos de la plantilla llevan LOS MISMOS NOMBRES que sus MERGEFIELD,
+// entre dobles llaves: {{M1VName}} {{M1Name}} {{Objekt}} {{Total}}
+// {{Depot}} {{Mbeginn}} {{Datum}}. El texto completo de la plantilla
+// Longstay, listo para pegar en un Google Doc, está en
+// docs/plantillas/mietvertrag-longstay.md.
+//
+// Se accede con una cuenta de servicio de Google Cloud a la que hay que
+// COMPARTIR la plantilla y la carpeta de contratos (como a una persona más,
+// con su correo ...@...iam.gserviceaccount.com).
 //
 // ⚠️ Escrito según la documentación pública de Google (Drive v3 + Docs v1),
 // SIN probar contra la cuenta real: la primera vez, mira la respuesta cruda
@@ -93,13 +102,16 @@ async function llamar(url, opciones = {}) {
  */
 export function parseContrato(texto, today = todayKey(), lang = 'es') {
   const trozos = String(texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
-  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null }
+  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null }
   const sueltos = []
   for (const tr of trozos) {
     const hab = tr.match(/(?:habitacion|habitación|hab\.?|zimmer|quarto)\s*(?:nr\.?|n[º°]?\.?)?\s*(\S+)/i)
     if (hab && !datos.habitacion) { datos.habitacion = hab[1].toUpperCase(); continue }
     const fecha = parseDateAnyLang(tr, today, lang)
     if (fecha && !datos.desde) { datos.desde = fecha.key; continue }
+    // La fianza va con su palabra: «kaution 500», «fianza 500», «depósito 500».
+    const kaution = tr.match(/(?:kaution|caucion|caución|deposito|depósito|fianza)\s*(?:de\s+)?(?:chf\s*)?(\d{2,5})/i)
+    if (kaution && !datos.deposito) { datos.deposito = kaution[1]; continue }
     // El alquiler tiene que ser un trozo que sea SOLO un importe («850»,
     // «CHF 850», «850.50 chf»): si lleva más palabras, no se adivina.
     const importe = tr.match(/^(?:chf\s*)?(\d{2,5})(?:[.,](\d{2}))?\s*(?:chf|fr\.?)?$/i)
@@ -118,22 +130,36 @@ export function parseContrato(texto, today = todayKey(), lang = 'es') {
   return { ...datos, faltan }
 }
 
-/** Qué se escribe en cada hueco {{...}} de la plantilla. */
-export function camposDePlantilla({ nombre, habitacion, alquiler, desde }, today = todayKey()) {
+/**
+ * Qué se escribe en cada hueco {{...}} de la plantilla. Los nombres son LOS
+ * MISMOS que los MERGEFIELD de las «Masken» de Word de la empresa, para que
+ * la plantilla de Google Docs sea un calco de la suya y cualquiera de la
+ * oficina la reconozca. La fianza sin decir es CHF 500 (su práctica en
+ * Longstay: 300–500).
+ */
+export function camposDePlantilla({ nombre, habitacion, alquiler, desde, deposito }, today = todayKey()) {
   const f = (k) => String(k).slice(0, 10).split('-').reverse().join('.')
+  const partes = String(nombre).trim().split(/\s+/)
+  const apellido = partes.length > 1 ? partes[partes.length - 1] : ''
+  const nombrePila = partes.length > 1 ? partes.slice(0, -1).join(' ') : partes[0]
   return {
-    '{{NAME}}': nombre,
-    '{{ZIMMER}}': habitacion,
-    '{{MIETE}}': alquiler,
-    '{{BEGINN}}': f(desde),
-    '{{DATUM}}': f(today),
+    '{{M1VName}}': nombrePila,
+    '{{M1Name}}': apellido,
+    '{{Objekt}}': `Zimmer Nr. ${habitacion}`,
+    '{{Total}}': alquiler,
+    '{{Depot}}': deposito ?? '500',
+    '{{Mbeginn}}': f(desde),
+    '{{Datum}}': f(today),
   }
 }
 
 /** Copia la plantilla, rellena los huecos y devuelve los enlaces. */
 export async function generarContrato(datos, today = todayKey()) {
   const g = config.google
-  const nombreDoc = `Mietvertrag ${datos.habitacion} ${datos.nombre} ${String(datos.desde).slice(0, 10)}`
+  // «MV <Nombre Apellido>»: el nombre que dicta el manual de la empresa
+  // (Anleitung Mietvertrag erstellen). El «unt.» lo añaden ellos al archivar
+  // la versión firmada.
+  const nombreDoc = `MV ${datos.nombre}`
   // 1. Copiar la plantilla (a la carpeta de contratos, si hay).
   const copia = await llamar(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(g.contractTemplateId)}/copy?supportsAllDrives=true`,

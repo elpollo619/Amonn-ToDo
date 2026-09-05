@@ -36,6 +36,7 @@ import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
+import { fetchDashboard, analizarPrecios } from './precios.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -693,6 +694,14 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
     case 'help':
       return t(lang, 'help', { nombre: firstName(user) })
 
+    // La secretaria (Gemini) contestó una pregunta libre con lo que sabe de
+    // la empresa. Se pasa tal cual, con un tope de tamaño por si acaso.
+    case 'answer': {
+      const texto = String(intent.text ?? '').trim()
+      if (!texto) return t(lang, 'fallback')
+      return texto.slice(0, 1500)
+    }
+
     case 'list_tasks': {
       const who = (intent.who ?? '').toString().trim()
       if (/^(equipo|team|equipa|equipe|todos|todas|alle|all)$/i.test(who)) {
@@ -958,6 +967,40 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         nombre: firstName(r.user), motivo: intent.motivo ?? '—',
         desde: f(start), hasta: f(end),
       })
+    }
+
+    case 'precios': {
+      // El hotel vive en Apaleo; hasta conectarlo, se dice y punto.
+      if (intent.objetivo === 'hotel') return t(lang, 'price_hotel_pending')
+      try {
+        const datos = await fetchDashboard()
+        const a = analizarPrecios(datos, today)
+        const dia = (k) => String(k).slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+        let out = t(lang, 'price_head', {
+          propiedad: a.propiedad,
+          base: a.base ?? '—', min: a.min ?? '—', max: a.max ?? '—',
+          media7: a.media7, media30: a.media30,
+          eventos: a.eventosProx30,
+          envio: a.ultimoEnvio ? `${a.ultimoEnvio}${a.aplicado ? ' ✓' : ' ✗'}` : '—',
+        })
+        out += t(lang, 'price_week', {
+          lista: a.prox7.map((n) =>
+            `• ${n.w ?? ''} ${dia(n.d)}: CHF ${n.p}${n.ev ? ` — ${n.ev}` : ''}`).join('\n'),
+        })
+        const lineas = a.consejos.map((c) => {
+          if (c.tipo === 'stale') return t(lang, 'price_advice_stale', { dias: c.dias })
+          if (c.tipo === 'bajar') return t(lang, 'price_advice_bajar', { noches: c.noches, min: c.hasta ?? '—' })
+          if (c.tipo === 'subir') return t(lang, 'price_advice_subir', { noches: c.noches, fecha: dia(c.ejemplo.d), evento: c.ejemplo.ev, techo: c.techo ?? '—' })
+          if (c.tipo === 'apply_failed') return t(lang, 'price_advice_apply')
+          return null
+        }).filter(Boolean)
+        out += lineas.length
+          ? t(lang, 'price_advices', { lista: lineas.map((x) => `• ${x}`).join('\n') })
+          : t(lang, 'price_advice_none')
+        return out
+      } catch (err) {
+        return t(lang, 'price_error', { motivo: err.message.slice(0, 140) })
+      }
     }
 
     case 'contrato_add': {

@@ -62,6 +62,13 @@ export const config = {
     // Carpeta de Drive donde dejar los contratos generados (opcional).
     contractsFolderId: process.env.GOOGLE_CONTRACTS_FOLDER_ID ?? '',
   },
+  // PreisPilot: el motor de precios de Casa Reto (Supabase, proyecto
+  // hansamonn-vermietung). Su función `dashboard` es pública, por eso la
+  // URL puede ir aquí como valor por defecto: no es un secreto.
+  preispilot: {
+    dashboardUrl: process.env.PREISPILOT_URL ??
+      'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
+  },
   // Apaleo (el sistema del hotel). Sin credenciales, no se activa.
   apaleo: {
     clientId: process.env.APALEO_CLIENT_ID ?? '',

@@ -14,6 +14,7 @@ import { normalize, parseDateAnyLang, parseRange, parseWorkDays, todayKey, weekd
 import { interpretReply } from './whatsapp.js'
 import { resolvePerson, resolveTask } from './aliases.js'
 import { matchStateByName } from './states.service.js'
+import { DOSSIER } from './empresa.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -128,6 +129,8 @@ const REGLAS = {
     contadorList: /^(?:lecturas|contadores)(?:\s+(?:de\s+)?(?:la\s+|el\s+)?(\S+))?\??$/,
     // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
+    // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
+    precios: /^(?:precios|analisis de precios|como van los precios|subo o bajo (?:los )?precios)(?:\s+(?:de\s+|del\s+|de la\s+)?(casa reto|casa|hotel|a14))?\??$/,
     // "cierra los gastos de agosto" · "exporta las spesen". Exige la palabra
     // gastos/spesen: "cierra" a secas es completar una tarea (verbo de done).
     gastoCierre: /^(?:cierra|cerrar|exporta(?:r)?)\s+(?:el mes de (?:los\s+)?)?(?:los\s+|las\s+)?(?:gastos|spesen)(?:\s+de(?:l mes de)?\s+(\w+))?$/,
@@ -181,6 +184,7 @@ const REGLAS = {
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
+    precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
     // "spesen august abschliessen" · "schliesse die spesen von august ab"
     gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
     hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
@@ -232,6 +236,7 @@ const REGLAS = {
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
+    precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
     // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
     // despesas: "fecha" sozinho é concluir uma tarefa (verbo de done).
     gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
@@ -268,6 +273,14 @@ function parseInLang(text, ctx, lang) {
   // se resuelve pronto y no compite con ninguna otra regla.
   if (cfg.basura && cfg.basura.test(t)) {
     return { action: 'entsorgung', texto: t }
+  }
+
+  // Los precios ANTES que el hotel: "precios del hotel" lleva la palabra
+  // "hotel" y la regla del hotel se lo quedaría.
+  const precios = cfg.precios ? t.match(cfg.precios) : null
+  if (precios) {
+    const objetivo = precios[1] ?? null
+    return { action: 'precios', objetivo: objetivo === 'a14' || objetivo === 'hotel' ? 'hotel' : objetivo ? 'casa' : null }
   }
 
   // Contratos ANTES que el hotel: "contrato para Max, habitación 204" lleva
@@ -689,20 +702,25 @@ function restoreCase(title, raw) {
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
-// ─── Gemini (IA) ──────────────────────────────────────────────
-// ⚠️ Este prompt solo cubre las acciones "clásicas" (crear/listar/completar).
-// Todo lo demás —gastos, compra, residuos, contactos, citas, hotel— lo
-// resuelven las reglas, que se consultan ANTES. Si algún día Gemini pasa a
-// ir primero, habría que enseñarle también esas acciones o dejaría de
-// entenderlas.
+// ─── Gemini (IA): la secretaria ───────────────────────────────
+// Las reglas van ANTES (instantáneas, gratis, sin mandar datos fuera).
+// Gemini entra solo cuando no entienden — y entonces actúa de secretaria:
+// conoce el dossier de la empresa (src/empresa.js) y puede CONTESTAR
+// preguntas libres con la acción "answer", además de mapear a las acciones
+// clásicas. ⚠️ Las acciones especializadas (gastos, compra, citas...) las
+// siguen llevando las reglas; aquí solo las clásicas + answer.
 function buildPrompt(text, ctx) {
   const names = ctx.users.map((u) => u.full_name).filter(Boolean).join(', ')
   const wd = WEEKDAY_NAMES[weekdayOf(ctx.today)]
   const mine = (ctx.openTasks ?? []).map((t) => `- ${t.title}`).join('\n') || '- (ninguna)'
-  return `Eres el asistente de "Amonn", una app de tareas de una empresa pequeña. Un miembro del equipo te escribe por WhatsApp. Convierte su mensaje en UNA acción en JSON. Responde SOLO con el JSON, sin texto alrededor.
+  const lang = ctx.lang ?? 'es'
+  return `Eres la secretaria de Hans Amonn AG. Un miembro del equipo te escribe por WhatsApp. Convierte su mensaje en UNA acción en JSON. Responde SOLO con el JSON, sin texto alrededor.
+
+LO QUE SABES DE LA EMPRESA:
+${DOSSIER}
 
 Hoy es ${wd} ${ctx.today} (zona Europe/Madrid).
-Quien escribe: ${ctx.sender.full_name}.
+Quien escribe: ${ctx.sender.full_name} (idioma: ${lang}).
 Personas del equipo: ${names}.
 Tareas abiertas de quien escribe:
 ${mine}
@@ -713,7 +731,8 @@ Acciones posibles (campo "action"):
 - "complete_task": dice que una tarea concreta está hecha. Campo "task_hint": palabras clave de la tarea.
 - "reply_done" / "reply_not_done": responde solo sí/no/hecho a una pregunta de si terminó una tarea.
 - "help": saluda o pregunta qué puedes hacer.
-- "unknown": no encaja en nada.
+- "answer": es una PREGUNTA o conversación que puedes responder con lo que sabes de la empresa. Campo "text": la respuesta, en el idioma de quien escribe (${lang}), corta y práctica como un WhatsApp (máximo ~6 líneas). Si algo no está conectado o no lo sabes, dilo claramente en vez de inventar.
+- "unknown": no encaja en nada y tampoco sabes responder.
 
 Mensaje: """${text}"""`
 }
