@@ -131,6 +131,9 @@ const REGLAS = {
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
     precios: /^(?:precios|analisis de precios|como van los precios|subo o bajo (?:los )?precios)(?:\s+(?:de\s+|del\s+|de la\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    // "mensajes de los huéspedes" · "responde al huésped 12345: llegamos a las 15"
+    huespedList: /^(?:mensajes(?: de(?: los)? huespedes)?|que dicen los huespedes)\??$/,
+    huespedReply: /^responde (?:al |a la |a )?(?:huesped|reserva)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "cierra los gastos de agosto" · "exporta las spesen". Exige la palabra
     // gastos/spesen: "cierra" a secas es completar una tarea (verbo de done).
     gastoCierre: /^(?:cierra|cerrar|exporta(?:r)?)\s+(?:el mes de (?:los\s+)?)?(?:los\s+|las\s+)?(?:gastos|spesen)(?:\s+de(?:l mes de)?\s+(\w+))?$/,
@@ -185,6 +188,8 @@ const REGLAS = {
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    huespedList: /^(?:gastnachrichten|nachrichten der gaste|was sagen die gaste)\??$/,
+    huespedReply: /^antworte (?:dem |an |der )?(?:gast|buchung)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "spesen august abschliessen" · "schliesse die spesen von august ab"
     gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
     hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
@@ -237,6 +242,8 @@ const REGLAS = {
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    huespedList: /^(?:mensagens dos hospedes|que dizem os hospedes)\??$/,
+    huespedReply: /^responde (?:ao |a )?(?:hospede|reserva)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
     // despesas: "fecha" sozinho é concluir uma tarefa (verbo de done).
     gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
@@ -281,6 +288,19 @@ function parseInLang(text, ctx, lang) {
   if (precios) {
     const objetivo = precios[1] ?? null
     return { action: 'precios', objetivo: objetivo === 'a14' || objetivo === 'hotel' ? 'hotel' : objetivo ? 'casa' : null }
+  }
+
+  // Mensajes de huéspedes. La respuesta necesita el texto TAL CUAL (va a un
+  // huésped): se re-extrae del crudo, como en los contactos.
+  if (cfg.huespedList && cfg.huespedList.test(t)) return { action: 'huesped_list' }
+  const huesped = cfg.huespedReply ? t.match(cfg.huespedReply) : null
+  if (huesped) {
+    const enCrudo = raw.match(/\s(\S+)\s*[:,-]\s*([\s\S]+)$/)
+    return {
+      action: 'huesped_reply',
+      bookingId: huesped[1],
+      texto: (enCrudo?.[2] ?? huesped[2]).trim(),
+    }
   }
 
   // Contratos ANTES que el hotel: "contrato para Max, habitación 204" lleva

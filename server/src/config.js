@@ -69,6 +69,19 @@ export const config = {
     dashboardUrl: process.env.PREISPILOT_URL ??
       'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
   },
+  // Espejo de mensajes de huéspedes (Beds24 vía la Edge Function
+  // guest-messages de Supabase). El asistente NUNCA responde solo: espeja a
+  // los autorizados y solo envía respuestas que ellos ordenen. Sin
+  // GUEST_PIN o sin GUEST_TEAM, apagado.
+  huespedes: {
+    url: process.env.GUEST_MESSAGES_URL ??
+      'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/guest-messages',
+    pin: process.env.GUEST_PIN ?? '',
+    // Teléfonos (E.164, separados por comas) que ven los mensajes y pueden
+    // ordenar respuestas: Cris, Beatriz, Reto, Roberta.
+    team: (process.env.GUEST_TEAM ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+    propertyId: Number(process.env.GUEST_PROPERTY_ID ?? 350351),
+  },
   // Apaleo (el sistema del hotel). Sin credenciales, no se activa.
   apaleo: {
     clientId: process.env.APALEO_CLIENT_ID ?? '',

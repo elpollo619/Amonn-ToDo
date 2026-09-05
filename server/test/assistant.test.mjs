@@ -138,6 +138,15 @@ check('en portugués', 'preços', 'pt', { action: 'precios' })
 check('"¿cuántos llegan hoy?" sigue siendo hotel', '¿cuántos llegan hoy al hotel?', 'es',
   { action: 'hotel' })
 
+console.log('\nHUÉSPEDES — espejo y respuesta ordenada')
+check('ver mensajes', 'mensajes de los huéspedes', 'es', { action: 'huesped_list' })
+check('responder con texto tal cual', 'responde al huésped 12345: Llegamos a las 15, Grüsse', 'es',
+  { action: 'huesped_reply', bookingId: '12345', texto: 'Llegamos a las 15, Grüsse' })
+check('en alemán', 'antworte dem gast 12345: Danke, bis morgen', 'de',
+  { action: 'huesped_reply', bookingId: '12345' })
+check('en portugués', 'responde ao hóspede 12345: obrigado', 'pt',
+  { action: 'huesped_reply', bookingId: '12345' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

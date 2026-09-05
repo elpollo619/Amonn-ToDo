@@ -37,6 +37,7 @@ import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
+import { huespedesConfigurado, esAutorizado, listarMensajes, responderHuesped } from './huespedes.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -967,6 +968,33 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         nombre: firstName(r.user), motivo: intent.motivo ?? '—',
         desde: f(start), hasta: f(end),
       })
+    }
+
+    case 'huesped_list': {
+      if (!huespedesConfigurado()) return t(lang, 'guest_not_configured')
+      try {
+        const mensajes = await listarMensajes()
+        if (mensajes.length === 0) return t(lang, 'guest_none')
+        const detalle = mensajes.slice(-6).map((m) =>
+          `• [${m.bookingId ?? '¿?'} · ${m.source ?? m.channel ?? '¿?'}] ${String(m.message ?? '').slice(0, 200)}`,
+        ).join('\n')
+        return t(lang, 'guest_mirror', { total: mensajes.length, detalle })
+      } catch (err) {
+        return t(lang, 'guest_error', { motivo: err.message.slice(0, 140) })
+      }
+    }
+
+    case 'huesped_reply': {
+      // Puerta dura: SOLO los autorizados (Cris, Beatriz, Reto, Roberta)
+      // pueden mandar algo a un huésped. El asistente jamás lo hace solo.
+      if (!huespedesConfigurado()) return t(lang, 'guest_not_configured')
+      if (!esAutorizado(user)) return t(lang, 'guest_unauthorized')
+      try {
+        await responderHuesped(intent.bookingId, intent.texto)
+        return t(lang, 'guest_reply_sent', { reserva: intent.bookingId, texto: intent.texto })
+      } catch (err) {
+        return t(lang, 'guest_error', { motivo: err.message.slice(0, 140) })
+      }
     }
 
     case 'precios': {

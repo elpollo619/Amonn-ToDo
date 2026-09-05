@@ -74,6 +74,19 @@ const resumen = await componerResumenSemanal('es')
 check('lleva las tareas de la semana', resumen, ['Resumen de la semana', 'Revisar la caldera'])
 check('y por WhatsApp responde lo mismo', await processMessage(CRIS, 'resumen semanal'), ['Resumen de la semana'])
 
+console.log('\n7b. HUÉSPEDES: SIN CONFIGURAR LO DICE, Y SIN AUTORIZACIÓN NO SALE NADA')
+check('sin configurar', await processMessage(CRIS, 'mensajes de los huéspedes'),
+  ['aún no está encendido'])
+// Se enciende de mentira (sin red): la puerta de autorización se comprueba
+// ANTES de hablar con Beds24, así que un no-autorizado nunca llega a la red.
+const { config: cfgSemana } = await import('../src/config.js')
+cfgSemana.huespedes.pin = 'pin-de-prueba'
+cfgSemana.huespedes.team = [CRIS]
+check('Rayna no puede responder a huéspedes', await processMessage(RAYNA, 'responde al huésped 123: hola'),
+  ['NO se ha enviado'])
+cfgSemana.huespedes.pin = ''
+cfgSemana.huespedes.team = []
+
 console.log('\n7. CONTRATOS SIN GOOGLE, LO DICE CLARO')
 check('explica qué falta', await processMessage(CRIS, 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'),
   ['no está conectado a Google', 'GOOGLE_SA_KEY'])

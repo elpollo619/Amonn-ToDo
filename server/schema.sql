@@ -199,6 +199,13 @@ create index if not exists appointments_por_fecha on appointments (starts_at);
 -- Migración: la columna del recordatorio llegó después de crear la tabla.
 alter table appointments add column if not exists reminded_at timestamptz;
 
+-- Mensajes de huéspedes ya espejados (Beds24). Como seen_mails: se recuerda
+-- el id para no reenviar dos veces; nada se marca ni se toca en el origen.
+create table if not exists seen_guest_messages (
+  id          text primary key,
+  created_at  timestamptz not null default now()
+);
+
 -- Lecturas de contadores: «luz 204: 4521». El tipo se guarda en alemán
 -- (strom, wasser, gas, heizung) diga como se diga, para que la serie de un
 -- contador no se parta entre idiomas.
