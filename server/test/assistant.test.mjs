@@ -138,6 +138,14 @@ check('en portugués', 'preços', 'pt', { action: 'precios' })
 check('"¿cuántos llegan hoy?" sigue siendo hotel', '¿cuántos llegan hoy al hotel?', 'es',
   { action: 'hotel' })
 
+console.log('\nMETEO Y ZINSSATZ')
+check('el tiempo', '¿qué tiempo hace?', 'es', { action: 'meteo' })
+check('tiempo a secas', 'tiempo', 'es', { action: 'meteo' })
+check('wetter', 'wetter', 'de', { action: 'meteo' })
+check('tempo pt', 'tempo', 'pt', { action: 'meteo' })
+check('referenzzinssatz', 'referenzzinssatz', 'es', { action: 'zins' })
+check('zinssatz de', 'zinssatz', 'de', { action: 'zins' })
+
 console.log('\nHUÉSPEDES — espejo y respuesta ordenada')
 check('ver mensajes', 'mensajes de los huéspedes', 'es', { action: 'huesped_list' })
 check('responder con texto tal cual', 'responde al huésped 12345: Llegamos a las 15, Grüsse', 'es',

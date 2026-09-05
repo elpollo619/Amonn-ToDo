@@ -19,6 +19,8 @@ import { calendarRouter } from './routes/calendar.js'
 import { spesenRouter } from './routes/spesen.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura, scheduleAvisoCitas, scheduleResumenSemanal } from './reminders.js'
 import { scheduleEspejoHuespedes } from './huespedes.js'
+import { scheduleAvisoMeteo } from './meteo.js'
+import { scheduleVigilanteZins } from './zins.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
 import {
@@ -131,6 +133,8 @@ async function start() {
   scheduleAvisoCitas()
   scheduleResumenSemanal()
   scheduleEspejoHuespedes()
+  scheduleAvisoMeteo()
+  scheduleVigilanteZins()
   // Vigilante del buzón: cada 15 minutos, y solo si está configurado.
   if (correoConfigurado()) {
     cron.schedule('*/15 * * * *', () => {

@@ -131,6 +131,9 @@ const REGLAS = {
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
     precios: /^(?:precios|analisis de precios|como van los precios|subo o bajo (?:los )?precios)(?:\s+(?:de\s+|del\s+|de la\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    // "¿qué tiempo hace?" · "tiempo" · "meteo"
+    meteoCmd: /^(?:que tiempo (?:hace|hara|va a hacer)|el tiempo|tiempo|meteo|prevision(?: del tiempo)?)\??$/,
+    zinsCmd: /^(?:referenzzinssatz|zinssatz|tipo de referencia|tipo hipotecario)\??$/,
     // "mensajes de los huéspedes" · "responde al huésped 12345: llegamos a las 15"
     huespedList: /^(?:mensajes(?: de(?: los)? huespedes)?|que dicen los huespedes)\??$/,
     huespedReply: /^responde (?:al |a la |a )?(?:huesped|reserva)\s+(\S+)\s*[:,-]\s*(.+)$/,
@@ -188,6 +191,8 @@ const REGLAS = {
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    meteoCmd: /^(?:wetter|wie wird das wetter|wetterbericht|wettervorhersage)\??$/,
+    zinsCmd: /^(?:referenzzinssatz|zinssatz|hypothekarischer referenzzinssatz)\??$/,
     huespedList: /^(?:gastnachrichten|nachrichten der gaste|was sagen die gaste)\??$/,
     huespedReply: /^antworte (?:dem |an |der )?(?:gast|buchung)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "spesen august abschliessen" · "schliesse die spesen von august ab"
@@ -242,6 +247,8 @@ const REGLAS = {
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
+    meteoCmd: /^(?:tempo|que tempo (?:faz|fara|vai fazer)|meteo|previsao(?: do tempo)?)\??$/,
+    zinsCmd: /^(?:referenzzinssatz|zinssatz|taxa de referencia)\??$/,
     huespedList: /^(?:mensagens dos hospedes|que dizem os hospedes)\??$/,
     huespedReply: /^responde (?:ao |a )?(?:hospede|reserva)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
@@ -289,6 +296,9 @@ function parseInLang(text, ctx, lang) {
     const objetivo = precios[1] ?? null
     return { action: 'precios', objetivo: objetivo === 'a14' || objetivo === 'hotel' ? 'hotel' : objetivo ? 'casa' : null }
   }
+
+  if (cfg.meteoCmd && cfg.meteoCmd.test(t)) return { action: 'meteo' }
+  if (cfg.zinsCmd && cfg.zinsCmd.test(t)) return { action: 'zins' }
 
   // Mensajes de huéspedes. La respuesta necesita el texto TAL CUAL (va a un
   // huésped): se re-extrae del crudo, como en los contactos.

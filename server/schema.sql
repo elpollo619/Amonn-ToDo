@@ -199,6 +199,13 @@ create index if not exists appointments_por_fecha on appointments (starts_at);
 -- Migración: la columna del recordatorio llegó después de crear la tabla.
 alter table appointments add column if not exists reminded_at timestamptz;
 
+-- Cajón de estado pequeño de la app (último Referenzzinssatz visto, etc.).
+create table if not exists app_state (
+  key         text primary key,
+  value       jsonb not null,
+  updated_at  timestamptz not null default now()
+);
+
 -- Mensajes de huéspedes ya espejados (Beds24). Como seen_mails: se recuerda
 -- el id para no reenviar dos veces; nada se marca ni se toca en el origen.
 create table if not exists seen_guest_messages (

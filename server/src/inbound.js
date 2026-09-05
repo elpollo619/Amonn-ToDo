@@ -38,6 +38,10 @@ import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
 import { huespedesConfigurado, esAutorizado, listarMensajes, responderHuesped } from './huespedes.js'
+import { fetchMeteo, formatearParte } from './meteo.js'
+import { fetchZins, zinsGuardado } from './zins.js'
+import { textoDePdf, leerRecibo } from './recibo.js'
+import { leerReciboConGemini } from './vision.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -276,7 +280,13 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
   // "¿Cuál de estas?" tras no saber a qué tarea se refería. No es un
   // borrador de tarea, así que se resuelve aparte.
   if (pending.esperando === 'gasto_datos') {
-    const r = await intentarGasto(phone, user, lang, texto, today, pending)
+    // Si el recibo ya se leyó solo (importe/fecha/comercio), lo leído se
+    // antepone a la respuesta: contestar «A14» basta para cerrar el gasto.
+    // PERO si la persona escribe su propio importe, está corrigiendo, y lo
+    // suyo manda: no se antepone nada.
+    const corrigiendo = /\d{1,5}[.,]\d{2}/.test(String(texto ?? ''))
+    const conLeido = pending.leido && !corrigiendo ? `${pending.leido} ${texto}` : texto
+    const r = await intentarGasto(phone, user, lang, conLeido, today, pending)
     if (r) return r
   }
 
@@ -521,6 +531,37 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
     // Si el mensaje ya traía los datos, se aprovechan y no se pregunta.
     const yaEstan = await intentarGasto(phone, user, lang, pista, today, { foto_id: idRecibo, mime: foto.mime }, true)
     if (yaEstan) return yaEstan
+
+    // Leer el recibo solos: primero el extractor propio (PDFs electrónicos
+    // de Coop/Migros...); si no hay texto —los recibos de la empresa suelen
+    // ser escaneos— lo mira Gemini vision. Lo leído se guarda en el
+    // pendiente: a la persona solo se le pregunta lo que falte (normalmente
+    // la propiedad). Si no se lee nada fiable, se pregunta todo, como antes.
+    let leido = null
+    if (esPdf) {
+      const textoPdf = textoDePdf(foto.buffer)
+      if (textoPdf) {
+        const r = leerRecibo(textoPdf)
+        if (r?.importe) leido = r
+      }
+    }
+    if (!leido) leido = await leerReciboConGemini(foto.buffer, foto.mime)
+    if (leido?.importe) {
+      // El importe y el comercio viajan como texto (intentarGasto ya sabe
+      // leerlos); la FECHA va aparte: escrita en el texto, el parser de
+      // plazos la echaría hacia el futuro, y un recibo siempre es pasado.
+      const trozo = `${leido.importe.toFixed(2)} ${leido.comercio ?? ''}`.trim()
+      await setPending(phone, user.id, {
+        esperando: 'gasto_datos', foto_id: idRecibo, mime: foto.mime,
+        leido: trozo, fecha_leida: leido.fecha ?? null,
+      })
+      return t(lang, 'exp_receipt_read', {
+        comercio: leido.comercio ?? '—',
+        importe: leido.importe.toFixed(2),
+        fecha: leido.fecha ? leido.fecha.split('-').reverse().join('.') : '—',
+        codigos: Object.keys(CODIGOS).slice(0, 5).join(', '),
+      })
+    }
     return t(lang, 'exp_receipt_saved', { codigos: Object.keys(CODIGOS).slice(0, 5).join(', ') })
   }
 
@@ -649,7 +690,9 @@ async function intentarGasto(phone, user, lang, texto, today, pend, silencioso =
   if (!codigo) return silencioso ? null : t(lang, 'exp_receipt_need_more', { que: 'la propiedad' })
 
   const fecha = parseDateAnyLang(t0, today, lang)
-  const dia = fecha?.key ?? today
+  // La fecha leída del propio recibo (OCR) manda sobre "hoy", pero no sobre
+  // lo que escriba la persona: si dice «ayer», ayer es.
+  const dia = fecha?.key ?? pend.fecha_leida ?? today
 
   const concepto = t0
     .replace(/\d{1,5}[.,]\d{2}/, ' ')
@@ -968,6 +1011,29 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         nombre: firstName(r.user), motivo: intent.motivo ?? '—',
         desde: f(start), hasta: f(end),
       })
+    }
+
+    case 'meteo': {
+      try {
+        const daily = await fetchMeteo(4)
+        return formatearParte(daily, lang)
+      } catch (err) {
+        return t(lang, 'wx_error', { motivo: err.message.slice(0, 140) })
+      }
+    }
+
+    case 'zins': {
+      try {
+        const guardado = await zinsGuardado()
+        const valor = guardado?.valor ?? await fetchZins()
+        if (valor === null || valor === undefined) return t(lang, 'zins_error')
+        return t(lang, 'zins_info', {
+          valor: String(valor).replace('.', ','),
+          visto: guardado?.visto ?? today,
+        })
+      } catch (err) {
+        return t(lang, 'zins_error')
+      }
     }
 
     case 'huesped_list': {

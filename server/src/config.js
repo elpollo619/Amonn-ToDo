@@ -69,6 +69,15 @@ export const config = {
     dashboardUrl: process.env.PREISPILOT_URL ??
       'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
   },
+  // Meteo de obra (Open-Meteo, gratis y sin clave). La orden «tiempo»
+  // funciona siempre; la ALERTA de la tarde solo va a METEO_TO (teléfonos
+  // separados por comas), para no llenar a nadie de partes meteorológicos.
+  meteo: {
+    lat: Number(process.env.METEO_LAT ?? 46.931),   // Muri bei Bern
+    lon: Number(process.env.METEO_LON ?? 7.487),
+    nombre: process.env.METEO_NOMBRE ?? 'Muri b. Bern',
+    avisarA: (process.env.METEO_TO ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+  },
   // Espejo de mensajes de huéspedes (Beds24 vía la Edge Function
   // guest-messages de Supabase). El asistente NUNCA responde solo: espeja a
   // los autorizados y solo envía respuestas que ellos ordenen. Sin

@@ -59,6 +59,10 @@ Todo esto está **desplegado y probado con datos reales**:
 | Contratos | «Contrato para Max Muster, habitación 204, 850, desde el 1 de octubre» → Google Doc + PDF con los MERGEFIELD reales de la empresa (⚠️ falta conectar Google, ver abajo) |
 | Precios | «Precios» / «¿subo o bajo los precios?» → informe de Casa Reto desde PreisPilot (Supabase) con consejos; el hotel espera a Apaleo |
 | Secretaria | Gemini ACTIVO (clave en el NAS desde 05.09.2026): cuando las reglas no entienden, responde preguntas libres con el dossier de la empresa (`server/src/empresa.js`) |
+| Huéspedes | Espejo cada 15 min de los mensajes de Casa Reto (Beds24 vía Edge Function `guest-messages` con PIN); responder SOLO pueden Cris/Beatriz/Reto/Roberta con «responde al huésped N: …» — el agente jamás escribe solo a huéspedes/inquilinos |
+| Meteo | «Tiempo» → parte de 3 días (Open-Meteo, sin clave); alerta 17:00 si mañana hay helada/lluvia fuerte/viento/nieve (METEO_TO) |
+| Referenzzinssatz | «Zinssatz» → tipo actual; vigilante mensual del BWO que avisa a RESUMEN_TO si cambia (con la regla del ±3 % por 0.25 pt) |
+| OCR recibos | El PDF electrónico se lee solo (extractor propio) y el escaneo/foto lo lee Gemini vision: solo se pregunta la propiedad |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
