@@ -77,11 +77,17 @@ chat; no están en el repo).
    formato de carpeta que ya usa la empresa en Drive. **Falta la ruta
    `\\servidor\…` y un usuario con permiso de escritura.** Cris tiene Claude
    Code en el PC de la oficina, que sí ve esa carpeta: es el camino corto.
-2. **Apaleo (hotel).** `server/src/apaleo.js` está escrito pero **sin probar
-   contra la cuenta real**. Faltan `APALEO_CLIENT_ID`, `APALEO_CLIENT_SECRET`
-   y `APALEO_PROPERTY_ID` (apaleo.dev → Apps → Create app → Simple client).
-   Al conectar, **mira primero la respuesta cruda** antes de fiarte de las
-   rutas: están puestas según la documentación pública, no verificadas.
+2. **Apaleo + LIKE MAGIC (hotel A14, Kerzers).** ⚡ La empresa **YA PAGA los
+   dos** (aclarado por Cris el 05.09.2026): no hay coste nuevo, solo pedir
+   las llaves de cuentas propias. (a) Apaleo: entrar con LA CUENTA DEL HOTEL
+   en apaleo.dev → Apps → Create app → Simple client → `APALEO_CLIENT_ID`,
+   `APALEO_CLIENT_SECRET`, `APALEO_PROPERTY_ID`; `server/src/apaleo.js` está
+   escrito pero sin probar — **mira primero la respuesta cruda**. Además
+   suscribirse a sus webhooks (autoservicio) para estar al día sin sondear.
+   (b) LIKE MAGIC: pedir al contacto/soporte de LIKE MAGIC credenciales
+   OAuth de su Open API (mencionar la «Integration API» para chatbots y los
+   webhooks de Unified Messaging): con eso el asistente VERÁ los mensajes
+   con huéspedes; responder seguirá exigiendo orden de un autorizado.
 3. ~~Cerrar el mes de Spesen~~ **HECHO** (sept 2026). «Cierra los gastos de
    agosto» funciona en es/de/pt: genera el CSV (enlace `/spesen/{token}.csv`,
    guardado en la tabla `expense_exports` de la base) y marca los gastos como

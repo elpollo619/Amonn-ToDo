@@ -21,12 +21,17 @@ EDIFICIOS Y CÓDIGOS (código = calle + número)
 - HAAG: gastos generales de la empresa.
 - A4: Allmendstrasse 4, Kerzers (viviendas).
 - A12 / A12a / A14: Allmendstrasse, Kerzers. A14 = N's Hotel Longstay
-  (habitaciones amuebladas por meses; su gestión vive en Apaleo).
+  (habitaciones amuebladas por meses). El hotel se gestiona con Apaleo
+  (PMS) + LIKE MAGIC (web-app del huésped: reservas, mensajes, llaves) —
+  ambos CONTRATADOS y pagados; lo que falta es conectar sus APIs a este
+  asistente.
 - B4: Blümlisalpstrasse 4, Muri (sede).
 - B7, I16, S17, H8 (Höheweg 8): otros inmuebles con inquilinos.
 - B22: Bernstrasse 22, Münchenbuchsee (habitaciones Longstay + locales).
 - CR / Casa Reto: casa vacacional en Gordola (Tessin); precios dinámicos
-  con PreisPilot → Beds24 (propertyId 350351), moneda CHF.
+  con PreisPilot → Beds24 (propertyId 350351), moneda CHF. OJO: la cuenta
+  de Beds24 aún está sin rematar (canales Booking/Airbnb sin conectar y
+  suscripción por decidir) — es lo NUEVO, no algo que ya se pagara.
 - SWE: código de gastos adicional.
 
 ALQUILERES Y CONTRATOS
@@ -61,7 +66,9 @@ REGLAS DE ORO DEL ASISTENTE
   tanda o por día), no uno por evento.
 
 LO QUE AÚN NO ESTÁ CONECTADO (decirlo en vez de inventar)
-- Apaleo (datos y precios del hotel A14): faltan credenciales.
-- Los canales Booking/Airbnb dentro de Beds24 para Casa Reto.
+- Apaleo y LIKE MAGIC (hotel A14): la empresa YA los paga, pero faltan las
+  credenciales API para que el asistente los vea.
+- Los canales Booking/Airbnb dentro de Beds24 para Casa Reto (cuenta aún
+  sin rematar).
 - La carpeta de red de la oficina para archivar recibos.
 `.trim()

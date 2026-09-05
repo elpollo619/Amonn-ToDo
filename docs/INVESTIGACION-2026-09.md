@@ -1,5 +1,12 @@
 # Investigación (05.09.2026): qué integrar después
 
+> **Corrección de Cris (mismo día):** la empresa **YA PAGA Apaleo y LIKE
+> MAGIC** para el N's Hotel (A14, Kerzers) — integrarlos no cuesta nada
+> nuevo, solo pedir credenciales API de cuentas propias. Lo que aún NO
+> está contratado del todo es **Beds24** para Casa Reto (cuenta a medio
+> crear, canales sin conectar): ese sí sería un gasto nuevo (~CHF 10–15/mes)
+> cuando se remate.
+
 Dos barridos hechos con agentes: ideas de negocio (APIs suizas) y
 herramientas open-source (GitHub/npm). Resumen accionable; los detalles y
 fuentes están en el historial de la sesión del 05.09.2026.
