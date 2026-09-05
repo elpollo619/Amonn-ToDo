@@ -15,27 +15,44 @@
 // ============================================================
 import { query } from './db.js'
 
+/**
+ * Quién escribe. Si el nombre es genérico ("Office", "Info") no dice nada,
+ * así que se usa el dominio, que sí identifica a la empresa.
+ */
+function quien(c) {
+  const nombre = String(c.remitenteNombre ?? '').trim()
+  const dominio = String(c.remitente ?? '').split('@')[1] ?? ''
+  if (!nombre || /^(office|info|kontakt|contact|mail|noreply)$/i.test(nombre)) return dominio || nombre || '?'
+  return nombre
+}
+
+/** El asunto, sin prefijos de respuesta y sin pasarse de largo. */
+function recorta(asunto, max = 70) {
+  const a = String(asunto ?? '').replace(/^(\s*(re|aw|antw|wg|fwd|fw|tr)\s*:\s*)+/i, '').trim()
+  return a.length > max ? `${a.slice(0, max - 1)}…` : a
+}
+
 /** Los tipos de correo que sabemos reconocer. */
 export const TIPOS = {
   habitacion: {
     // Zimmer-Anfrage: lo más frecuente del hotel.
     asunto: /\b(zimmer|anfrage|reservation|reservierung|buchung|aufenthalt|unterkunft)\b/i,
-    titulo: (c) => `Solicitud de habitación — ${c.remitenteNombre || c.remitente}`,
+    titulo: (c) => `Habitación · ${quien(c)}: ${recorta(c.asunto)}`,
     dias: 1,   // se responde al día siguiente como muy tarde
   },
   oferta: {
     asunto: /\b(offerte|angebot|kostenvoranschlag|preisanfrage)\b/i,
-    titulo: (c) => `Oferta recibida — ${c.remitenteNombre || c.remitente}`,
+    titulo: (c) => `Oferta · ${quien(c)}: ${recorta(c.asunto)}`,
     dias: 3,
   },
   factura: {
     asunto: /\b(rechnung|faktura|zahlungserinnerung|mahnung|invoice)\b/i,
-    titulo: (c) => `Factura — ${c.remitenteNombre || c.remitente}`,
+    titulo: (c) => `Factura · ${quien(c)}: ${recorta(c.asunto)}`,
     dias: 10,  // suelen tener 30 días, pero no conviene dejarlo al final
   },
   cita: {
     asunto: /\b(termin|besprechung|sitzung|besichtigung)\b/i,
-    titulo: (c) => `Cita por correo — ${c.remitenteNombre || c.remitente}`,
+    titulo: (c) => `Cita · ${quien(c)}: ${recorta(c.asunto)}`,
     dias: 1,
   },
 }

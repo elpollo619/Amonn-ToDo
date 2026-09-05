@@ -62,6 +62,18 @@ await marcarVisto('<uno@x.ch>', 'habitacion', null, 'Zimmer-Reservierung')
 checkIgual('tras el primero, la respuesta ya no crea otra tarea',
   await hiloYaAbierto('Re: Zimmer-Reservierung'), true)
 
+console.log('\n4c. EL TÍTULO DICE LO SUFICIENTE')
+// Un título con solo el remitente no permite descartar una tarea de un
+// vistazo: el correo de la policía sobre la habitación 201 parecía una
+// solicitud de habitación.
+const policia = { remitenteNombre: 'POL Prostitution', remitente: 'Prostitution@fr.ch', asunto: "RE: N's Hotel Zimmer 201 Videoaufzeichnung" }
+const tPol = TIPOS[clasificarCorreo(policia)].titulo(policia)
+checkIgual('se ve de qué va sin abrirlo', tPol.includes('Videoaufzeichnung'), true)
+checkIgual('sin el prefijo de respuesta', tPol.includes('RE:'), false)
+const generico = { remitenteNombre: 'Office', remitente: 'office@bhtech.ch', asunto: 'Anfrage' }
+checkIgual('un nombre genérico se cambia por el dominio',
+  TIPOS[clasificarCorreo(generico)].titulo(generico).includes('bhtech.ch'), true)
+
 console.log('\n5. LOS PLAZOS TIENEN SENTIDO')
 checkIgual('una solicitud de habitación se responde al día siguiente', TIPOS.habitacion.dias, 1)
 checkIgual('una factura tiene más margen', TIPOS.factura.dias > TIPOS.habitacion.dias, true)
