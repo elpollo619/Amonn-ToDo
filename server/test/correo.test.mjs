@@ -1,7 +1,7 @@
 // Pruebas del vigilante del buzón.
 // Los asuntos son REALES, sacados del buzón de la empresa (últimos 14 días).
 import { initDb, query, pool } from '../src/db.js'
-import { clasificarCorreo, nombreDeRemitente, yaVisto, marcarVisto, TIPOS } from '../src/correo.js'
+import { clasificarCorreo, nombreDeRemitente, yaVisto, marcarVisto, TIPOS, claveDeAsunto, hiloYaAbierto } from '../src/correo.js'
 
 let fallos = 0
 function checkIgual(n, real, debe) {
@@ -43,6 +43,24 @@ checkIgual('después de marcarlo, sí', await yaVisto('<abc@ejemplo.ch>'), true)
 await marcarVisto('<abc@ejemplo.ch>', 'habitacion')  // no debe romper
 checkIgual('marcarlo dos veces no rompe', await yaVisto('<abc@ejemplo.ch>'), true)
 checkIgual('sin identificador se considera visto (no duplicar)', await yaVisto(null), true)
+
+console.log('\n4b. NO MOLESTAR CON LO NUESTRO NI REPETIR HILOS')
+// Las respuestas entre el equipo no son trabajo que entra.
+checkIgual('un correo de un compañero se ignora',
+  clasificarCorreo({ asunto: 'AW: Termin für Beratung', remitente: 'mridha@reto-amonn.ch' }), null)
+checkIgual('y los del hotel también', clasificarCorreo({ asunto: 'Zimmer frei?', remitente: 'info@ns-hotel.ch' }), null)
+checkIgual('pero uno de fuera sí cuenta',
+  clasificarCorreo({ asunto: 'Zimmer-Reservierung', remitente: 's.marjanovic@workflow.swiss' }), 'habitacion')
+// Un hilo largo es un trabajo, no cinco.
+checkIgual('el asunto se limpia de prefijos',
+  claveDeAsunto('AW: WG: Termin für Beratung'), 'termin für beratung')
+checkIgual('respuesta y original son el mismo hilo',
+  claveDeAsunto('Re: Zimmer-Reservierung') === claveDeAsunto('Zimmer-Reservierung'), true)
+await query('delete from seen_mails')
+checkIgual('un hilo nuevo no está abierto', await hiloYaAbierto('Zimmer-Reservierung'), false)
+await marcarVisto('<uno@x.ch>', 'habitacion', null, 'Zimmer-Reservierung')
+checkIgual('tras el primero, la respuesta ya no crea otra tarea',
+  await hiloYaAbierto('Re: Zimmer-Reservierung'), true)
 
 console.log('\n5. LOS PLAZOS TIENEN SENTIDO')
 checkIgual('una solicitud de habitación se responde al día siguiente', TIPOS.habitacion.dias, 1)

@@ -252,3 +252,5 @@ create table if not exists seen_mails (
   task_id     uuid references tasks(id) on delete set null,
   seen_at     timestamptz not null default now()
 );
+alter table seen_mails add column if not exists subject_key text;
+create index if not exists seen_mails_asunto on seen_mails (subject_key, seen_at);

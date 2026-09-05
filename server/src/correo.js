@@ -50,6 +50,9 @@ export function clasificarCorreo({ asunto = '', remitente = '' } = {}) {
   // Las respuestas automáticas de ausencia no son trabajo.
   if (/^(automatische antwort|out of office|abwesenheit|réponse automatique)/i.test(a.trim())) return null
   if (/\bno-?reply\b|\bmailer-daemon\b|\bnewsletter\b/i.test(String(remitente))) return null
+  // Los correos entre nosotros son conversación interna, no trabajo que
+  // entra: si no, cada respuesta del equipo genera su propia tarea.
+  if (/@(reto-amonn\.ch|ns-hotel\.ch)\s*$/i.test(String(remitente).trim())) return null
   for (const [tipo, def] of Object.entries(TIPOS)) {
     if (def.asunto.test(a)) return tipo
   }
@@ -64,6 +67,28 @@ export function nombreDeRemitente(cabecera) {
   return { nombre: '', correo: s.replace(/[<>]/g, '').toLowerCase() }
 }
 
+/**
+ * El asunto sin prefijos de respuesta ni reenvío, para reconocer que
+ * "AW: Termin für Beratung" y "Termin für Beratung" son el mismo hilo.
+ */
+export function claveDeAsunto(asunto) {
+  return String(asunto ?? '')
+    .replace(/^(\s*(re|aw|antw|wg|fwd|fw|tr)\s*:\s*)+/i, '')
+    .toLowerCase().replace(/\s+/g, ' ').trim()
+    .slice(0, 180)
+}
+
+/** ¿Ya hay una tarea de este hilo en los últimos 30 días? */
+export async function hiloYaAbierto(asunto) {
+  const clave = claveDeAsunto(asunto)
+  if (!clave) return false
+  const { rows } = await query(
+    "select 1 from seen_mails where subject_key = $1 and seen_at > now() - interval '30 days' limit 1",
+    [clave],
+  )
+  return rows.length > 0
+}
+
 /** ¿Ya habíamos procesado este correo? Se recuerda por su Message-ID. */
 export async function yaVisto(messageId) {
   if (!messageId) return true // sin identificador, mejor no arriesgarse a duplicar
@@ -71,11 +96,11 @@ export async function yaVisto(messageId) {
   return rows.length > 0
 }
 
-export async function marcarVisto(messageId, tipo, taskId = null) {
+export async function marcarVisto(messageId, tipo, taskId = null, asunto = '') {
   await query(
-    `insert into seen_mails (message_id, kind, task_id) values ($1,$2,$3)
+    `insert into seen_mails (message_id, kind, task_id, subject_key) values ($1,$2,$3,$4)
      on conflict (message_id) do nothing`,
-    [messageId, tipo, taskId],
+    [messageId, tipo, taskId, claveDeAsunto(asunto)],
   )
 }
 
@@ -133,6 +158,11 @@ export async function revisarCorreo({ dias = 2 } = {}) {
         const tipo = clasificarCorreo(correo)
         if (!tipo) continue
         if (await yaVisto(correo.messageId)) continue
+        // Un hilo con cinco respuestas es un trabajo, no cinco.
+        if (await hiloYaAbierto(correo.asunto)) {
+          await marcarVisto(correo.messageId, tipo, null, correo.asunto)
+          continue
+        }
 
         const def = TIPOS[tipo]
         const hoy = todayKey()
@@ -140,12 +170,12 @@ export async function revisarCorreo({ dias = 2 } = {}) {
           {
             title: def.titulo(correo).slice(0, 200),
             description: `${correo.asunto}\n\nDe: ${correo.remitenteNombre || ''} <${correo.remitente}>`.trim(),
-            dueDate: masDias(hoy, def.dias),
+            due_date: masDias(hoy, def.dias),
           },
           null,
           { source: 'email' },
         )
-        await marcarVisto(correo.messageId, tipo, tarea?.id ?? null)
+        await marcarVisto(correo.messageId, tipo, tarea?.id ?? null, correo.asunto)
         nuevos.push({ tipo, asunto: correo.asunto, de: correo.remitente })
       }
     } finally {
