@@ -620,6 +620,11 @@ function restoreCase(title, raw) {
 }
 
 // ─── Gemini (IA) ──────────────────────────────────────────────
+// ⚠️ Este prompt solo cubre las acciones "clásicas" (crear/listar/completar).
+// Todo lo demás —gastos, compra, residuos, contactos, citas, hotel— lo
+// resuelven las reglas, que se consultan ANTES. Si algún día Gemini pasa a
+// ir primero, habría que enseñarle también esas acciones o dejaría de
+// entenderlas.
 function buildPrompt(text, ctx) {
   const names = ctx.users.map((u) => u.full_name).filter(Boolean).join(', ')
   const wd = WEEKDAY_NAMES[weekdayOf(ctx.today)]
@@ -673,17 +678,30 @@ async function parseWithGemini(text, ctx) {
 /** Interpreta el mensaje: Gemini si está configurado, reglas si no (o si falla). */
 export async function interpret(text, ctx) {
   ctx.today = ctx.today ?? todayKey()
+
+  // PRIMERO las reglas. Son instantáneas, no cuestan nada, no mandan a nadie
+  // los nombres de los clientes, y son las únicas que conocen todo lo que se
+  // ha ido añadiendo: gastos, compra, residuos, contactos, citas, hotel...
+  const intent = parseWithRules(text, ctx)
+  if (intent.action !== 'unknown') {
+    console.log(`[asistente] reglas → ${JSON.stringify(intent)}`)
+    return { ...intent, via: 'reglas' }
+  }
+
+  // Solo cuando las reglas NO entienden se pregunta a Gemini. Así se paga
+  // por lo raro, no por lo de todos los días, y una caída de Google no deja
+  // el asistente mudo.
   if (config.gemini.apiKey) {
     try {
-      const intent = await parseWithGemini(text, ctx)
-      console.log(`[asistente] gemini → ${JSON.stringify(intent)}`)
-      return { ...intent, via: 'gemini' }
+      const deIa = await parseWithGemini(text, ctx)
+      console.log(`[asistente] no lo entendí por reglas; gemini → ${JSON.stringify(deIa)}`)
+      return { ...deIa, via: 'gemini' }
     } catch (err) {
-      console.error('[asistente] Gemini falló, uso reglas:', err.message)
+      console.error('[asistente] Gemini falló:', err.message)
     }
   }
-  const intent = parseWithRules(text, ctx)
-  console.log(`[asistente] reglas → ${JSON.stringify(intent)}`)
+
+  console.log('[asistente] reglas → {"action":"unknown"}')
   return { ...intent, via: 'reglas' }
 }
 
