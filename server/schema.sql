@@ -199,6 +199,34 @@ create index if not exists appointments_por_fecha on appointments (starts_at);
 -- Migración: la columna del recordatorio llegó después de crear la tabla.
 alter table appointments add column if not exists reminded_at timestamptz;
 
+-- Contratos de alquiler: FOTO de la hoja «Liste aktuell» del Excel maestro
+-- (Liste Mietvertrag neu.xlsx). El Excel sigue siendo la fuente de verdad
+-- (decisión: en los Excel originales no se escribe); esto es una copia de
+-- solo lectura para consultar por WhatsApp y para los futuros avisos de
+-- impago. Se reimporta borrando y volviendo a cargar (imported_at lo dice).
+create table if not exists mietvertraege (
+  id           uuid primary key default gen_random_uuid(),
+  objgrp       text,                     -- edificio: A4, B22, H8...
+  objcode      text not null,            -- A4-11.1, B4-052...
+  m1vname      text,
+  m1name       text,
+  m1tel        text,
+  m1email      text,
+  mbeginn      date,
+  frist        text,                     -- meses de preaviso
+  mnetto       numeric,
+  total        numeric,                  -- alquiler mensual total
+  depot        numeric,
+  objekt       text,                     -- "5½-Zimmerwohnung EG links"
+  objektzus    text,
+  objadr       text,
+  objort       text,
+  bemerkungen  text,
+  imported_at  timestamptz not null default now()
+);
+create index if not exists mietvertraege_objcode on mietvertraege (lower(objcode));
+create index if not exists mietvertraege_grupo on mietvertraege (lower(coalesce(objgrp,'')));
+
 -- Facturas QR generadas (QR-Rechnung). El PDF vive aquí, como los CSV del
 -- cierre: el enlace /factura/{token}.pdf sobrevive a los redespliegues. La
 -- referencia QRR es la que luego permitirá conciliar el pago en el banco.

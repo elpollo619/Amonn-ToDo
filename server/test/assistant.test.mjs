@@ -146,6 +146,20 @@ check('tempo pt', 'tempo', 'pt', { action: 'meteo' })
 check('referenzzinssatz', 'referenzzinssatz', 'es', { action: 'zins' })
 check('zinssatz de', 'zinssatz', 'de', { action: 'zins' })
 
+console.log('\nCONTRATOS: CONSULTAR SIN PISAR A CREAR, Y FACTURAS')
+check('consultar por unidad', 'contrato de la 204', 'es', { action: 'vertrag_info', que: '204' })
+check('consultar por código', 'contrato de A4-11.1', 'es', { action: 'vertrag_info', que: 'a4-11.1' })
+check('consultar por apellido', 'contrato de Koubaa', 'es', { action: 'vertrag_info' })
+check('crear sigue siendo crear', 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre', 'es',
+  { action: 'contrato_add' })
+check('"vertrag von 204" consulta', 'vertrag von 204', 'de', { action: 'vertrag_info', que: '204' })
+check('"vertrag für Max, Zimmer 204" crea', 'mietvertrag für Max Muster, Zimmer 204, 850', 'de',
+  { action: 'contrato_add' })
+check('alquileres total', 'alquileres', 'es', { action: 'mieten_sum', grupo: null })
+check('alquileres de un edificio', 'alquileres de B22', 'es', { action: 'mieten_sum', grupo: 'B22' })
+check('factura', 'factura 850 para Max Muster, alquiler octubre', 'es',
+  { action: 'factura_add', texto: '850 para Max Muster, alquiler octubre' })
+
 console.log('\nHUÉSPEDES — espejo y respuesta ordenada')
 check('ver mensajes', 'mensajes de los huéspedes', 'es', { action: 'huesped_list' })
 check('responder con texto tal cual', 'responde al huésped 12345: Llegamos a las 15, Grüsse', 'es',

@@ -24,7 +24,7 @@ function checkIgual(n, real, debe) {
 }
 
 await initDb()
-for (const t of ['absences', 'meter_readings', 'appointments', 'expense_exports', 'expenses', 'attachments', 'comments', 'subtasks', 'aliases', 'wa_conversations', 'tasks']) {
+for (const t of ['absences', 'meter_readings', 'appointments', 'expense_exports', 'expenses', 'mietvertraege', 'qr_bills', 'attachments', 'comments', 'subtasks', 'aliases', 'wa_conversations', 'tasks']) {
   await query(`delete from ${t}`)
 }
 await query('delete from users')
@@ -73,6 +73,16 @@ console.log('\n6. RESUMEN SEMANAL')
 const resumen = await componerResumenSemanal('es')
 check('lleva las tareas de la semana', resumen, ['Resumen de la semana', 'Revisar la caldera'])
 check('y por WhatsApp responde lo mismo', await processMessage(CRIS, 'resumen semanal'), ['Resumen de la semana'])
+
+console.log('\n6b. CONSULTA DE CONTRATOS (FOTO DE LA LISTE)')
+await query(`insert into mietvertraege (objgrp, objcode, m1vname, m1name, mbeginn, total, depot, objekt)
+  values ('A4','A4-11.1','Kamal','Koubaa','2021-08-01',2798,5596,'5½-Zimmerwohnung EG links'),
+         ('B22','B22-035','Aymen','Zaghouani','2025-12-01',800,500,'Zimmer Nr. 35 DG')`)
+check('por unidad', await processMessage(CRIS, 'contrato de la 35'), ['Zaghouani', '800', 'Zimmer Nr. 35'])
+check('por apellido', await processMessage(CRIS, 'contrato de Koubaa'), ['Koubaa', '2798', 'A4-11.1'])
+check('avisa de que es una foto', await processMessage(CRIS, 'contrato de Koubaa'), ['el Excel manda'])
+check('suma por edificio', await processMessage(CRIS, 'alquileres de B22'), ['1 contrato', '800'])
+check('no encontrado se dice', await processMessage(CRIS, 'contrato de la 999'), ['No encuentro'])
 
 console.log('\n7b. HUÉSPEDES: SIN CONFIGURAR LO DICE, Y SIN AUTORIZACIÓN NO SALE NADA')
 check('sin configurar', await processMessage(CRIS, 'mensajes de los huéspedes'),

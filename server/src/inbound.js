@@ -43,6 +43,7 @@ import { fetchZins, zinsGuardado } from './zins.js'
 import { textoDePdf, leerRecibo } from './recibo.js'
 import { leerReciboConGemini } from './vision.js'
 import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
+import { buscarVertraege, sumaAlquileres, formatVertrag } from './vertraege.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -1096,6 +1097,29 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       } catch (err) {
         return t(lang, 'price_error', { motivo: err.message.slice(0, 140) })
       }
+    }
+
+    case 'vertrag_info': {
+      const encontrados = await buscarVertraege(intent.que)
+      if (encontrados.length === 0) return t(lang, 'vertrag_none', { que: intent.que })
+      const foto = encontrados[0].foto
+        ? new Date(encontrados[0].foto).toISOString().slice(0, 10).split('-').reverse().join('.')
+        : '—'
+      return t(lang, 'vertrag_found', {
+        lista: encontrados.map(formatVertrag).join('\n\n'),
+        foto,
+      })
+    }
+
+    case 'mieten_sum': {
+      const s = await sumaAlquileres(intent.grupo)
+      if (!s || Number(s.contratos) === 0) return t(lang, 'vertrag_none', { que: intent.grupo ?? 'TOTAL' })
+      const foto = s.foto ? new Date(s.foto).toISOString().slice(0, 10).split('-').reverse().join('.') : '—'
+      return t(lang, 'mieten_sum', {
+        grupo: s.grupo, contratos: s.contratos,
+        suma: Number(s.suma ?? 0).toLocaleString('de-CH'),
+        foto,
+      })
     }
 
     case 'factura_add': {
