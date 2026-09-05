@@ -45,6 +45,7 @@ import { leerReciboConGemini } from './vision.js'
 import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
 import { buscarVertraege, sumaAlquileres, formatVertrag } from './vertraege.js'
 import { esCamt, parseCamt, conciliarPagos } from './camt.js'
+import { estadoDeCobros, formatImpagos } from './impagos.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -1148,6 +1149,13 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         suma: Number(s.suma ?? 0).toLocaleString('de-CH'),
         foto,
       })
+    }
+
+    case 'impagos': {
+      // Datos de cobros = datos del banco: solo autorizados.
+      if (!esAutorizado(user)) return t(lang, 'camt_unauthorized')
+      const e = await estadoDeCobros(today)
+      return formatImpagos(e, lang)
     }
 
     case 'factura_add': {

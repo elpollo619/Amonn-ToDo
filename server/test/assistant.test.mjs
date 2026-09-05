@@ -159,6 +159,8 @@ check('alquileres total', 'alquileres', 'es', { action: 'mieten_sum', grupo: nul
 check('alquileres de un edificio', 'alquileres de B22', 'es', { action: 'mieten_sum', grupo: 'B22' })
 check('factura', 'factura 850 para Max Muster, alquiler octubre', 'es',
   { action: 'factura_add', texto: '850 para Max Muster, alquiler octubre' })
+check('impagos', '¿quién no ha pagado?', 'es', { action: 'impagos' })
+check('impagos de', 'wer hat nicht bezahlt', 'de', { action: 'impagos' })
 
 console.log('\nHUÉSPEDES — espejo y respuesta ordenada')
 check('ver mensajes', 'mensajes de los huéspedes', 'es', { action: 'huesped_list' })

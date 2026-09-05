@@ -22,6 +22,7 @@ import { scheduleReminders, runReminders , scheduleAvisoBasura, scheduleAvisoCit
 import { scheduleEspejoHuespedes } from './huespedes.js'
 import { scheduleAvisoMeteo } from './meteo.js'
 import { scheduleVigilanteZins } from './zins.js'
+import { scheduleAvisoImpagos } from './impagos.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
 import {
@@ -138,6 +139,7 @@ async function start() {
   scheduleEspejoHuespedes()
   scheduleAvisoMeteo()
   scheduleVigilanteZins()
+  scheduleAvisoImpagos()
   // Vigilante del buzón: cada 15 minutos, y solo si está configurado.
   if (correoConfigurado()) {
     cron.schedule('*/15 * * * *', () => {

@@ -133,6 +133,8 @@ const REGLAS = {
     vertragInfo: /^(?:contrato|mietvertrag|vertrag)\s+(?:de|del|de la|da|do)\s*(?:la\s+|el\s+)?(?:habitacion\s+|zimmer\s+|quarto\s+)?([\w.\-]+)\??$/,
     // "alquileres" · "alquileres de B22"
     mietenSum: /^(?:alquileres|suma de alquileres|rendas)(?:\s+(?:de|del|de la|da|do)\s+(\S+))?\??$/,
+    // "¿quién no ha pagado?" · "impagos"
+    impagos: /^(?:impagos|impagados|quien no ha pagado|quien no pago|morosos)\??$/,
     // "factura 850 para Max Muster, alquiler octubre"
     facturaAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|nueva)\s+)?(?:una\s+)?(?:factura|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
@@ -199,6 +201,7 @@ const REGLAS = {
     // Consultar es "vertrag von 204"; crear es "vertrag für ..." (contratoAdd).
     vertragInfo: /^(?:mietvertrag|vertrag)\s+(?:von|vom)\s*(?:zimmer\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:mieten|mietzinsen)(?:\s+(?:von|vom)\s+(\S+))?\??$/,
+    impagos: /^(?:wer hat nicht bezahlt|offene mieten|zahlungsruckstande)\??$/,
     facturaAdd: /^(?:(?:mach(?:e)?|erstelle?|neue)\s+)?(?:eine\s+)?(?:rechnung|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:wetter|wie wird das wetter|wetterbericht|wettervorhersage)\??$/,
@@ -258,6 +261,7 @@ const REGLAS = {
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     vertragInfo: /^(?:contrato)\s+(?:de|do|da)\s*(?:o\s+|a\s+)?(?:quarto\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:rendas)(?:\s+(?:de|do|da)\s+(\S+))?\??$/,
+    impagos: /^(?:quem nao pagou|rendas em atraso|incumprimentos)\??$/,
     facturaAdd: /^(?:(?:faz|cria(?:r)?|nova)\s+)?(?:uma\s+)?(?:fatura|factura)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:tempo|que tempo (?:faz|fara|vai fazer)|meteo|previsao(?: do tempo)?)\??$/,
@@ -333,6 +337,7 @@ function parseInLang(text, ctx, lang) {
   if (vertrag) return { action: 'vertrag_info', que: vertrag[1] }
   const mieten = cfg.mietenSum ? t.match(cfg.mietenSum) : null
   if (mieten) return { action: 'mieten_sum', grupo: mieten[1] ? mieten[1].toUpperCase() : null }
+  if (cfg.impagos && cfg.impagos.test(t)) return { action: 'impagos' }
 
   // Facturas QR. Como el contrato, el nombre del deudor va en crudo.
   const factura = cfg.facturaAdd ? t.match(cfg.facturaAdd) : null

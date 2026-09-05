@@ -3,6 +3,7 @@
 // referencia QRR, un lote con dos pagos (TxDtls) y un cargo que se ignora.
 import { initDb, query, pool } from '../src/db.js'
 import { esCamt, parseCamt, conciliarPagos } from '../src/camt.js'
+import { estadoDeCobros, formatImpagos } from '../src/impagos.js'
 
 let fallos = 0
 function checkIgual(n, real, debe) {
@@ -74,6 +75,19 @@ console.log('\n3. REENVIAR EL MISMO FICHERO NO CUENTA DOS VECES')
 const r2 = await conciliarPagos(entradas)
 checkIgual('cero abonos nuevos', r2.creditos, 0)
 checkIgual('tres repetidos', r2.repetidos, 3)
+
+console.log('\n4. "¿QUIÉN NO HA PAGADO?" SOBRE LOS EXTRACTOS VISTOS')
+// Un contrato más SIN abono este mes: debe salir en la lista.
+await query(`insert into mietvertraege (objgrp, objcode, m1vname, m1name, total)
+  values ('B22','B22-036','Rita','Exemplo',750)`)
+const e = await estadoDeCobros('2026-09-25')
+checkIgual('Koubaa pagó (nombre casa) y no sale', e.impagados.some((v) => v.m1name === 'Koubaa'), false)
+checkIgual('Exemplo no pagó y sale', e.impagados.some((v) => v.m1name === 'Exemplo'), true)
+const texto = formatImpagos(e, 'es')
+checkIgual('el texto avisa de en qué se basa', texto.includes('abonos vistos'), true)
+checkIgual('y de que es pista, no juicio', texto.includes('pista'), true)
+const sinDatos = await estadoDeCobros('2019-01-25')
+checkIgual('sin extractos del mes no se inventa nada', formatImpagos(sinDatos, 'es').includes('mándame primero'), true)
 
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas del extracto pasan\n' : `\n❌ ${fallos} fallo(s)\n`)
