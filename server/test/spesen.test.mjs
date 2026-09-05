@@ -2,7 +2,7 @@
 import { initDb, query, pool } from '../src/db.js'
 import { processMessage } from '../src/inbound.js'
 import { CATEGORIAS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from '../src/spesen.js'
-import { gastosAbiertos, exportarCsv, chf } from '../src/gastos.js'
+import { addGasto, cerrarMes, exportPorToken, gastosAbiertos, exportarCsv, chf } from '../src/gastos.js'
 import { esTextoDeVerdad, leerRecibo } from '../src/recibo.js'
 
 const CRIS = '+41765683445'
@@ -56,7 +56,7 @@ checkIgual('saca el IVA', r.iva, '8.1')
 
 console.log('\n5. APUNTARLO POR WHATSAPP')
 await initDb()
-for (const t of ['expenses','contacts','appointments','shopping_items','attachments','comments','subtasks','aliases','wa_conversations','tasks']) await query(`delete from ${t}`)
+for (const t of ['expense_exports','expenses','contacts','appointments','shopping_items','attachments','comments','subtasks','aliases','wa_conversations','tasks']) await query(`delete from ${t}`)
 await query('delete from users')
 await query(`insert into users (email, password_hash, full_name, phone, language)
   values ('cris@x.com','x','Cristian Amaya',$1,'es')`, [CRIS])
@@ -102,6 +102,22 @@ const csv = exportarCsv(await gastosAbiertos())
 check('lleva las columnas del Spesen', csv, ['Code;Datum;Bemerkung;Betrag CHF;Spalte;Konto;MwSt'])
 check('y las filas con su cuenta', csv, ['HAAG', 'Landi Kabelbinder', '37.90', '6100'])
 checkIgual('una fila por gasto más la cabecera', csv.trim().split('\r\n').length, (await gastosAbiertos()).length + 1)
+
+console.log('\n7. CERRAR EL MES')
+// Con fechas fijas para no depender del día en que corran las pruebas.
+const antesDelCierre = (await gastosAbiertos()).length
+await addGasto({ code: 'HAAG', spentOn: '2026-08-05', concept: 'Landi Schrauben', amountCents: 2150, category: 'ure_allg' })
+await addGasto({ code: 'A14', spentOn: '2026-08-20', concept: 'IKEA Lampe', amountCents: 4990, category: 'a14_material' })
+const cierre = await cerrarMes('2026-08')
+checkIgual('cierra los dos de agosto', cierre.gastos, 2)
+checkIgual('suma bien', cierre.total_cents, 7140)
+check('el CSV lleva los dos', cierre.csv, ['Landi Schrauben', 'IKEA Lampe', '05/08/2026'])
+checkIgual('el token es de 32 hex', /^[0-9a-f]{32}$/.test(cierre.token), true)
+checkIgual('los de otros meses siguen abiertos', (await gastosAbiertos()).length, antesDelCierre)
+const porToken = await exportPorToken(cierre.token)
+check('el CSV se recupera por su token', porToken?.csv ?? '', ['Landi Schrauben'])
+checkIgual('un token inventado no devuelve nada', await exportPorToken('0'.repeat(32)), null)
+checkIgual('cerrar un mes vacío devuelve null', await cerrarMes('2019-01'), null)
 
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de Spesen pasan\n' : `\n❌ ${fallos} fallo(s)\n`)

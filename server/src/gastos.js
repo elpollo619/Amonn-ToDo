@@ -6,6 +6,7 @@
 // en él mientras alguien lo tiene abierto es la forma más rápida de perder
 // trabajo sin que nadie se entere. Se exporta cuando toca cerrar el mes.
 // ============================================================
+import crypto from 'node:crypto'
 import { query } from './db.js'
 import { broadcast } from './events.js'
 import { porKey, CATEGORIAS } from './spesen.js'
@@ -80,6 +81,50 @@ export async function marcarExportados(ids) {
   )
   broadcast()
   return rowCount
+}
+
+/** Gastos abiertos de un mes concreto ('2026-08'), de todo el equipo. */
+export async function gastosDeMes(month) {
+  const { rows } = await query(
+    `select e.*, u.full_name as person_name
+       from expenses e
+       left join users u on u.id = e.person_id
+      where e.status = 'open' and to_char(e.spent_on, 'YYYY-MM') = $1
+      order by e.spent_on asc, e.created_at asc`,
+    [month],
+  )
+  return rows
+}
+
+/**
+ * Cierra el mes: genera el CSV, lo guarda en la base con un token de
+ * descarga y marca los gastos como exportados. Devuelve el cierre, o null
+ * si ese mes no tenía nada abierto. El CSV se descarga en
+ * /spesen/{token}.csv y desde ahí se pega en el Spesen 2026.xlsx a mano:
+ * en el fichero bueno no se escribe (tiene fórmulas y lo abre gente).
+ */
+export async function cerrarMes(month) {
+  const abiertos = await gastosDeMes(month)
+  if (abiertos.length === 0) return null
+  const csv = exportarCsv(abiertos)
+  const token = crypto.randomBytes(16).toString('hex')
+  const total = abiertos.reduce((n, g) => n + g.amount_cents, 0)
+  const { rows } = await query(
+    `insert into expense_exports (month, token, csv, gastos, total_cents)
+     values ($1,$2,$3,$4,$5) returning *`,
+    [month, token, csv, abiertos.length, total],
+  )
+  await marcarExportados(abiertos.map((g) => g.id))
+  return { ...rows[0], lineas: abiertos }
+}
+
+/** Un cierre por su token de descarga, o null. */
+export async function exportPorToken(token) {
+  const { rows } = await query(
+    'select * from expense_exports where token = $1',
+    [token],
+  )
+  return rows[0] ?? null
 }
 
 export { CATEGORIAS }

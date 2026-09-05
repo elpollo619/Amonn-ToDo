@@ -71,6 +71,23 @@ check('alemán en chat español', 'Erstelle eine Aufgabe für Isma: Heizung prü
 check('español en chat alemán', 'crea una tarea a Isma: revisar la caldera, para el viernes', 'de',
   { action: 'create_task', assignee: 'isma', due: '2026-09-04' })
 
+console.log('\nSPESEN — cerrar el mes sin pisar a las tareas ni a los gastos')
+// "cierra" y "fecha" también son verbos de completar tarea; "spesen …" también
+// abre un gasto. El cierre solo puede saltar con la palabra gastos/despesas.
+check('cierre con mes', 'cierra los gastos de agosto', 'es', { action: 'gasto_cierre' })
+check('cierre sin mes', 'cierra los gastos', 'es', { action: 'gasto_cierre' })
+check('exportar también cierra', 'exporta las spesen', 'es', { action: 'gasto_cierre' })
+check('"cierra la de la caldera" sigue completando', 'cierra la de la caldera', 'es',
+  { action: 'complete_task', task_hint: 'caldera' })
+check('apuntar gasto sigue apuntando', 'gasto 37.90 Landi Kabelbinder', 'es',
+  { action: 'gasto_add', importe: 37.9 })
+check('cierre en alemán', 'spesen august abschliessen', 'de', { action: 'gasto_cierre' })
+check('apuntar spesen en alemán sigue apuntando', 'spesen 45.20 Migros', 'de',
+  { action: 'gasto_add', importe: 45.2 })
+check('cierre en portugués', 'fecha as despesas de agosto', 'pt', { action: 'gasto_cierre' })
+check('"fecha a da caldeira" sigue completando', 'fecha a da caldeira', 'pt',
+  { action: 'complete_task', task_hint: 'caldeira' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

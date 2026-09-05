@@ -20,7 +20,7 @@ import {
   setDue, reassignTask, getTask, openTasksByState, openTasksDueBy,
 } from './tasks.service.js'
 import { firstName, taskSummary } from './notify.js'
-import { describeRange, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
+import { describeRange, monthKeyFromText, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
 import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
 import { getPending, setPending, clearPending } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
@@ -31,7 +31,7 @@ import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entso
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
-import { addGasto, gastosAbiertos, saldos, chf } from './gastos.js'
+import { addGasto, cerrarMes, gastosAbiertos, saldos, chf } from './gastos.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -917,6 +917,28 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
           lista: porPersona.map((p) => `• ${p.full_name}: CHF ${chf(Number(p.total_cents))}`).join('\n'),
         })
       }
+      return out
+    }
+
+    case 'gasto_cierre': {
+      // "cierra los gastos de agosto" → CSV para pegar en el Excel y los
+      // gastos quedan marcados como exportados (dejan de contar como deuda).
+      const mes = monthKeyFromText(intent.texto ?? '', today)
+      const cierre = await cerrarMes(mes)
+      const mesBonito = mes.split('-').reverse().join('/')
+      if (!cierre) return t(lang, 'exp_close_empty', { mes: mesBonito })
+      const porPersona = new Map()
+      for (const g of cierre.lineas) {
+        const quien = g.person_name ?? '—'
+        porPersona.set(quien, (porPersona.get(quien) ?? 0) + g.amount_cents)
+      }
+      let out = t(lang, 'exp_close_done', {
+        mes: mesBonito,
+        gastos: cierre.gastos,
+        total: chf(cierre.total_cents),
+        lista: [...porPersona].map(([quien, cents]) => `• ${quien}: CHF ${chf(cents)}`).join('\n'),
+      })
+      if (config.appUrl) out += t(lang, 'exp_close_link', { url: `${config.appUrl}/spesen/${cierre.token}.csv` })
       return out
     }
 

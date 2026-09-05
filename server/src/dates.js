@@ -96,6 +96,27 @@ const IDIOMAS = {
   },
 }
 
+/**
+ * El mes que nombra el texto ("agosto", "august"), como 'YYYY-MM'. Se busca
+ * en los tres idiomas a la vez: los nombres no chocan entre sí. Un mes por
+ * delante del actual se entiende como el del año pasado (en enero, "cierra
+ * diciembre" es diciembre del año anterior). Sin nombre de mes devuelve el
+ * mes ANTERIOR al de hoy: los meses se cierran ya empezado el siguiente.
+ */
+export function monthKeyFromText(text, today = todayKey()) {
+  const t = normalize(text)
+  const [y, m] = today.split('-').map(Number)
+  for (const cfg of Object.values(IDIOMAS)) {
+    const idx = cfg.months.findIndex((mes) => new RegExp(`\\b${mes}\\b`).test(t))
+    if (idx === -1) continue
+    const mes = idx + 1
+    const anno = mes > m ? y - 1 : y
+    return `${anno}-${String(mes).padStart(2, '0')}`
+  }
+  const anterior = m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 }
+  return `${anterior.y}-${String(anterior.m).padStart(2, '0')}`
+}
+
 /** ¿La persona ha dicho explícitamente "sin fecha"? */
 export function saysNoDate(text, lang = 'es') {
   const t = normalize(text)

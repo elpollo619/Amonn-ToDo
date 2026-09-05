@@ -50,6 +50,7 @@ Todo esto está **desplegado y probado con datos reales**:
 | Citas | «Cita con Baumgartner el martes a las 14:00» + calendario `.ics` suscribible |
 | Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
+| Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
@@ -69,8 +70,12 @@ chat; no están en el repo).
    y `APALEO_PROPERTY_ID` (apaleo.dev → Apps → Create app → Simple client).
    Al conectar, **mira primero la respuesta cruda** antes de fiarte de las
    rutas: están puestas según la documentación pública, no verificadas.
-3. **Cerrar el mes de Spesen.** «Cierra los gastos de agosto» → CSV +
-   marcarlos como exportados. `exportarCsv()` ya existe en `gastos.js`.
+3. ~~Cerrar el mes de Spesen~~ **HECHO** (sept 2026). «Cierra los gastos de
+   agosto» funciona en es/de/pt: genera el CSV (enlace `/spesen/{token}.csv`,
+   guardado en la tabla `expense_exports` de la base) y marca los gastos como
+   exportados. Sin mes dicho, cierra el mes anterior. El enlace de descarga
+   se construye con `APP_URL` (la misma variable que usan los avisos); si no
+   está definida, el cierre se hace igual pero sin enlace.
 4. **Rondas de control.** El Excel «Duschen-Kontrolle» (36 habitaciones) como
    lista que se marca desde el móvil. ⚠️ Las **206 y 207** llevan desde el
    31.08.2026 con fuga de agua y no son tarea de nadie.

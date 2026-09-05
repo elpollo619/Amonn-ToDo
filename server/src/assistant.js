@@ -117,6 +117,9 @@ const REGLAS = {
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
+    // "cierra los gastos de agosto" · "exporta las spesen". Exige la palabra
+    // gastos/spesen: "cierra" a secas es completar una tarea (verbo de done).
+    gastoCierre: /^(?:cierra|cerrar|exporta(?:r)?)\s+(?:el mes de (?:los\s+)?)?(?:los\s+|las\s+)?(?:gastos|spesen)(?:\s+de(?:l mes de)?\s+(\w+))?$/,
     // "¿cuántos llegan hoy?" · "¿qué cuartos están sucios?" · "el hotel"
     hotel: /\b(hotel|llegan|llegadas|salidas|check[\s-]?in|huespedes|cuartos?|habitacion(?:es)?|sucia?s?|limpia?s?|ocupacion)\b/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
@@ -161,6 +164,8 @@ const REGLAS = {
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
+    // "spesen august abschliessen" · "schliesse die spesen von august ab"
+    gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
     hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
   },
@@ -204,6 +209,9 @@ const REGLAS = {
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
+    // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
+    // despesas: "fecha" sozinho é concluir uma tarefa (verbo de done).
+    gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
     hotel: /\b(hotel|chegam|chegadas|saidas|check[\s-]?in|hospedes|quartos?|sujos?|limpos?|ocupacao)\b/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
   },
@@ -245,6 +253,9 @@ function parseInLang(text, ctx, lang) {
   // tareas porque "cuartos" y "habitación" no son palabras de tarea.
   if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
 
+  // El cierre de mes va ANTES que apuntar un gasto: en alemán "spesen august
+  // abschliessen" empieza igual que "spesen 45.20 Migros" y se lo comería.
+  if (cfg.gastoCierre && cfg.gastoCierre.test(t)) return { action: 'gasto_cierre', texto: t }
   if (cfg.gastoList && cfg.gastoList.test(t)) return { action: 'gasto_list' }
   const gastoNuevo = cfg.gastoAdd ? t.match(cfg.gastoAdd) : null
   if (gastoNuevo) {

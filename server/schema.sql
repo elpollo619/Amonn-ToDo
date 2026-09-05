@@ -244,6 +244,19 @@ create table if not exists expenses (
 create index if not exists expenses_abiertos on expenses (status, spent_on);
 create index if not exists expenses_persona on expenses (person_id, status);
 
+-- Cierres de mes del Spesen. El CSV vive en la base, no en un fichero: así
+-- el enlace de descarga sigue funcionando aunque Watchtower recree el
+-- contenedor o UPLOAD_DIR no esté definido.
+create table if not exists expense_exports (
+  id           uuid primary key default gen_random_uuid(),
+  month        text not null,               -- '2026-08'
+  token        text not null unique,        -- va en la URL de descarga
+  csv          text not null,
+  gastos       integer not null,
+  total_cents  integer not null,
+  created_at   timestamptz not null default now()
+);
+
 -- Correos ya procesados por el vigilante. Se recuerdan aquí para no tocar el
 -- buzón de nadie: nada se marca como leído ni se mueve de sitio.
 create table if not exists seen_mails (

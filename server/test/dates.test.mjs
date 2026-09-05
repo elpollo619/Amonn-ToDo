@@ -1,6 +1,6 @@
 // Pruebas de las fechas en los tres idiomas. Fecha fija para que el
 // resultado no dependa del día en que se ejecuten.
-import { parseDate, parseDateAnyLang, describeDue, saysNoDate } from '../src/dates.js'
+import { parseDate, parseDateAnyLang, describeDue, saysNoDate, monthKeyFromText } from '../src/dates.js'
 
 const HOY = '2026-09-03' // jueves
 let fallos = 0
@@ -55,6 +55,14 @@ eq('hoy es', describeDue(HOY, HOY, 'es'), 'hoy')
 eq('mañana de', describeDue('2026-09-04', HOY, 'de'), 'morgen')
 eq('futuro pt', describeDue('2026-09-11', HOY, 'pt'), 'sex 11 set')
 eq('vencida es', describeDue('2026-09-01', HOY, 'es'), 'mar 1 sep (vencida hace 2 días)')
+
+console.log('\nEL MES DEL CIERRE DE SPESEN')
+eq('mes pasado', monthKeyFromText('cierra los gastos de agosto', HOY), '2026-08')
+eq('en alemán', monthKeyFromText('spesen august abschliessen', HOY), '2026-08')
+eq('el mes en curso, por su nombre', monthKeyFromText('cierra los gastos de septiembre', HOY), '2026-09')
+eq('un mes "futuro" es el del año pasado', monthKeyFromText('cierra los gastos de diciembre', HOY), '2025-12')
+eq('sin nombre → el mes anterior', monthKeyFromText('cierra los gastos', HOY), '2026-08')
+eq('sin nombre en enero → diciembre anterior', monthKeyFromText('cierra los gastos', '2027-01-05'), '2026-12')
 
 console.log(fallos === 0 ? '\n✅ todas las pruebas de fechas pasan' : `\n❌ ${fallos} fallos`)
 process.exit(fallos === 0 ? 0 : 1)

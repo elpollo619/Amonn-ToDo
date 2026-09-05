@@ -16,6 +16,7 @@ import { subtasksRouter } from './routes/subtasks.js'
 import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
 import { calendarRouter } from './routes/calendar.js'
+import { spesenRouter } from './routes/spesen.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura } from './reminders.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
@@ -65,6 +66,9 @@ app.use('/api/whatsapp/webhook', webhookRouter)
 // Calendario suscribible (iCalendar). Va fuera de /api porque lo consumen
 // Google Calendar y el iPhone, no la app.
 app.use('/calendar', calendarRouter)
+// CSV de los cierres de mes del Spesen. También fuera de /api: el enlace se
+// manda por WhatsApp y se abre desde el móvil, sin sesión de la app.
+app.use('/spesen', spesenRouter)
 
 // Tiempo real (SSE): el navegador se suscribe a los cambios de tareas.
 app.get('/api/events', requireAuth, (req, res) => {
