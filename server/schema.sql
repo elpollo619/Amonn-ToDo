@@ -238,6 +238,19 @@ create table if not exists qr_bills (
   message      text,
   reference    text,
   pdf          bytea not null,
+  paid_at      timestamptz,              -- lo pone la conciliación del camt
+  created_at   timestamptz not null default now()
+);
+alter table qr_bills add column if not exists paid_at timestamptz;
+
+-- Abonos ya vistos en extractos bancarios (camt). El id es un hash de la
+-- entrada: reenviar el mismo fichero no cuenta nada dos veces.
+create table if not exists bank_entries (
+  id           text primary key,
+  booked_on    date,
+  amount_cents integer not null,
+  reference    text,
+  payer        text,
   created_at   timestamptz not null default now()
 );
 

@@ -44,6 +44,7 @@ import { textoDePdf, leerRecibo } from './recibo.js'
 import { leerReciboConGemini } from './vision.js'
 import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
 import { buscarVertraege, sumaAlquileres, formatVertrag } from './vertraege.js'
+import { esCamt, parseCamt, conciliarPagos } from './camt.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -512,6 +513,33 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
   const esAudio = String(foto.mime ?? '').startsWith('audio/')
   const kAñadido = esAudio ? 'audio_added' : 'photo_added'
   const kPregunta = esAudio ? 'audio_which_task' : 'photo_which_task'
+  // Un extracto bancario (camt.053/054 en XML) no es una foto ni un recibo:
+  // se concilia y punto. Solo de los autorizados — es el banco de la empresa.
+  if (esCamt(foto.buffer, foto.mime)) {
+    if (!esAutorizado(user)) return t(lang, 'camt_unauthorized')
+    try {
+      const { entradas } = parseCamt(foto.buffer.toString('utf8'))
+      if (entradas.length === 0) return t(lang, 'camt_empty')
+      const r = await conciliarPagos(entradas)
+      const linea = (x, extra) => `• ${x.fecha ?? '—'} CHF ${x.importe} — ${extra}`
+      const partes = []
+      if (r.facturas.length) partes.push(t(lang, 'camt_invoices', {
+        lista: r.facturas.map((x) => linea(x, `✅ factura de ${x.factura.debtor ?? '—'}`)).join('\n'),
+      }))
+      if (r.contratos.length) partes.push(t(lang, 'camt_contracts', {
+        lista: r.contratos.map((x) => linea(x, `${x.contrato.objcode} (${x.contrato.m1vname ?? ''} ${x.contrato.m1name})`)).join('\n'),
+      }))
+      if (r.desconocidos.length) partes.push(t(lang, 'camt_unknown', {
+        lista: r.desconocidos.slice(0, 8).map((x) => linea(x, x.quien ?? x.info ?? '¿?')).join('\n'),
+      }))
+      return t(lang, 'camt_summary', {
+        creditos: r.creditos, total: r.totalChf.toFixed(2), repetidos: r.repetidos,
+      }) + (partes.length ? '\n\n' + partes.join('\n\n') : '')
+    } catch (err) {
+      return t(lang, 'camt_error', { motivo: err.message.slice(0, 140) })
+    }
+  }
+
   const estado = storageStatus()
   if (!estado.ok) return t(lang, 'photo_no_storage', { motivo: estado.reason })
 
