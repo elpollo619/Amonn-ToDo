@@ -1,19 +1,18 @@
 # Empieza por aquí
 
-Instrucciones para Claude Code en una sesión nueva, en el Mac de Cris (misma
-red que el NAS). **Cris no es técnico y escribe en español: háblale en
-español, un paso cada vez, y haz tú mismo todo lo que puedas por consola.**
+Instrucciones para Claude Code en una sesión nueva. **Cris no es técnico y
+escribe en español: háblale en español, un paso cada vez, y haz tú mismo todo
+lo que puedas por consola.**
 
 ## 1. Ponerte en marcha
 
 ```bash
 git clone https://github.com/elpollo619/Amonn-ToDo
-cd Amonn-ToDo
-git checkout claude/job-list-app-whatsapp-av9rwl
+cd Amonn-ToDo && git checkout claude/job-list-app-whatsapp-av9rwl
 ```
 
-Lee **`docs/HANDOFF.md` entero** antes de tocar nada. Este fichero solo te
-dice dónde seguir; el detalle y los gotchas están allí.
+Lee después `docs/HANDOFF.md` (detalle técnico) y `docs/IDEAS.md` (todo lo
+hablado y lo pendiente).
 
 ## 2. Acceso al NAS — por Tailscale, desde cualquier sitio
 
@@ -22,141 +21,108 @@ ssh -i ~/.ssh/id_ed25519_kali Cris@100.77.9.60      # nas-amonn
 ```
 
 ⚠️ **No uses 192.168.1.9.** Esa IP solo se ve estando en la red del NAS, y
-Cris trabaja desde la oficina, su casa y casa de sus padres — varias de esas
-redes usan también el rango 192.168.1.x, así que ninguna VPN lo arreglaba. Se
-perdió mucho tiempo en tres sesiones por esto. Desde el 4 sep 2026 el NAS está
-en la tailnet como **`nas-amonn` = 100.77.9.60** (contenedor `tailscale`,
-`network_mode: host`, estado en el volumen `tailscale-state`).
+Cris trabaja desde tres sitios distintos, varios con el mismo rango
+192.168.1.x. Se perdieron horas en tres sesiones por esto antes de instalar
+Tailscale (contenedor `tailscale`, `network_mode: host`).
 
-El contenedor anuncia la ruta `192.168.1.0/24`, pero **hay que aprobarla en la
-consola de Tailscale** para llegar al resto de la red de la oficina; hará falta
-para el Netzlaufwerk.
+- App: `http://100.77.9.60:8080` · versión: `curl -s .../api/version`
+- `docker` va **sin sudo**. Cris **no** puede escribir en `/volume1/docker/data`:
+  usa `/home/Cris` o volúmenes con nombre.
+- Compose: `/volume1/docker/docker-compose.yaml` — **tiene los secretos
+  reales, no lo imprimas ni lo copies al repo.** El servicio se llama
+  `server`, no `amonn-server` (eso es el `container_name`).
+- **Desplegar = `git push`.** CI publica y Watchtower aplica en ≤5 min. Si
+  tienes prisa: `docker pull ghcr.io/elpollo619/amonn-todo:latest && cd
+  /volume1/docker && docker compose -p amonn -f docker-compose.yaml up -d`
 
-El usuario `Cris` está en el grupo `docker`: **`docker …` va sin `sudo`**.
+## 3. Qué hace hoy el asistente de WhatsApp (+41 76 226 04 47)
 
-- App: `http://100.77.9.60:8080` · versión: `curl -s http://100.77.9.60:8080/api/version`
-- Gateway de WhatsApp: `http://100.77.9.60:2785` (el panel sale en blanco por
-  IP: usa `crypto.randomUUID`, que no existe en contexto no seguro).
-- Compose de Amonn: `/volume1/docker/docker-compose.yaml` — **contiene los
-  secretos reales, no lo imprimas ni lo copies al repo.**
-  ⚠️ El **servicio** se llama `server`, NO `amonn-server` (ese es el
-  `container_name`).
-- **Desplegar = `git push`.** CI publica `latest` y Watchtower lo aplica en
-  ≤5 min.
-- ⚠️ Cris NO puede escribir en `/volume1/docker/data` (permisos). Usa su home
-  `/home/Cris` o volúmenes Docker con nombre.
+Todo esto está **desplegado y probado con datos reales**:
 
-## 3. Estado actual (4 sep 2026)
+| Área | Ejemplos |
+|---|---|
+| Tareas | «Crea una tarea a Rayna: pintar la fachada, para el lunes» · «Hecha la de la caldera» |
+| Retoques | «Cambia el plazo de la caldera al viernes» · «Pásale la caldera a Rayna» · «¿Cómo va la caldera?» · «Qué hay en esperando material» |
+| Fotos y voz | Se adjuntan a la tarea. La voz se transcribe (Whisper local) y se ejecuta como orden |
+| Avisos | Un mensaje diario por persona: atrasadas · hoy · mañana |
+| Residuos Muri | «¿Cuándo sacan el papel?» + aviso la tarde anterior |
+| Compra | «Falta café» · «¿Qué falta?» · «Todo comprado» |
+| Citas | «Cita con Baumgartner el martes a las 14:00» + calendario `.ics` suscribible |
+| Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
+| Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
+| Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
+| Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
-Los cinco pasos del rediseño están **hechos, desplegados y verificados**,
-incluidas las fotos entrantes por WhatsApp (probadas con fotos reales de Cris).
+Personas: los 7 trabajadores están dados de alta con teléfono, correo,
+idioma y **contraseña propia** (las contraseñas se le dieron a Cris en el
+chat; no están en el repo).
 
-Además, ese mismo día:
+## 4. Lo que falta, por orden de lo que más ahorra
 
-- **Los 7 trabajadores están dados de alta** con teléfono, correo, color e
-  idioma. Contraseña bloqueada a propósito: existen para tareas y WhatsApp,
-  pero no pueden entrar a la app hasta que se les dé una.
-  ⚠️ Había **dos Cristian Amaya** (uno vacío, con el correo de empresa); por eso
-  "crea tarea a cris" preguntaba cuál. Se fusionaron. Si vuelve a pasar con
-  otro nombre, mira primero si hay duplicados antes de tocar el código.
-- **Cuatro órdenes nuevas** sobre tareas existentes: cambiar plazo, reasignar,
-  ver detalle y listar por estado o vencimiento (`test/ordenes.test.mjs`).
-- **Notas de voz**: se guardan como adjunto de la tarea. Falta transcribir.
-- **Aviso diario agrupado**: un mensaje por persona con atrasadas / hoy /
-  mañana, en vez de un mensaje por tarea (`test/avisos.test.mjs`).
-
-⚠️ **La base de datos apareció vacía** el 3 de septiembre (0 tareas, 0
-vocabulario; el contenedor `amonn-db-1` se recreó a las 06:01). No se ha
-averiguado por qué. Conviene entenderlo antes de cargar datos de verdad.
-Hay un respaldo en `/home/Cris/amonn-backup-20260904-0850.sql`.
-
-## 4. LO ÚNICO QUE FALTA: probar las fotos con una foto de verdad
-
-Las fotos entrantes **ya están programadas y probadas** (ver el HANDOFF, que
-tiene el detalle). Resumen de lo esencial:
-
-- El Gateway **sí manda la foto**: entera, en base64, dentro del propio
-  mensaje, en `metadata.media.data`. No busques ficheros; la carpeta `media/`
-  está vacía y no importa.
-- Si el pie de foto dice la tarea, se pega ahí. Si no, se guarda igual y el
-  asistente pregunta a cuál va, con lista numerada.
-
-**Lo que falta es solo comprobarlo en vivo**, porque el código está probado
-contra la forma que guarda la base de datos, no contra el evento en directo:
-
-1. Despliega (`git push`; Watchtower lo aplica en ≤5 min).
-2. Pide a Cris una foto al +41 76 226 04 47, con y sin pie de foto.
-3. Mira que la foto aparece en la tarea dentro de la app.
-4. Si no aparece, busca esta línea en `docker logs amonn-server`:
-   `[wa] llega algo que parece foto pero sin datos; forma: ...`
-   Esa lista de claves dice dónde está realmente la imagen; añade esa ruta al
-   array `RUTAS` de `server/src/media.js` y listo.
-
-⚠️ Cris trabaja a veces desde fuera de la oficina y entonces **el NAS no es
-alcanzable por SSH** (su casa y la oficina usan el mismo rango 192.168.1.x, así
-que ninguna VPN lo arregla). Sí puede entrar por el panel web del NAS. Si hace
-falta acceso remoto de verdad, lo que toca es **instalar Tailscale en el NAS**;
-Cris ya lo usa en sus otros equipos.
-
-## 4b. Lo añadido el 4 de septiembre (tarde)
-
-- **Citas (Termine)** + **calendario suscribible**: `/calendar/<CALENDAR_TOKEN>.ics`
-  con las citas (aviso 1 h antes) y las tareas con plazo (día completo).
-  Google Calendar / iPhone / Outlook se suscriben una vez. Se eligió esto en
-  lugar de OAuth con Google: sin permisos que caducan. Google refresca cuando
-  quiere (horas), así que no vale para cambios de último minuto.
-- **Contactos de obra**: 34 importados de la carpeta `06 Kunden` de Drive
-  (Adressliste + Kontaktliste 770-lds Seewer), con BKP, obra y **estado de
-  oferta**. `server/scripts/importar-contactos.mjs` se puede repetir sin
-  duplicar. ⚠️ NO se escribe en los Excel originales a propósito: si alguien
-  los tiene abiertos, se pisan los cambios.
-- **Residuos de Muri** (`entsorgung.js`) y **lista de la compra**
-  (`compras.js`), ambos consultables por WhatsApp.
-- **Notas de voz** transcritas con Whisper en el NAS (contenedor `whisper`,
-  `WHISPER_URL=http://whisper:9000`, modelo base, ~2,5x tiempo real).
-
-Variables nuevas en el compose del NAS: `WHISPER_URL`, `ENTSORGUNG_TO`,
-`CALENDAR_TOKEN`. ⚠️ `create table if not exists` NO añade columnas a una
-tabla que ya existe: usa `alter table ... add column if not exists`.
+1. **Recibos a la carpeta de la empresa.** Hoy se archivan en el NAS
+   (`uploads/spesen/26.09/A14 260904 Migros …pdf`), con el nombre y el
+   formato de carpeta que ya usa la empresa en Drive. **Falta la ruta
+   `\\servidor\…` y un usuario con permiso de escritura.** Cris tiene Claude
+   Code en el PC de la oficina, que sí ve esa carpeta: es el camino corto.
+2. **Apaleo (hotel).** `server/src/apaleo.js` está escrito pero **sin probar
+   contra la cuenta real**. Faltan `APALEO_CLIENT_ID`, `APALEO_CLIENT_SECRET`
+   y `APALEO_PROPERTY_ID` (apaleo.dev → Apps → Create app → Simple client).
+   Al conectar, **mira primero la respuesta cruda** antes de fiarte de las
+   rutas: están puestas según la documentación pública, no verificadas.
+3. **Cerrar el mes de Spesen.** «Cierra los gastos de agosto» → CSV +
+   marcarlos como exportados. `exportarCsv()` ya existe en `gastos.js`.
+4. **Rondas de control.** El Excel «Duschen-Kontrolle» (36 habitaciones) como
+   lista que se marca desde el móvil. ⚠️ Las **206 y 207** llevan desde el
+   31.08.2026 con fuga de agua y no son tarea de nadie.
+5. **Aviso del día 25** de alquileres impagados (los contratos exigen pago
+   antes del 28 para renovarse). 503 contratos en `Liste Mietvertrag neu.xlsx`.
+6. **Clave de Gemini** (`GEMINI_API_KEY`, aistudio.google.com/apikey). Ya está
+   enchufado como RESPALDO: las reglas responden primero y Gemini solo entra
+   cuando no entienden.
+7. **OCR de recibos** (Tesseract en el NAS, como Whisper) y **el tablero web
+   desde fuera** (`cloudflared` ya está instalado en el NAS).
 
 ## 5. Pruebas
 
 ```bash
-cd server && npm test                 # fechas + asistente (sin base de datos)
-# con Postgres: DATABASE_URL=… WA_ENABLED=false npm run test:db
-cd app && npm test                    # línea de tiempo
-cd app && npm run build               # comprueba tipos y compila
-```
-
-Para las pruebas con base de datos, levanta un Postgres de usar y tirar:
-
-```bash
+cd server && npm test                 # sin base de datos
 export PATH=/opt/homebrew/opt/postgresql@16/bin:$PATH
-initdb -D /tmp/pg -U postgres --auth=trust
-pg_ctl -D /tmp/pg -o "-p 5433 -k /tmp/pg" -l /tmp/pg/log start
+initdb -D /tmp/pg -U postgres --auth=trust && pg_ctl -D /tmp/pg -o "-p 5433 -k /tmp/pg" -l /tmp/pg/log start
 DATABASE_URL="postgres://postgres@127.0.0.1:5433/postgres" WA_ENABLED=false npm run test:db
 ```
 
-Para ver la app sin credenciales: `cd app && VITE_DEMO=true npm run dev`
-(modo demostración, con datos de ejemplo y sin contraseña).
+**18 baterías**, todas en verde. Si tocas el asistente, ejecútalas: varias
+existen porque un cambio rompió algo silenciosamente.
 
-## 6. Trampas que ya han morder una vez
+## 6. Trampas que ya han mordido
 
-- **`text-transform: capitalize` en español** da "Agosto De 2026". Poner la
-  mayúscula inicial en JS. (Ha pasado tres veces.)
-- **Regex generadas por script**: revisa que no queden con `\\s` en vez de
-  `\s`. Una estuvo rota un paso entero sin que se notara. **Pruébalas siempre
-  con una llamada directa después de generarlas.**
-- **Formularios anidados**: los componentes de pasos y comentarios viven DENTRO
-  del formulario de la tarea. Nada de `<form>` dentro: Enter enviaría el de
-  fuera y cerraría el modal.
-- **Verbos compartidos en el asistente**: `pon`, `añade` y `anota` sirven para
-  crear tareas Y para estados/pasos/comentarios. Las reglas nuevas van antes
-  que la de crear pero **exigen** que la cola sea un estado real o que la pista
-  señale una tarea existente. Sin eso se malinterpretan.
-- **Marcar hecha** debe mover también el estado (clase `done`), o la tarea se
-  queda en la columna "Esperando material".
-- **Estado y `status` van siempre juntos**: usa `resolveState()` /
-  `setTaskState()`, nunca escribas `status` a mano.
-- **Aislamiento de los tests con base de datos**: los que reordenan o crean
-  estados deben restablecerlos en la preparación, o la pasada siguiente falla.
+- **`create table if not exists` NO añade columnas** a una tabla que ya
+  existe. Usa `alter table … add column if not exists`.
+- **El campo es `due_date`, no `dueDate`.** Escribirlo mal no da error: la
+  tarea nace sin plazo y todo *parece* funcionar.
+- **El Gateway devuelve el array de sesiones DIRECTAMENTE**, sin envolver. Y
+  suscribirse con `sessionId: "auto"` se acusa como correcto pero **no llega
+  ningún evento**.
+- **Los recibos de la empresa son escaneos**, no PDFs con texto. Un extractor
+  propio devolvía basura binaria diciendo haber leído: exige texto legible
+  antes de fiarte.
+- **`text-transform: capitalize` en español** da "Agosto De 2026". Mayúscula
+  inicial en JS.
+- **`restoreCase()` es para títulos de tarea**, no para contactos: rompe
+  nombres y capitaliza correos. Usa el texto crudo.
+- **Verbos compartidos**: «pon», «añade», «pasa», «cambia», «asigna» sirven
+  para crear tareas Y para otras cosas. Toda regla nueva exige que la pista
+  señale una tarea existente. Hay pruebas que vigilan que crear siga creando.
+- **Formularios anidados**: pasos y comentarios viven DENTRO del formulario
+  de la tarea. Nada de `<form>` dentro.
+
+## 7. Decisiones tomadas (no volver a discutirlas)
+
+- **Sin IA de pago por defecto.** Reglas primero; Gemini solo de respaldo.
+- **No se escribe en los Excel originales** (Spesen, contactos): tienen
+  fórmulas y los abre gente.
+- **El calendario se publica** (`.ics` con token), no se conecta a Google.
+- **El buzón no se toca**: nada se marca leído; lo visto se recuerda en la
+  base por Message-ID.
+- **Nunca se descarta un adjunto**: foto o recibo se guardan ANTES de
+  preguntar nada.
