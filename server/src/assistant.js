@@ -117,6 +117,8 @@ const REGLAS = {
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
+    // "¿cuántos llegan hoy?" · "¿qué cuartos están sucios?" · "el hotel"
+    hotel: /\b(hotel|llegan|llegadas|salidas|check[\s-]?in|huespedes|cuartos?|habitacion(?:es)?|sucia?s?|limpia?s?|ocupacion)\b/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
   },
 
@@ -159,6 +161,7 @@ const REGLAS = {
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
+    hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
   },
 
@@ -201,6 +204,7 @@ const REGLAS = {
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
+    hotel: /\b(hotel|chegam|chegadas|saidas|check[\s-]?in|hospedes|quartos?|sujos?|limpos?|ocupacao)\b/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
   },
 }
@@ -237,6 +241,10 @@ function parseInLang(text, ctx, lang) {
 
   // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene
   // nada que ver con las tareas y así no compite con "crea una tarea".
+  // El hotel: llegadas, salidas, habitaciones sucias. Va antes que las
+  // tareas porque "cuartos" y "habitación" no son palabras de tarea.
+  if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
+
   if (cfg.gastoList && cfg.gastoList.test(t)) return { action: 'gasto_list' }
   const gastoNuevo = cfg.gastoAdd ? t.match(cfg.gastoAdd) : null
   if (gastoNuevo) {

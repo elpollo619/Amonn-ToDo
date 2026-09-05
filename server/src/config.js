@@ -50,6 +50,12 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? '',
   // Whisper en el NAS para las notas de voz. Vacío = sin transcripción.
   whisperUrl: (process.env.WHISPER_URL ?? '').replace(/\/$/, ''),
+  // Apaleo (el sistema del hotel). Sin credenciales, no se activa.
+  apaleo: {
+    clientId: process.env.APALEO_CLIENT_ID ?? '',
+    clientSecret: process.env.APALEO_CLIENT_SECRET ?? '',
+    propertyId: process.env.APALEO_PROPERTY_ID ?? '',
+  },
   // Vigilante del buzón. Sin estos datos, simplemente no se activa.
   mailWatch: {
     host: process.env.MAIL_HOST ?? '',

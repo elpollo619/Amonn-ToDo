@@ -32,6 +32,7 @@ import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
 import { addGasto, gastosAbiertos, saldos, chf } from './gastos.js'
+import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
@@ -816,6 +817,49 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return t(lang, 'waste_next', {
         lista: lista.map((x) => `• ${nombres[x.tipo]} — ${cuandoBasura(x.fecha, today, lang)}`).join('\n'),
       })
+    }
+
+    case 'hotel': {
+      if (!apaleoConfigurado()) return t(lang, 'hotel_off')
+      const q = String(intent.texto ?? '')
+      const soloSucias = /sucia|schmutzig|sujo|limpiar|reinig|limpar/.test(q)
+      const soloLlegadas = /llegan|llegada|anreise|chegam|chegada|check/.test(q) && !soloSucias
+      try {
+        if (soloSucias) {
+          const { unidades } = await habitaciones()
+          const { sucias } = porEstadoDeLimpieza(unidades)
+          if (sucias.length === 0) return t(lang, 'hotel_dirty_none')
+          return t(lang, 'hotel_dirty', {
+            total: sucias.length,
+            lista: sucias.map((u) => u.name ?? u.id).join(', '),
+          })
+        }
+        const { reservas } = await llegadas(today)
+        const personas = contarPersonas(reservas)
+        const detalle = reservas.length
+          ? '\n' + reservas.slice(0, 8).map((r) => {
+              const h = r.unit?.name ? ` — ${r.unit.name}` : ''
+              const quien = r.primaryGuest?.lastName ?? r.booker?.lastName ?? ''
+              return `• ${quien}${h}`
+            }).join('\n')
+          : ''
+        if (soloLlegadas) {
+          if (reservas.length === 0) return t(lang, 'hotel_arrivals_none')
+          return t(lang, 'hotel_arrivals', { personas, reservas: reservas.length, detalle })
+        }
+        // Parte completo del día.
+        const [{ reservas: salen }, { unidades }] = await Promise.all([salidas(today), habitaciones()])
+        const { sucias, limpias } = porEstadoDeLimpieza(unidades)
+        return t(lang, 'hotel_today', {
+          personas, llegadas: reservas.length, detalle,
+          salidas: salen.length,
+          sucias: sucias.length,
+          listaSucias: sucias.map((u) => u.name ?? u.id).join(', ') || '—',
+          limpias: limpias.length,
+        })
+      } catch (err) {
+        return t(lang, 'hotel_error', { motivo: err.message.slice(0, 140) })
+      }
     }
 
     case 'gasto_add': {

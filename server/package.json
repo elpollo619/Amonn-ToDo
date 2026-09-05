@@ -9,7 +9,7 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test": "node test/dates.test.mjs && node test/assistant.test.mjs",
-    "test:db": "node test/dialogo.test.mjs && node test/vocabulario.test.mjs && node test/plazos.test.mjs && node test/estados.test.mjs && node test/pasos.test.mjs && node test/comentarios.test.mjs && node test/fotos.test.mjs && node test/ordenes.test.mjs && node test/avisos.test.mjs && node test/voz.test.mjs && node test/basura.test.mjs && node test/compras.test.mjs && node test/agenda.test.mjs && node test/contactos.test.mjs && node test/spesen.test.mjs && node test/correo.test.mjs"
+    "test:db": "node test/dialogo.test.mjs && node test/vocabulario.test.mjs && node test/plazos.test.mjs && node test/estados.test.mjs && node test/pasos.test.mjs && node test/comentarios.test.mjs && node test/fotos.test.mjs && node test/ordenes.test.mjs && node test/avisos.test.mjs && node test/voz.test.mjs && node test/basura.test.mjs && node test/compras.test.mjs && node test/agenda.test.mjs && node test/contactos.test.mjs && node test/spesen.test.mjs && node test/correo.test.mjs && node test/hotel.test.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
