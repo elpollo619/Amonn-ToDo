@@ -42,6 +42,7 @@ import { fetchMeteo, formatearParte } from './meteo.js'
 import { fetchZins, zinsGuardado } from './zins.js'
 import { textoDePdf, leerRecibo } from './recibo.js'
 import { leerReciboConGemini } from './vision.js'
+import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -1094,6 +1095,27 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         return out
       } catch (err) {
         return t(lang, 'price_error', { motivo: err.message.slice(0, 140) })
+      }
+    }
+
+    case 'factura_add': {
+      // Facturar es dinero oficial: misma puerta que responder a huéspedes.
+      if (!cobrosConfigurados()) return t(lang, 'invoice_not_configured')
+      if (!esAutorizado(user)) return t(lang, 'invoice_unauthorized')
+      const datos = parseFactura(intent.texto)
+      if (datos.faltan.length) return t(lang, 'invoice_need', { faltan: datos.faltan.join(', ') })
+      try {
+        const f = await crearFactura({
+          importe: datos.importe, deudor: datos.deudor, mensaje: intent.texto,
+        })
+        let out = t(lang, 'invoice_done', {
+          importe: datos.importe.toFixed(2), deudor: datos.deudor,
+          referencia: f.referencia ?? '—',
+        })
+        if (config.appUrl) out += t(lang, 'invoice_link', { url: `${config.appUrl}/factura/${f.token}.pdf` })
+        return out
+      } catch (err) {
+        return t(lang, 'invoice_error', { motivo: err.message.slice(0, 140) })
       }
     }
 

@@ -199,6 +199,20 @@ create index if not exists appointments_por_fecha on appointments (starts_at);
 -- Migración: la columna del recordatorio llegó después de crear la tabla.
 alter table appointments add column if not exists reminded_at timestamptz;
 
+-- Facturas QR generadas (QR-Rechnung). El PDF vive aquí, como los CSV del
+-- cierre: el enlace /factura/{token}.pdf sobrevive a los redespliegues. La
+-- referencia QRR es la que luego permitirá conciliar el pago en el banco.
+create table if not exists qr_bills (
+  id           uuid primary key default gen_random_uuid(),
+  token        text not null unique,
+  amount_cents integer not null,
+  debtor       text,
+  message      text,
+  reference    text,
+  pdf          bytea not null,
+  created_at   timestamptz not null default now()
+);
+
 -- Cajón de estado pequeño de la app (último Referenzzinssatz visto, etc.).
 create table if not exists app_state (
   key         text primary key,

@@ -17,6 +17,7 @@ import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
 import { calendarRouter } from './routes/calendar.js'
 import { spesenRouter } from './routes/spesen.js'
+import { facturaRouter } from './routes/factura.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura, scheduleAvisoCitas, scheduleResumenSemanal } from './reminders.js'
 import { scheduleEspejoHuespedes } from './huespedes.js'
 import { scheduleAvisoMeteo } from './meteo.js'
@@ -72,6 +73,8 @@ app.use('/calendar', calendarRouter)
 // CSV de los cierres de mes del Spesen. También fuera de /api: el enlace se
 // manda por WhatsApp y se abre desde el móvil, sin sesión de la app.
 app.use('/spesen', spesenRouter)
+// PDFs de las QR-Rechnungen, mismo esquema de token.
+app.use('/factura', facturaRouter)
 
 // Tiempo real (SSE): el navegador se suscribe a los cambios de tareas.
 app.get('/api/events', requireAuth, (req, res) => {

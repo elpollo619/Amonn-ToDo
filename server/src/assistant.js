@@ -129,6 +129,8 @@ const REGLAS = {
     contadorList: /^(?:lecturas|contadores)(?:\s+(?:de\s+)?(?:la\s+|el\s+)?(\S+))?\??$/,
     // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
+    // "factura 850 para Max Muster, alquiler octubre"
+    facturaAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|nueva)\s+)?(?:una\s+)?(?:factura|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
     precios: /^(?:precios|analisis de precios|como van los precios|subo o bajo (?:los )?precios)(?:\s+(?:de\s+|del\s+|de la\s+)?(casa reto|casa|hotel|a14))?\??$/,
     // "¿qué tiempo hace?" · "tiempo" · "meteo"
@@ -190,6 +192,7 @@ const REGLAS = {
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
+    facturaAdd: /^(?:(?:mach(?:e)?|erstelle?|neue)\s+)?(?:eine\s+)?(?:rechnung|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:wetter|wie wird das wetter|wetterbericht|wettervorhersage)\??$/,
     zinsCmd: /^(?:referenzzinssatz|zinssatz|hypothekarischer referenzzinssatz)\??$/,
@@ -246,6 +249,7 @@ const REGLAS = {
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
+    facturaAdd: /^(?:(?:faz|cria(?:r)?|nova)\s+)?(?:uma\s+)?(?:fatura|factura)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:tempo|que tempo (?:faz|fara|vai fazer)|meteo|previsao(?: do tempo)?)\??$/,
     zinsCmd: /^(?:referenzzinssatz|zinssatz|taxa de referencia)\??$/,
@@ -311,6 +315,13 @@ function parseInLang(text, ctx, lang) {
       bookingId: huesped[1],
       texto: (enCrudo?.[2] ?? huesped[2]).trim(),
     }
+  }
+
+  // Facturas QR. Como el contrato, el nombre del deudor va en crudo.
+  const factura = cfg.facturaAdd ? t.match(cfg.facturaAdd) : null
+  if (factura) {
+    const enCrudo = raw.match(/(?:factura|rechnung|fatura)\s*[:,-]?\s*(.+)$/i)
+    return { action: 'factura_add', texto: (enCrudo?.[1] ?? factura[1]).trim() }
   }
 
   // Contratos ANTES que el hotel: "contrato para Max, habitación 204" lleva

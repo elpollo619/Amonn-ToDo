@@ -69,6 +69,15 @@ export const config = {
     dashboardUrl: process.env.PREISPILOT_URL ??
       'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
   },
+  // QR-Rechnung. Sin QR_IBAN, la orden «factura …» explica qué falta.
+  // ⚠️ Confirmar el IBAN con Cris antes de ponerlo: es adonde va el dinero.
+  qr: {
+    iban: process.env.QR_IBAN ?? '',
+    nombre: process.env.QR_CREDITOR_NAME ?? 'Hans Amonn Immobilien AG',
+    direccion: process.env.QR_CREDITOR_ADDRESS ?? 'Blümlisalpstrasse 4',
+    zip: Number(process.env.QR_CREDITOR_ZIP ?? 3074),
+    ciudad: process.env.QR_CREDITOR_CITY ?? 'Muri b. Bern',
+  },
   // Meteo de obra (Open-Meteo, gratis y sin clave). La orden «tiempo»
   // funciona siempre; la ALERTA de la tarde solo va a METEO_TO (teléfonos
   // separados por comas), para no llenar a nadie de partes meteorológicos.

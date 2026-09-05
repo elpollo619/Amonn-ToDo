@@ -63,6 +63,7 @@ Todo esto está **desplegado y probado con datos reales**:
 | Meteo | «Tiempo» → parte de 3 días (Open-Meteo, sin clave); alerta 17:00 si mañana hay helada/lluvia fuerte/viento/nieve (METEO_TO) |
 | Referenzzinssatz | «Zinssatz» → tipo actual; vigilante mensual del BWO que avisa a RESUMEN_TO si cambia (con la regla del ±3 % por 0.25 pt) |
 | OCR recibos | El PDF electrónico se lee solo (extractor propio) y el escaneo/foto lo lee Gemini vision: solo se pregunta la propiedad |
+| Facturas QR | «Factura 850 para Max Muster, alquiler octubre» → PDF con QR-Rechnung y referencia QRR en `/factura/{token}.pdf` (solo autorizados; ⚠️ APAGADO hasta confirmar `QR_IBAN` con Cris — el dinero va a esa cuenta) |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
