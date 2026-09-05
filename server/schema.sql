@@ -192,9 +192,38 @@ create table if not exists appointments (
   created_by  uuid references users(id) on delete set null,
   attendee_id uuid references users(id) on delete set null,
   source      text not null default 'app',
+  reminded_at timestamptz,               -- cuándo se avisó de que se acerca
   created_at  timestamptz not null default now()
 );
 create index if not exists appointments_por_fecha on appointments (starts_at);
+-- Migración: la columna del recordatorio llegó después de crear la tabla.
+alter table appointments add column if not exists reminded_at timestamptz;
+
+-- Lecturas de contadores: «luz 204: 4521». El tipo se guarda en alemán
+-- (strom, wasser, gas, heizung) diga como se diga, para que la serie de un
+-- contador no se parta entre idiomas.
+create table if not exists meter_readings (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null,             -- strom | wasser | gas | heizung | zahler
+  unit        text not null,             -- habitación o edificio: 204, A14...
+  value       numeric not null,
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists meter_readings_serie on meter_readings (kind, unit, created_at desc);
+
+-- Ausencias del equipo: vacaciones, bajas, permisos. Mientras duran, la
+-- persona no recibe el aviso diario y al asignarle tareas se advierte.
+create table if not exists absences (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  starts_on   date not null,
+  ends_on     date not null,
+  reason      text,                      -- vacaciones | baja | permiso...
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists absences_por_fecha on absences (user_id, starts_on, ends_on);
 
 -- Contactos de obra: quién es quién en cada proyecto (de la Adressliste).
 create table if not exists contacts (

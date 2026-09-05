@@ -117,6 +117,17 @@ const REGLAS = {
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
+    // "resumen semanal": la foto del negocio. Va con apellido ("semanal")
+    // porque "resumen" a secas ya significa listar tareas.
+    resumenSemanal: /^(?:resumen (?:semanal|de la semana)|como va la semana)\??$/,
+    // "Rayna de vacaciones del 10 al 15" · "quién está de vacaciones"
+    ausenciaList: /^(?:quien esta (?:de vacaciones|de baja|fuera|ausente)|ausencias|vacaciones)\b\??$/,
+    ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(vacaciones|baja|permiso|libre)\s*(.*)$/,
+    // "luz 204: 4521" · "lecturas de la 204"
+    contadorAdd: /^(luz|electricidad|agua|gas|calefaccion|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
+    contadorList: /^(?:lecturas|contadores)(?:\s+(?:de\s+)?(?:la\s+|el\s+)?(\S+))?\??$/,
+    // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
+    contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "cierra los gastos de agosto" · "exporta las spesen". Exige la palabra
     // gastos/spesen: "cierra" a secas es completar una tarea (verbo de done).
     gastoCierre: /^(?:cierra|cerrar|exporta(?:r)?)\s+(?:el mes de (?:los\s+)?)?(?:los\s+|las\s+)?(?:gastos|spesen)(?:\s+de(?:l mes de)?\s+(\w+))?$/,
@@ -164,6 +175,12 @@ const REGLAS = {
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
+    resumenSemanal: /^(?:wochenbericht|wochenubersicht|wochen ubersicht|wie lauft die woche)\??$/,
+    ausenciaList: /^(?:wer (?:ist|hat) (?:im urlaub|in den ferien|ferien|frei)|abwesenheiten|ferien)\b\??$/,
+    ausenciaAdd: /^(\w+)\s+(?:ist\s+|hat\s+)?(im urlaub|in den ferien|ferien|urlaub|krank|abwesend)\s*(.*)$/,
+    contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
+    contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
+    contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     // "spesen august abschliessen" · "schliesse die spesen von august ab"
     gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
     hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
@@ -209,6 +226,12 @@ const REGLAS = {
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
+    resumenSemanal: /^(?:resumo (?:semanal|da semana)|como vai a semana)\??$/,
+    ausenciaList: /^(?:quem esta de ferias|ausencias|ferias)\b\??$/,
+    ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(ferias|baixa|licenca|folga)\s*(.*)$/,
+    contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
+    contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
+    contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
     // despesas: "fecha" sozinho é concluir uma tarefa (verbo de done).
     gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
@@ -247,11 +270,47 @@ function parseInLang(text, ctx, lang) {
     return { action: 'entsorgung', texto: t }
   }
 
+  // Contratos ANTES que el hotel: "contrato para Max, habitación 204" lleva
+  // la palabra "habitación" y el hotel se lo quedaría. Como en los contactos,
+  // hace falta el texto TAL CUAL se escribió: normalizado destrozaría el
+  // nombre del inquilino.
+  const contrato = cfg.contratoAdd ? t.match(cfg.contratoAdd) : null
+  if (contrato) {
+    const enCrudo = raw.match(/contrato\s+(?:para|de|a)\s+(.+)$|vertrag\s+(?:fur|für|an)\s+(.+)$/i)
+    return { action: 'contrato_add', texto: (enCrudo?.[1] ?? enCrudo?.[2] ?? contrato[1]).trim() }
+  }
+
   // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene
   // nada que ver con las tareas y así no compite con "crea una tarea".
   // El hotel: llegadas, salidas, habitaciones sucias. Va antes que las
   // tareas porque "cuartos" y "habitación" no son palabras de tarea.
   if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
+
+  // El resumen semanal va antes que las listas: "resumen" a secas es listar.
+  if (cfg.resumenSemanal && cfg.resumenSemanal.test(t)) return { action: 'resumen_semanal' }
+
+  // Ausencias. La lista va primero: "wer ist im urlaub" encaja también en el
+  // alta (leería "wer" como si fuera el nombre de una persona).
+  if (cfg.ausenciaList && cfg.ausenciaList.test(t)) return { action: 'ausencia_list' }
+  const ausencia = cfg.ausenciaAdd ? t.match(cfg.ausenciaAdd) : null
+  if (ausencia) {
+    return {
+      action: 'ausencia_add',
+      quien: ausencia[1], motivo: ausencia[2], texto: (ausencia[3] ?? '').trim(),
+    }
+  }
+
+  // Lecturas de contadores: "luz 204: 4521".
+  const lectura = cfg.contadorAdd ? t.match(cfg.contadorAdd) : null
+  if (lectura) {
+    return {
+      action: 'contador_add',
+      tipo: lectura[1], unidad: lectura[2].toUpperCase(),
+      valor: Number(lectura[3].replace(',', '.')),
+    }
+  }
+  const lecturas = cfg.contadorList ? t.match(cfg.contadorList) : null
+  if (lecturas) return { action: 'contador_list', unidad: lecturas[1] ? lecturas[1].toUpperCase() : null }
 
   // El cierre de mes va ANTES que apuntar un gasto: en alemán "spesen august
   // abschliessen" empieza igual que "spesen 45.20 Migros" y se lo comería.

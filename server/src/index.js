@@ -17,7 +17,7 @@ import { commentsRouter } from './routes/comments.js'
 import { webhookRouter } from './routes/webhook.js'
 import { calendarRouter } from './routes/calendar.js'
 import { spesenRouter } from './routes/spesen.js'
-import { scheduleReminders, runReminders , scheduleAvisoBasura } from './reminders.js'
+import { scheduleReminders, runReminders , scheduleAvisoBasura, scheduleAvisoCitas, scheduleResumenSemanal } from './reminders.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
 import {
@@ -127,6 +127,8 @@ async function start() {
   await initDb()
   scheduleReminders()
   scheduleAvisoBasura()
+  scheduleAvisoCitas()
+  scheduleResumenSemanal()
   // Vigilante del buzón: cada 15 minutos, y solo si está configurado.
   if (correoConfigurado()) {
     cron.schedule('*/15 * * * *', () => {

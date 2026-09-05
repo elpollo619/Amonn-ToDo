@@ -51,6 +51,11 @@ Todo esto está **desplegado y probado con datos reales**:
 | Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
 | Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
+| Resumen semanal | «Resumen semanal» a demanda; los lunes 07:00 automático a los teléfonos de `RESUMEN_TO` |
+| Aviso de citas | 1 h antes de cada cita, WhatsApp automático a quien va (cron cada 5 min) |
+| Ausencias | «Rayna de vacaciones del 10.10 al 15.10» → sin avisos diarios esos días + advertencia al asignarle tareas |
+| Contadores | «Luz 204: 4521» apunta la lectura y enseña la diferencia con la anterior; «lecturas de la 204» |
+| Contratos | «Contrato para Max Muster, habitación 204, 850, desde el 1 de octubre» → Google Doc + PDF (⚠️ falta conectar Google, ver abajo) |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 
@@ -76,16 +81,30 @@ chat; no están en el repo).
    exportados. Sin mes dicho, cierra el mes anterior. El enlace de descarga
    se construye con `APP_URL` (la misma variable que usan los avisos); si no
    está definida, el cierre se hace igual pero sin enlace.
-4. **Rondas de control.** El Excel «Duschen-Kontrolle» (36 habitaciones) como
-   lista que se marca desde el móvil. ⚠️ Las **206 y 207** llevan desde el
-   31.08.2026 con fuga de agua y no son tarea de nadie.
-5. **Aviso del día 25** de alquileres impagados (los contratos exigen pago
+4. **Conectar el generador de contratos a Google** (sept 2026: el código está
+   escrito en `server/src/contratos.js`, con pruebas del parseo; solo falta la
+   credencial). Pasos con Cris: (a) console.cloud.google.com → proyecto →
+   habilitar las APIs de Drive y Docs → cuenta de servicio → clave JSON →
+   `GOOGLE_SA_KEY` (el JSON entero o en base64); (b) crear la plantilla en
+   Google Docs con los huecos `{{NAME}} {{ZIMMER}} {{MIETE}} {{BEGINN}}
+   {{DATUM}}` → su id a `GOOGLE_CONTRACT_TEMPLATE_ID` (opcional carpeta:
+   `GOOGLE_CONTRACTS_FOLDER_ID`); (c) **compartir** plantilla y carpeta con el
+   correo de la cuenta de servicio. ⚠️ Rutas según docs públicas, sin probar:
+   mira la respuesta cruda la primera vez. Pedir a Cris un contrato real de
+   ejemplo para copiar el formato en la plantilla.
+5. ~~Rondas de control (Duschen-Kontrolle)~~ **descartado** por decisión de
+   Cris (sept 2026). ⚠️ Sigue pendiente en la vida real: las habitaciones
+   **206 y 207** llevan desde el 31.08.2026 con fuga de agua.
+6. **Aviso del día 25** de alquileres impagados (los contratos exigen pago
    antes del 28 para renovarse). 503 contratos en `Liste Mietvertrag neu.xlsx`.
-6. **Clave de Gemini** (`GEMINI_API_KEY`, aistudio.google.com/apikey). Ya está
+7. **Clave de Gemini** (`GEMINI_API_KEY`, aistudio.google.com/apikey). Ya está
    enchufado como RESPALDO: las reglas responden primero y Gemini solo entra
    cuando no entienden.
-7. **OCR de recibos** (Tesseract en el NAS, como Whisper) y **el tablero web
+8. **OCR de recibos** (Tesseract en el NAS, como Whisper) y **el tablero web
    desde fuera** (`cloudflared` ya está instalado en el NAS).
+9. **Variables nuevas opcionales** en el compose del NAS: `RESUMEN_TO`
+   (teléfonos, separados por comas, que reciben el resumen del lunes) y
+   `RESUMEN_CRON` (por defecto `0 7 * * 1`).
 
 ## 5. Pruebas
 
@@ -96,7 +115,7 @@ initdb -D /tmp/pg -U postgres --auth=trust && pg_ctl -D /tmp/pg -o "-p 5433 -k /
 DATABASE_URL="postgres://postgres@127.0.0.1:5433/postgres" WA_ENABLED=false npm run test:db
 ```
 
-**18 baterías**, todas en verde. Si tocas el asistente, ejecútalas: varias
+**22 baterías** (3 sin base + 19 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
 existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido

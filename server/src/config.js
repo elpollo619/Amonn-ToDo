@@ -50,6 +50,18 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? '',
   // Whisper en el NAS para las notas de voz. Vacío = sin transcripción.
   whisperUrl: (process.env.WHISPER_URL ?? '').replace(/\/$/, ''),
+  // Contratos desde una plantilla de Google Docs. Sin credenciales, la
+  // orden «contrato para …» explica qué falta en vez de activarse.
+  google: {
+    // Clave JSON de la cuenta de servicio (el fichero entero, en una sola
+    // variable: tal cual o en base64). Hay que compartir la plantilla y la
+    // carpeta con el correo ...@...iam.gserviceaccount.com de esa cuenta.
+    serviceAccountKey: process.env.GOOGLE_SA_KEY ?? '',
+    // Id del Google Doc plantilla (lo que va entre /d/ y /edit en su URL).
+    contractTemplateId: process.env.GOOGLE_CONTRACT_TEMPLATE_ID ?? '',
+    // Carpeta de Drive donde dejar los contratos generados (opcional).
+    contractsFolderId: process.env.GOOGLE_CONTRACTS_FOLDER_ID ?? '',
+  },
   // Apaleo (el sistema del hotel). Sin credenciales, no se activa.
   apaleo: {
     clientId: process.env.APALEO_CLIENT_ID ?? '',

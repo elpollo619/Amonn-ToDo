@@ -32,6 +32,10 @@ import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf } from './gastos.js'
+import { componerResumenSemanal } from './reminders.js'
+import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
+import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
+import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -229,6 +233,17 @@ async function crearTarea(user, lang, draft, users, today) {
     nota = canales.length
       ? t(lang, 'notified', { canales: canales.join(' + ') })
       : t(lang, 'not_notified', { nombre: firstName(assignee) })
+  }
+  // Si el asignado está ausente (hoy o el día del plazo), se avisa a quien
+  // crea la tarea — pero la tarea se crea igual: la decisión es suya.
+  if (assignee && assignee.id !== user.id) {
+    const fuera = await ausenciaDe(assignee.id, draft.due || today)
+    if (fuera) {
+      nota += t(lang, 'abs_warn', {
+        nombre: firstName(assignee),
+        hasta: String(fuera.ends_on).slice(0, 10).split('-').reverse().slice(0, 2).join('/'),
+      })
+    }
   }
   const link = config.appUrl ? t(lang, 'see_link', { url: config.appUrl }) : ''
   const aprendido = draft.aprendido
@@ -918,6 +933,90 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         })
       }
       return out
+    }
+
+    case 'resumen_semanal':
+      return componerResumenSemanal(lang)
+
+    case 'ausencia_add': {
+      const r = resolverPersona(String(intent.quien ?? ''), users, user, lang, aliases)
+      if (r.error) return r.error
+      if (r.noEncontrada || !r.user) return t(lang, 'abs_who', { nombre: intent.quien })
+      const texto = String(intent.texto ?? '')
+      // "del 10.10 al 15.10" · "del lunes al viernes" · un solo día · nada = hoy.
+      const rango = parseRange(texto, today, lang)
+      const dia = rango ? null : parseDateAnyLang(texto, today, lang)
+      const start = rango?.start ?? dia?.key ?? today
+      const end = rango?.end ?? dia?.key ?? today
+      if (texto && !rango && !dia) return t(lang, 'abs_need_dates')
+      await addAbsence({
+        userId: r.user.id, startsOn: start, endsOn: end,
+        reason: intent.motivo ?? null, createdBy: user.id,
+      })
+      const f = (k) => k.split('-').reverse().slice(0, 2).join('/')
+      return t(lang, 'abs_added', {
+        nombre: firstName(r.user), motivo: intent.motivo ?? '—',
+        desde: f(start), hasta: f(end),
+      })
+    }
+
+    case 'contrato_add': {
+      if (!contratosConfigurados()) return t(lang, 'contract_not_configured')
+      const datos = parseContrato(intent.texto, today, lang)
+      if (datos.faltan.length) return t(lang, 'contract_need', { faltan: datos.faltan.join(', ') })
+      try {
+        const c = await generarContrato(datos, today)
+        return t(lang, 'contract_done', {
+          nombre: datos.nombre, habitacion: datos.habitacion,
+          alquiler: datos.alquiler,
+          desde: String(datos.desde).split('-').reverse().join('.'),
+          doc: c.docUrl, pdf: c.pdfUrl,
+        })
+      } catch (err) {
+        return t(lang, 'contract_error', { motivo: err.message.slice(0, 160) })
+      }
+    }
+
+    case 'contador_add': {
+      const kind = TIPOS[intent.tipo] ?? 'zahler'
+      const { lectura, anterior } = await addReading({
+        kind, unit: intent.unidad, value: intent.valor, createdBy: user.id,
+      })
+      const nombre = (NOMBRES_CONTADOR[lang] ?? NOMBRES_CONTADOR.de)[kind]
+      let diff = ''
+      if (anterior) {
+        const delta = Number(lectura.value) - Number(anterior.value)
+        diff = t(lang, 'meter_diff', {
+          delta: (delta >= 0 ? '+' : '') + String(Math.round(delta * 100) / 100),
+          fecha: String(anterior.created_at).length > 9
+            ? new Date(anterior.created_at).toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+            : '—',
+        })
+      }
+      return t(lang, 'meter_added', { tipo: nombre, unidad: intent.unidad, valor: intent.valor, diff })
+    }
+
+    case 'contador_list': {
+      const filas = await listReadings(intent.unidad)
+      if (filas.length === 0) return t(lang, 'meter_none')
+      const nombres = NOMBRES_CONTADOR[lang] ?? NOMBRES_CONTADOR.de
+      return t(lang, 'meter_list', {
+        lista: filas.map((r) => {
+          const f = new Date(r.created_at).toISOString().slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+          return `• ${nombres[r.kind] ?? r.kind} ${r.unit}: ${r.value} (${f})`
+        }).join('\n'),
+      })
+    }
+
+    case 'ausencia_list': {
+      const proximas = await listAbsences(today)
+      if (proximas.length === 0) return t(lang, 'abs_none')
+      const f = (k) => String(k).slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+      return t(lang, 'abs_list', {
+        lista: proximas.map((a) =>
+          `• ${a.full_name}: ${f(a.starts_on)} → ${f(a.ends_on)}${a.reason ? ` (${a.reason})` : ''}`,
+        ).join('\n'),
+      })
     }
 
     case 'gasto_cierre': {

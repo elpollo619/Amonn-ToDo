@@ -88,6 +88,45 @@ check('cierre en portugués', 'fecha as despesas de agosto', 'pt', { action: 'ga
 check('"fecha a da caldeira" sigue completando', 'fecha a da caldeira', 'pt',
   { action: 'complete_task', task_hint: 'caldeira' })
 
+console.log('\nRESUMEN SEMANAL — sin pisar a "resumen" (que es listar)')
+check('resumen semanal', 'resumen semanal', 'es', { action: 'resumen_semanal' })
+check('"resumen" a secas sigue listando', 'resumen', 'es', { action: 'list_tasks' })
+check('en alemán', 'wochenbericht', 'de', { action: 'resumen_semanal' })
+check('en portugués', 'resumo da semana', 'pt', { action: 'resumen_semanal' })
+
+console.log('\nAUSENCIAS')
+check('alta con rango', 'Rayna de vacaciones del 10.10 al 15.10', 'es',
+  { action: 'ausencia_add', quien: 'rayna', motivo: 'vacaciones' })
+check('quién está fuera', '¿quién está de vacaciones?', 'es', { action: 'ausencia_list' })
+check('"wer ist im urlaub" es lista, no una persona "wer"', 'wer ist im urlaub', 'de',
+  { action: 'ausencia_list' })
+check('alta en alemán', 'rayna ferien vom 10.10 bis 15.10', 'de',
+  { action: 'ausencia_add', quien: 'rayna' })
+check('alta en portugués', 'rayna de ferias de 10.10 a 15.10', 'pt',
+  { action: 'ausencia_add', quien: 'rayna' })
+
+console.log('\nCONTADORES')
+check('apuntar lectura', 'luz 204: 4521', 'es',
+  { action: 'contador_add', tipo: 'luz', unidad: '204', valor: 4521 })
+check('con decimales y sin dos puntos', 'agua a14 1234,5', 'es',
+  { action: 'contador_add', tipo: 'agua', unidad: 'A14', valor: 1234.5 })
+check('lecturas de una unidad', 'lecturas de la 204', 'es',
+  { action: 'contador_list', unidad: '204' })
+check('en alemán', 'strom 204 4521', 'de', { action: 'contador_add', tipo: 'strom' })
+check('"gasto 37.90 Landi" NO es un contador', 'gasto 37.90 Landi Kabelbinder', 'es',
+  { action: 'gasto_add' })
+
+console.log('\nCONTRATOS')
+check('contrato con datos', 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre', 'es',
+  { action: 'contrato_add' })
+check('con verbo delante', 'haz un contrato para Max Muster, habitación 204, 850', 'es',
+  { action: 'contrato_add' })
+check('en alemán', 'mietvertrag für Max Muster, Zimmer 204, 850', 'de', { action: 'contrato_add' })
+check('el nombre conserva mayúsculas', 'contrato para Max Muster, habitación 204', 'es',
+  { texto: 'Max Muster, habitación 204' })
+check('"crea una tarea" sigue creando tareas', 'crea una tarea a Isma: revisar la caldera, para el viernes', 'es',
+  { action: 'create_task' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })
