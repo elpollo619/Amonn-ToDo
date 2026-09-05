@@ -37,7 +37,8 @@ import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
-import { huespedesConfigurado, esAutorizado, listarMensajes, responderHuesped } from './huespedes.js'
+import { huespedesConfigurado, listarMensajes, responderHuesped } from './huespedes.js'
+import { tienePermiso, darPermiso, quitarPermiso, listarPermisos, NOMBRES_PERMISO, PERMISOS } from './permisos.js'
 import { fetchMeteo, formatearParte } from './meteo.js'
 import { fetchZins, zinsGuardado } from './zins.js'
 import { textoDePdf, leerRecibo } from './recibo.js'
@@ -517,7 +518,7 @@ async function manejarFoto(phone, user, lang, foto, texto, aliases = []) {
   // Un extracto bancario (camt.053/054 en XML) no es una foto ni un recibo:
   // se concilia y punto. Solo de los autorizados — es el banco de la empresa.
   if (esCamt(foto.buffer, foto.mime)) {
-    if (!esAutorizado(user)) return t(lang, 'camt_unauthorized')
+    if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'camt_unauthorized')
     try {
       const { entradas } = parseCamt(foto.buffer.toString('utf8'))
       if (entradas.length === 0) return t(lang, 'camt_empty')
@@ -1069,6 +1070,7 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
 
     case 'huesped_list': {
       if (!huespedesConfigurado()) return t(lang, 'guest_not_configured')
+      if (!(await tienePermiso(user.id, 'huespedes'))) return t(lang, 'guest_unauthorized')
       try {
         const mensajes = await listarMensajes()
         if (mensajes.length === 0) return t(lang, 'guest_none')
@@ -1085,7 +1087,7 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       // Puerta dura: SOLO los autorizados (Cris, Beatriz, Reto, Roberta)
       // pueden mandar algo a un huésped. El asistente jamás lo hace solo.
       if (!huespedesConfigurado()) return t(lang, 'guest_not_configured')
-      if (!esAutorizado(user)) return t(lang, 'guest_unauthorized')
+      if (!(await tienePermiso(user.id, 'huespedes'))) return t(lang, 'guest_unauthorized')
       try {
         await responderHuesped(intent.bookingId, intent.texto)
         return t(lang, 'guest_reply_sent', { reserva: intent.bookingId, texto: intent.texto })
@@ -1151,9 +1153,36 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       })
     }
 
+    case 'permiso_dar':
+    case 'permiso_quitar': {
+      // Solo el admin (Cris) reparte accesos. Nadie se los da a sí mismo.
+      if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'perm_only_admin')
+      if (!intent.perm || !PERMISOS.includes(intent.perm)) {
+        return t(lang, 'perm_unknown', { lista: PERMISOS.join(', ') })
+      }
+      const r = resolverPersona(String(intent.quien ?? ''), users, user, lang, aliases)
+      if (r.error) return r.error
+      if (r.noEncontrada || !r.user) return t(lang, 'abs_who', { nombre: intent.quien })
+      if (intent.action === 'permiso_dar') {
+        await darPermiso(r.user.id, intent.perm, user.id)
+        return t(lang, 'perm_granted', { nombre: firstName(r.user), perm: intent.perm })
+      }
+      const quitado = await quitarPermiso(r.user.id, intent.perm)
+      return t(lang, quitado ? 'perm_revoked' : 'perm_not_had', { nombre: firstName(r.user), perm: intent.perm })
+    }
+
+    case 'permiso_list': {
+      if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'perm_only_admin')
+      const filas = await listarPermisos()
+      if (filas.length === 0) return t(lang, 'perm_none')
+      return t(lang, 'perm_list', {
+        lista: filas.map((p) => `• ${p.full_name}: ${p.perms.join(', ')}`).join('\n'),
+      })
+    }
+
     case 'impagos': {
       // Datos de cobros = datos del banco: solo autorizados.
-      if (!esAutorizado(user)) return t(lang, 'camt_unauthorized')
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'camt_unauthorized')
       const e = await estadoDeCobros(today)
       return formatImpagos(e, lang)
     }
@@ -1161,7 +1190,7 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
     case 'factura_add': {
       // Facturar es dinero oficial: misma puerta que responder a huéspedes.
       if (!cobrosConfigurados()) return t(lang, 'invoice_not_configured')
-      if (!esAutorizado(user)) return t(lang, 'invoice_unauthorized')
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'invoice_unauthorized')
       const datos = parseFactura(intent.texto)
       if (datos.faltan.length) return t(lang, 'invoice_need', { faltan: datos.faltan.join(', ') })
       try {

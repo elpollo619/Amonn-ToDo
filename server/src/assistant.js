@@ -15,6 +15,7 @@ import { interpretReply } from './whatsapp.js'
 import { resolvePerson, resolveTask } from './aliases.js'
 import { matchStateByName } from './states.service.js'
 import { DOSSIER } from './empresa.js'
+import { NOMBRES_PERMISO as NOMBRES_PERMISO_RULES } from './permisos.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -135,6 +136,10 @@ const REGLAS = {
     mietenSum: /^(?:alquileres|suma de alquileres|rendas)(?:\s+(?:de|del|de la|da|do)\s+(\S+))?\??$/,
     // "¿quién no ha pagado?" · "impagos"
     impagos: /^(?:impagos|impagados|quien no ha pagado|quien no pago|morosos)\??$/,
+    // "dale acceso al dinero a Jasmina" · "quita el acceso a los huéspedes a X"
+    permisoDar: /^(?:dale|da|dar)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
+    permisoQuitar: /^(?:quita(?:le)?|quitar|retira(?:le)?)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
+    permisoList: /^(?:accesos|permisos|quien tiene acceso)\??$/,
     // "factura 850 para Max Muster, alquiler octubre"
     facturaAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|nueva)\s+)?(?:una\s+)?(?:factura|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     // "precios" · "¿subo o bajo los precios?" · "precios del hotel"
@@ -202,6 +207,9 @@ const REGLAS = {
     vertragInfo: /^(?:mietvertrag|vertrag)\s+(?:von|vom)\s*(?:zimmer\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:mieten|mietzinsen)(?:\s+(?:von|vom)\s+(\S+))?\??$/,
     impagos: /^(?:wer hat nicht bezahlt|offene mieten|zahlungsruckstande)\??$/,
+    permisoDar: /^(?:gib|gebe)\s+(\w+)\s+zugriff\s+auf\s+(\w+)$/,
+    permisoQuitar: /^(?:entzieh(?:e)?|nimm)\s+(\w+)\s+(?:den\s+)?zugriff\s+auf\s+(\w+)$/,
+    permisoList: /^(?:zugriffe|berechtigungen|wer hat zugriff)\??$/,
     facturaAdd: /^(?:(?:mach(?:e)?|erstelle?|neue)\s+)?(?:eine\s+)?(?:rechnung|qr[- ]?rechnung)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:preise|preisanalyse|wie stehen die preise|preise rauf oder runter)(?:\s+(?:von\s+|vom\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:wetter|wie wird das wetter|wetterbericht|wettervorhersage)\??$/,
@@ -262,6 +270,9 @@ const REGLAS = {
     vertragInfo: /^(?:contrato)\s+(?:de|do|da)\s*(?:o\s+|a\s+)?(?:quarto\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:rendas)(?:\s+(?:de|do|da)\s+(\S+))?\??$/,
     impagos: /^(?:quem nao pagou|rendas em atraso|incumprimentos)\??$/,
+    permisoDar: /^(?:da|dar)\s+(?:o\s+)?acesso\s+(?:ao?\s+|aos\s+|as\s+)?(\w+)\s+a\s+(\w+)$/,
+    permisoQuitar: /^(?:tira|retira|tirar)\s+(?:o\s+)?acesso\s+(?:ao?\s+|aos\s+|as\s+)?(\w+)\s+a\s+(\w+)$/,
+    permisoList: /^(?:acessos|permissoes|quem tem acesso)\??$/,
     facturaAdd: /^(?:(?:faz|cria(?:r)?|nova)\s+)?(?:uma\s+)?(?:fatura|factura)\s*[:,-]?\s*(.+)$/,
     precios: /^(?:precos|analise de precos|como estao os precos|subo ou baixo os precos)(?:\s+(?:de\s+|da\s+|do\s+)?(casa reto|casa|hotel|a14))?\??$/,
     meteoCmd: /^(?:tempo|que tempo (?:faz|fara|vai fazer)|meteo|previsao(?: do tempo)?)\??$/,
@@ -338,6 +349,22 @@ function parseInLang(text, ctx, lang) {
   const mieten = cfg.mietenSum ? t.match(cfg.mietenSum) : null
   if (mieten) return { action: 'mieten_sum', grupo: mieten[1] ? mieten[1].toUpperCase() : null }
   if (cfg.impagos && cfg.impagos.test(t)) return { action: 'impagos' }
+
+  // Gestión de accesos. El orden persona/permiso cambia según el idioma
+  // («dale acceso al dinero a Jasmina» vs «gib Jasmina zugriff auf geld»):
+  // el permiso se reconoce por su nombre y el otro grupo es la persona.
+  if (cfg.permisoList && cfg.permisoList.test(t)) return { action: 'permiso_list' }
+  for (const [regla, accion] of [[cfg.permisoDar, 'permiso_dar'], [cfg.permisoQuitar, 'permiso_quitar']]) {
+    const m = regla ? t.match(regla) : null
+    if (m) {
+      const [a, b] = [m[1], m[2]]
+      const permA = NOMBRES_PERMISO_RULES[a]
+      const permB = NOMBRES_PERMISO_RULES[b]
+      const perm = permA ?? permB ?? null
+      const quien = permA ? b : a
+      return { action: accion, perm, quien }
+    }
+  }
 
   // Facturas QR. Como el contrato, el nombre del deudor va en crudo.
   const factura = cfg.facturaAdd ? t.match(cfg.facturaAdd) : null

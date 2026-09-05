@@ -66,7 +66,8 @@ Todo esto está **desplegado y probado con datos reales**:
 | Facturas QR | «Factura 850 para Max Muster, alquiler octubre» → PDF con QR-Rechnung y referencia QRR en `/factura/{token}.pdf` (solo autorizados; ⚠️ APAGADO hasta confirmar `QR_IBAN` con Cris — el dinero va a esa cuenta) |
 | Contratos (consulta) | «Contrato de la 204» / «contrato de Koubaa» / «alquileres de B22» — foto de la Liste (222 activos, importados 05.09.2026); reimportar: `server/scripts/importar-liste/` |
 | Extractos bancarios | Mandar el camt.053/054 del e-banking por WhatsApp (solo autorizados) → quién pagó: facturas QR cobradas por referencia (paid_at) + pistas por nombre contra la Liste; reenviar el fichero no duplica (bank_entries) |
-| Impagos | «¿Quién no ha pagado?» (solo autorizados) → contratos sin abono que les case este mes, según los extractos recibidos; el día 25 a las 09:00 va solo a RESUMEN_TO y SOLO si hay extractos del mes (sin datos, silencio) |
+| Impagos | «¿Quién no ha pagado?» (permiso dinero) → contratos sin abono que les case este mes, según los extractos recibidos; el día 25 a las 09:00 va solo a RESUMEN_TO y SOLO si hay extractos del mes (sin datos, silencio) |
+| Permisos | Cris (admin) reparte accesos POR WHATSAPP: «dale acceso al dinero a Jasmina», «quita…», «accesos». Catálogo: admin, dinero, huespedes, hotel, accesos, contratos (los tres últimos, listos para cuando Apaleo/SALTO/Google se conecten). Siembra al arrancar: ADMIN_PHONE (Cris) + GUEST_TEAM con dinero+huéspedes, solo si no tienen nada |
 | Correo | Vigila el buzón y crea tareas de solicitudes, ofertas, facturas y citas |
 | Hotel | «¿Cuántos llegan hoy?» · «¿Qué cuartos están sucios?» (falta conectar Apaleo) |
 

@@ -24,7 +24,7 @@ function checkIgual(n, real, debe) {
 }
 
 await initDb()
-for (const t of ['absences', 'meter_readings', 'appointments', 'expense_exports', 'expenses', 'mietvertraege', 'qr_bills', 'attachments', 'comments', 'subtasks', 'aliases', 'wa_conversations', 'tasks']) {
+for (const t of ['absences', 'meter_readings', 'appointments', 'expense_exports', 'expenses', 'mietvertraege', 'qr_bills', 'bank_entries', 'attachments', 'comments', 'subtasks', 'aliases', 'wa_conversations', 'tasks']) {
   await query(`delete from ${t}`)
 }
 await query('delete from users')
@@ -84,18 +84,38 @@ check('avisa de que es una foto', await processMessage(CRIS, 'contrato de Koubaa
 check('suma por edificio', await processMessage(CRIS, 'alquileres de B22'), ['1 contrato', '800'])
 check('no encontrado se dice', await processMessage(CRIS, 'contrato de la 999'), ['No encuentro'])
 
-console.log('\n7b. HUÉSPEDES: SIN CONFIGURAR LO DICE, Y SIN AUTORIZACIÓN NO SALE NADA')
+console.log('\n7b. HUÉSPEDES: SIN CONFIGURAR LO DICE, Y SIN PERMISO NO SALE NADA')
 check('sin configurar', await processMessage(CRIS, 'mensajes de los huéspedes'),
   ['aún no está encendido'])
-// Se enciende de mentira (sin red): la puerta de autorización se comprueba
-// ANTES de hablar con Beds24, así que un no-autorizado nunca llega a la red.
+// Se enciende de mentira (sin red): la puerta de permisos se comprueba
+// ANTES de hablar con Beds24, así que quien no tiene permiso nunca llega
+// a la red.
 const { config: cfgSemana } = await import('../src/config.js')
 cfgSemana.huespedes.pin = 'pin-de-prueba'
-cfgSemana.huespedes.team = [CRIS]
-check('Rayna no puede responder a huéspedes', await processMessage(RAYNA, 'responde al huésped 123: hola'),
-  ['NO se ha enviado'])
+check('Rayna sin permiso no puede responder a huéspedes',
+  await processMessage(RAYNA, 'responde al huésped 123: hola'), ['NO se ha enviado'])
 cfgSemana.huespedes.pin = ''
-cfgSemana.huespedes.team = []
+
+console.log('\n7c. LOS ACCESOS LOS REPARTE EL ADMIN, POR WHATSAPP')
+await query('delete from permissions')
+check('sin ser admin, nadie reparte', await processMessage(CRIS, 'dale acceso al dinero a Rayna'),
+  ['solo los reparte el administrador'])
+const cris = (await query('select id from users where phone = $1', [CRIS])).rows[0]
+await query("insert into permissions (user_id, perm) values ($1, 'admin')", [cris.id])
+check('el admin da acceso', await processMessage(CRIS, 'dale acceso al dinero a Rayna'),
+  ['Rayna', 'dinero'])
+check('y Rayna ya puede preguntar impagos', await processMessage(RAYNA, '¿quién no ha pagado?'),
+  ['extracto'])
+check('el admin lo quita', await processMessage(CRIS, 'quita el acceso al dinero a Rayna'),
+  ['ya no tiene acceso'])
+check('y Rayna vuelve a estar fuera', await processMessage(RAYNA, '¿quién no ha pagado?'),
+  ['autorizados'])
+check('la lista de accesos', await processMessage(CRIS, 'accesos'), ['Cristian', 'admin'])
+check('un acceso inventado se rechaza', await processMessage(CRIS, 'dale acceso al chocolate a Rayna'),
+  ['No conozco ese acceso'])
+check('el admin puede repartir "todo" (admin)', await processMessage(CRIS, 'dale acceso a todo a Rayna'),
+  ['Rayna', 'admin'])
+await query('delete from permissions')
 
 console.log('\n7. CONTRATOS SIN GOOGLE, LO DICE CLARO')
 check('explica qué falta', await processMessage(CRIS, 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'),

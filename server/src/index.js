@@ -23,6 +23,7 @@ import { scheduleEspejoHuespedes } from './huespedes.js'
 import { scheduleAvisoMeteo } from './meteo.js'
 import { scheduleVigilanteZins } from './zins.js'
 import { scheduleAvisoImpagos } from './impagos.js'
+import { sembrarPermisos } from './permisos.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
 import {
@@ -132,6 +133,7 @@ app.use(errorHandler)
 // ─── Arranque ─────────────────────────────────────────────
 async function start() {
   await initDb()
+  await sembrarPermisos()
   scheduleReminders()
   scheduleAvisoBasura()
   scheduleAvisoCitas()

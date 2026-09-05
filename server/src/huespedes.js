@@ -17,15 +17,10 @@ import { config } from './config.js'
 import { query } from './db.js'
 import { sendWhatsApp } from './whatsapp.js'
 import { t as tr, safeLang } from './i18n.js'
+import { telefonosConPermiso } from './permisos.js'
 
 export function huespedesConfigurado() {
-  const h = config.huespedes ?? {}
-  return Boolean(h.pin && h.team.length)
-}
-
-/** ¿Puede esta persona ordenar respuestas a huéspedes? */
-export function esAutorizado(user) {
-  return (config.huespedes?.team ?? []).includes(user?.phone)
+  return Boolean(config.huespedes?.pin)
 }
 
 async function llamar(body) {
@@ -71,6 +66,14 @@ export async function runEspejoHuespedes() {
   }
   if (nuevos.length === 0) return { nuevos: 0, avisados: 0 }
 
+  // El espejo va a quien tenga el permiso 'huespedes' EN ESE MOMENTO: los
+  // accesos los gestiona el admin por WhatsApp y se leen de la base.
+  const destinos = await telefonosConPermiso('huespedes')
+  if (destinos.length === 0) {
+    console.warn('[huespedes] hay mensajes nuevos pero nadie tiene el permiso huespedes')
+    return { nuevos: nuevos.length, avisados: 0 }
+  }
+
   // ⚠️ La forma exacta de cada mensaje no está verificada contra la cuenta
   // real (los canales aún no están conectados): se leen los campos con
   // paracaídas y se espeja TODO lo no visto, etiquetado como se pueda.
@@ -83,7 +86,7 @@ export async function runEspejoHuespedes() {
     + (nuevos.length > 6 ? `\n… y ${nuevos.length - 6} más` : '')
 
   let avisados = 0
-  for (const phone of config.huespedes.team) {
+  for (const phone of destinos) {
     const { rows } = await query('select language from users where phone = $1', [phone])
     const lang = safeLang(rows[0]?.language ?? 'es')
     try {
@@ -105,5 +108,5 @@ export function scheduleEspejoHuespedes() {
   cron.schedule('*/15 * * * *', () => {
     runEspejoHuespedes().catch((e) => console.error('[huespedes]', e.message))
   }, { timezone: config.timezone })
-  console.log(`[huespedes] espejo cada 15 min · autorizados: ${config.huespedes.team.length}`)
+  console.log('[huespedes] espejo cada 15 min · destinatarios: quien tenga el permiso huespedes')
 }

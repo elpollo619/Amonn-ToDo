@@ -281,6 +281,19 @@ create table if not exists meter_readings (
 );
 create index if not exists meter_readings_serie on meter_readings (kind, unit, created_at desc);
 
+-- Permisos del asistente, gestionados POR WHATSAPP por el admin (Cris):
+-- «dale acceso al dinero a Jasmina». Perms: 'admin' (puede dar/quitar y lo
+-- implica todo), 'dinero' (facturas QR, extractos, impagos), 'huespedes'
+-- (ver y responder mensajes de huéspedes). Se siembra al arrancar desde
+-- ADMIN_PHONE y GUEST_TEAM para no dejar a nadie fuera en la transición.
+create table if not exists permissions (
+  user_id     uuid not null references users(id) on delete cascade,
+  perm        text not null,
+  granted_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  primary key (user_id, perm)
+);
+
 -- Ausencias del equipo: vacaciones, bajas, permisos. Mientras duran, la
 -- persona no recibe el aviso diario y al asignarle tareas se advierte.
 create table if not exists absences (
