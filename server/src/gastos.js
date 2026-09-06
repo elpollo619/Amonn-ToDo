@@ -127,4 +127,30 @@ export async function exportPorToken(token) {
   return rows[0] ?? null
 }
 
+/**
+ * Vorsteuer (IVA soportado) de un trimestre, por tipo. La base para el
+ * borrador de la declaración de MwSt: los Spesen ya guardan su tipo
+ * (8.1 normal, 2.6 reducido) y el importe es bruto, así que el IVA
+ * incluido es bruto × t / (100 + t).
+ */
+export async function vorsteuerTrimestre(anno, q) {
+  const desde = `${anno}-${String((q - 1) * 3 + 1).padStart(2, '0')}-01`
+  const hasta = q === 4 ? `${anno + 1}-01-01` : `${anno}-${String(q * 3 + 1).padStart(2, '0')}-01`
+  const { rows } = await query(
+    `select coalesce(vat, 'ohne') as vat, count(*)::int as gastos, sum(amount_cents)::bigint as bruto_cents
+       from expenses
+      where spent_on >= $1 and spent_on < $2
+      group by coalesce(vat, 'ohne') order by vat`,
+    [desde, hasta],
+  )
+  return rows.map((r) => {
+    const t = Number(r.vat)
+    const bruto = Number(r.bruto_cents)
+    return {
+      vat: r.vat, gastos: r.gastos, brutoCents: bruto,
+      vorsteuerCents: Number.isFinite(t) && t > 0 ? Math.round(bruto * t / (100 + t)) : 0,
+    }
+  })
+}
+
 export { CATEGORIAS }

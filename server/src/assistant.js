@@ -140,6 +140,8 @@ const REGLAS = {
     mahnungCmd: /^(?:(?:1\.?|2\.?|primera?|segunda?|erste|zweite)\s+)?(?:mahnung|recordatorio de pago|zahlungserinnerung)\s+(?:a|an|para|fur)\s+.+$/,
     // "mietertrag septiembre" · "mietertrag"
     mietertragCmd: /^mietertrag(?:\s+(\w+))?\??$/,
+    // "mwst q3" · "iva 2026 q2" · "vorsteuer"
+    mwstCmd: /^(?:mwst|iva|vorsteuer)(?:\s+(\d{4}))?(?:\s+q?([1-4]))?\??$/,
     // "dale acceso al dinero a Jasmina" · "quita el acceso a los huéspedes a X"
     permisoDar: /^(?:dale|da|dar)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
     permisoQuitar: /^(?:quita(?:le)?|quitar|retira(?:le)?)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
@@ -356,6 +358,8 @@ function parseInLang(text, ctx, lang) {
   if (cfg.mahnungCmd && cfg.mahnungCmd.test(t)) return { action: 'mahnung', texto: t }
   const mietertrag = cfg.mietertragCmd ? t.match(cfg.mietertragCmd) : null
   if (mietertrag) return { action: 'mietertrag', mes: mietertrag[1] ?? null }
+  const mwst = cfg.mwstCmd ? t.match(cfg.mwstCmd) : null
+  if (mwst) return { action: 'mwst', anno: mwst[1] ? Number(mwst[1]) : null, q: mwst[2] ? Number(mwst[2]) : null }
 
   // Gestión de accesos. El orden persona/permiso cambia según el idioma
   // («dale acceso al dinero a Jasmina» vs «gib Jasmina zugriff auf geld»):

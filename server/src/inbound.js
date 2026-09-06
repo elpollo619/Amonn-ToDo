@@ -31,7 +31,7 @@ import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entso
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
-import { addGasto, cerrarMes, gastosAbiertos, saldos, chf } from './gastos.js'
+import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre } from './gastos.js'
 import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
@@ -1217,6 +1217,22 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       })
       if (config.appUrl) out += t(lang, 'exp_close_link', { url: `${config.appUrl}/spesen/${r.token}.csv` })
       return out
+    }
+
+    case 'mwst': {
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'camt_unauthorized')
+      const anno = intent.anno ?? Number(today.slice(0, 4))
+      const q = intent.q ?? Math.ceil(Number(today.slice(5, 7)) / 3)
+      const filas = await vorsteuerTrimestre(anno, q)
+      if (filas.length === 0) return t(lang, 'mwst_empty', { anno, q })
+      const totalVs = filas.reduce((n, f) => n + f.vorsteuerCents, 0)
+      return t(lang, 'mwst_summary', {
+        anno, q,
+        lista: filas.map((f) =>
+          `• ${f.vat === 'ohne' ? t(lang, 'mwst_none_rate') : f.vat + ' %'}: ${f.gastos} · ${t(lang, 'mwst_gross')} CHF ${chf(f.brutoCents)} · Vorsteuer CHF ${chf(f.vorsteuerCents)}`,
+        ).join('\n'),
+        total: chf(totalVs),
+      })
     }
 
     case 'impagos': {

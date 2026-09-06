@@ -132,6 +132,10 @@ await query(`insert into mietvertraege (objgrp, objcode, m1vname, m1name, total)
   values ('B22','B22-036','Rita','Exemplo',750)`)
 check('ambigua pide el código', await processMessage(CRIS, 'mahnung a la B22'), ['código exacto', 'B22-035'])
 cfgQr.qr.iban = ''
+await query(`insert into expenses (code, spent_on, concept, amount_cents, vat, category)
+  values ('HAAG','2026-09-01','Landi Test',10810,'8.1','ure_allg')`)
+check('la Vorsteuer del trimestre se calcula', await processMessage(CRIS, 'mwst 2026 q3'),
+  ['Vorsteuer 2026 Q3', '8.10', 'Treuhänder'])
 const { volcarBackup } = await import('../src/backup.js')
 const fsB = await import('node:fs')
 const dirB = fsB.mkdtempSync('/tmp/amonn-backup-')
