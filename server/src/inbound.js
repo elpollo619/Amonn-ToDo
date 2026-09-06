@@ -34,7 +34,7 @@ import { addContact, buscarContactos, formatContacto } from './contactos.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre } from './gastos.js'
 import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
-import { addReading, listReadings, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
+import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
 import { huespedesConfigurado, listarMensajes, responderHuesped } from './huespedes.js'
@@ -1296,7 +1296,15 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
             : '—',
         })
       }
-      return t(lang, 'meter_added', { tipo: nombre, unidad: intent.unidad, valor: intent.valor, diff })
+      let out = t(lang, 'meter_added', { tipo: nombre, unidad: intent.unidad, valor: intent.valor, diff })
+      // ¿Fuga? Se mira el ritmo contra la historia de ESTE contador.
+      const anomalia = detectarAnomalia(await serieDe(kind, intent.unidad))
+      if (anomalia) {
+        out += t(lang, 'meter_anomaly', {
+          tasa: anomalia.tasa, media: anomalia.media, tipo: nombre, unidad: intent.unidad,
+        })
+      }
+      return out
     }
 
     case 'contador_list': {

@@ -47,6 +47,45 @@ export async function lastReading(kind, unit) {
   return rows[0] ?? null
 }
 
+/**
+ * ¿La última lectura delata una fuga? Puro: recibe las lecturas de UN
+ * contador ordenadas de vieja a nueva y compara el ritmo diario del último
+ * tramo con la media de los tramos anteriores. Hace falta historia (≥3
+ * lecturas) y un ritmo claramente disparado (>2.5×) para acusar: mejor
+ * callar que gritar fuga cada vez que alguien ducha a un huésped más.
+ * La fuga de las habitaciones 206/207 (semanas abierta) es el caso que
+ * esta alerta habría cantado el primer día.
+ */
+export function detectarAnomalia(lecturas) {
+  if (!Array.isArray(lecturas) || lecturas.length < 3) return null
+  const dias = (a, b) => Math.max((new Date(b.created_at) - new Date(a.created_at)) / 86400000, 0.04)
+  const tramos = []
+  for (let i = 1; i < lecturas.length; i++) {
+    const delta = Number(lecturas[i].value) - Number(lecturas[i - 1].value)
+    if (delta < 0) return null // contador reiniciado o mal apuntado: no se juzga
+    tramos.push(delta / dias(lecturas[i - 1], lecturas[i]))
+  }
+  const ultimo = tramos[tramos.length - 1]
+  const previos = tramos.slice(0, -1)
+  const media = previos.reduce((a, b) => a + b, 0) / previos.length
+  if (media <= 0 || ultimo <= 0) return null
+  if (ultimo > media * 2.5) {
+    return { tasa: Math.round(ultimo * 10) / 10, media: Math.round(media * 10) / 10 }
+  }
+  return null
+}
+
+/** Las últimas lecturas de un contador concreto, de vieja a nueva. */
+export async function serieDe(kind, unit, limite = 6) {
+  const { rows } = await query(
+    `select value, created_at from meter_readings
+      where kind = $1 and unit = $2
+      order by created_at desc limit $3`,
+    [kind, unit, limite],
+  )
+  return rows.reverse()
+}
+
 /** Últimas lecturas: de una unidad concreta, o la última de cada contador. */
 export async function listReadings(unit = null, limite = 12) {
   if (unit) {

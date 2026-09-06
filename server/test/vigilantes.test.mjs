@@ -28,6 +28,15 @@ eq('mañana alerta por las cuatro', alertasDeObra(daily, 1).map((a) => a.tipo),
 eq('0°C ya es helada (hormigón)', alertasDeObra({ temperature_2m_min: [0] }, 0).length, 1)
 eq('nieve tiene emoji', emojiTiempo(73), '🌨️')
 
+console.log('\n1b. CONTADORES: LA ALERTA DE FUGA')
+const { detectarAnomalia } = await import('../src/contadores.js')
+const dia = (n) => ({ created_at: `2026-09-${String(n).padStart(2, '0')}T08:00:00Z` })
+const serie = (vals) => vals.map((v, i) => ({ value: v, ...dia(i + 1) }))
+eq('ritmo normal no alerta', detectarAnomalia(serie([100, 110, 121, 130])), null)
+eq('un salto 5x sí alerta', detectarAnomalia(serie([100, 110, 120, 170])), { tasa: 50, media: 10 })
+eq('con dos lecturas no se juzga', detectarAnomalia(serie([100, 400])), null)
+eq('un contador que baja (reinicio) no se juzga', detectarAnomalia(serie([100, 110, 90, 200])), null)
+
 console.log('\n2. REFERENZZINSSATZ: EL EXTRACTOR')
 eq('la página real de hoy', extraerZins('<h2 anchornav="x">Aktueller Referenzzinssatz: 1,25%</h2>'), 1.25)
 eq('con punto también', extraerZins('Aktueller Referenzzinssatz: 1.75 %'), 1.75)
