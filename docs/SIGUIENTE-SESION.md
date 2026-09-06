@@ -132,7 +132,19 @@ chat; no están en el repo).
    `docs/plantillas/mietvertrag-longstay.md`.
 8. **OCR de recibos** (Tesseract en el NAS, como Whisper) y **el tablero web
    desde fuera** (`cloudflared` ya está instalado en el NAS).
-9. **Variables nuevas opcionales** en el compose del NAS: `RESUMEN_TO`
+9. **Export contable a Infoniqa ONE 50** (el software del Treuhänder, ex
+   Sage 50 — investigado 06.09.2026). El import va por CSV `sfbbuch.csv`
+   (Extras → Buchungen importieren; `;`, ANSI **no UTF-8**, fechas
+   dd.mm.jjjj, importes 1234.50, todo-o-nada, cuentas y códigos MwSt deben
+   existir en el mandante). ⚠️ El layout exacto NO es público — y el layout
+   de 31 campos del Hilfe-Center es de ONE **Start**, no de ONE 50: no
+   calcárselo. Camino correcto: pedir al Treuhänder (a) un
+   `sfbbuch.csv` de ejemplo exportado desde SU ONE 50 con 3–4 asientos
+   variados (el export ES la especificación), (b) su lista de
+   Steuerschlüssel (típicos: USt81/USt26/USt38, VSM81, VSB81…) y (c) el
+   plan de cuentas. Con eso se calca el fichero desde Node (iconv-lite
+   para ANSI) y se prueba en un mandante de prueba con Beleggruppe propia.
+10. **Variables nuevas opcionales** en el compose del NAS: `RESUMEN_TO`
    (teléfonos, separados por comas, que reciben el resumen del lunes) y
    `RESUMEN_CRON` (por defecto `0 7 * * 1`).
 
