@@ -19,7 +19,10 @@ spesenRouter.get('/:token.csv', async (req, res, next) => {
     const exp = await exportPorToken(token)
     if (!exp) return res.status(404).type('text/plain').send('not found')
     res.type('text/csv; charset=utf-8')
-    res.set('Content-Disposition', `attachment; filename="Spesen ${exp.month}.csv"`)
+    // Un cierre de Spesen lleva su prefijo; otros exports (Mietertrag) ya
+    // traen su nombre completo en month.
+    const nombre = /^\d{4}-\d{2}$/.test(exp.month) ? `Spesen ${exp.month}` : exp.month
+    res.set('Content-Disposition', `attachment; filename="${nombre}.csv"`)
     // El BOM hace que Excel abra el UTF-8 con las diéresis bien.
     res.send('﻿' + exp.csv)
   } catch (err) {

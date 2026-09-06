@@ -136,6 +136,10 @@ const REGLAS = {
     mietenSum: /^(?:alquileres|suma de alquileres|rendas)(?:\s+(?:de|del|de la|da|do)\s+(\S+))?\??$/,
     // "¿quién no ha pagado?" · "impagos"
     impagos: /^(?:impagos|impagados|quien no ha pagado|quien no pago|morosos)\??$/,
+    // "mahnung a la A4-11.1" · "2. mahnung a Koubaa" · "recordatorio de pago a la 204"
+    mahnungCmd: /^(?:(?:1\.?|2\.?|primera?|segunda?|erste|zweite)\s+)?(?:mahnung|recordatorio de pago|zahlungserinnerung)\s+(?:a|an|para|fur)\s+.+$/,
+    // "mietertrag septiembre" · "mietertrag"
+    mietertragCmd: /^mietertrag(?:\s+(\w+))?\??$/,
     // "dale acceso al dinero a Jasmina" · "quita el acceso a los huéspedes a X"
     permisoDar: /^(?:dale|da|dar)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
     permisoQuitar: /^(?:quita(?:le)?|quitar|retira(?:le)?)\s+(?:el\s+)?(?:acceso|permiso)\s+(?:al?\s+|a\s+l[oa]s?\s+|de\s+)?(\w+)\s+a\s+(\w+)$/,
@@ -349,6 +353,9 @@ function parseInLang(text, ctx, lang) {
   const mieten = cfg.mietenSum ? t.match(cfg.mietenSum) : null
   if (mieten) return { action: 'mieten_sum', grupo: mieten[1] ? mieten[1].toUpperCase() : null }
   if (cfg.impagos && cfg.impagos.test(t)) return { action: 'impagos' }
+  if (cfg.mahnungCmd && cfg.mahnungCmd.test(t)) return { action: 'mahnung', texto: t }
+  const mietertrag = cfg.mietertragCmd ? t.match(cfg.mietertragCmd) : null
+  if (mietertrag) return { action: 'mietertrag', mes: mietertrag[1] ?? null }
 
   // Gestión de accesos. El orden persona/permiso cambia según el idioma
   // («dale acceso al dinero a Jasmina» vs «gib Jasmina zugriff auf geld»):

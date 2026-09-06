@@ -47,6 +47,8 @@ import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
 import { buscarVertraege, sumaAlquileres, formatVertrag } from './vertraege.js'
 import { esCamt, parseCamt, conciliarPagos } from './camt.js'
 import { estadoDeCobros, formatImpagos } from './impagos.js'
+import { parseMahnung, crearMahnung } from './mahnung.js'
+import { mietertragCsv } from './vertraege.js'
 import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
@@ -1178,6 +1180,43 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return t(lang, 'perm_list', {
         lista: filas.map((p) => `• ${p.full_name}: ${p.perms.join(', ')}`).join('\n'),
       })
+    }
+
+    case 'mahnung': {
+      if (!cobrosConfigurados()) return t(lang, 'invoice_not_configured')
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'invoice_unauthorized')
+      const { nivel, que } = parseMahnung(intent.texto)
+      if (!que) return t(lang, 'mahnung_need')
+      const mesActual = new Intl.DateTimeFormat('de-CH', {
+        timeZone: config.timezone, month: 'long', year: 'numeric',
+      }).format(new Date())
+      const r = await crearMahnung({ que, nivel, mes: mesActual })
+      if (r.error === 'no_encontrado') return t(lang, 'vertrag_none', { que })
+      if (r.error === 'ambiguo') {
+        return t(lang, 'mahnung_ambiguous', {
+          lista: r.candidatos.map((v) => `• ${v.objcode} ${v.m1name ?? ''}`).join('\n'),
+        })
+      }
+      if (r.error) return t(lang, 'invoice_error', { motivo: r.error })
+      let out = t(lang, 'mahnung_done', {
+        nivel: r.nivel, objcode: r.contrato.objcode,
+        nombre: [r.contrato.m1vname, r.contrato.m1name].filter(Boolean).join(' '),
+        importe: r.importe,
+      })
+      if (config.appUrl) out += t(lang, 'invoice_link', { url: `${config.appUrl}/factura/${r.token}.pdf` })
+      return out
+    }
+
+    case 'mietertrag': {
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'camt_unauthorized')
+      const mes = intent.mes ?? today.slice(0, 7)
+      const r = await mietertragCsv(mes)
+      if (!r) return t(lang, 'vertrag_none', { que: 'Liste' })
+      let out = t(lang, 'mietertrag_done', {
+        mes, contratos: r.contratos, suma: r.suma.toLocaleString('de-CH'),
+      })
+      if (config.appUrl) out += t(lang, 'exp_close_link', { url: `${config.appUrl}/spesen/${r.token}.csv` })
+      return out
     }
 
     case 'impagos': {

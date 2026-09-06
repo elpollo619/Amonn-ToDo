@@ -8,6 +8,7 @@
 // foto (imported_at) se enseña siempre: nadie debe tomar por fresco un
 // dato de hace meses.
 // ============================================================
+import crypto from 'node:crypto'
 import { query } from './db.js'
 
 /** Contratos que casan con una unidad o un nombre («204», «A4-11», «Koubaa»). */
@@ -39,6 +40,37 @@ export async function sumaAlquileres(grupo = null) {
     [grupo],
   )
   return rows[0]
+}
+
+/**
+ * El Mietertrag del mes: una fila por contrato con su alquiler, en CSV,
+ * listo para pegar en el «01 – Mietertrag» y asentar en Honag — el paso 7
+ * del manual de la empresa, que hoy se teclea a mano. Se guarda por el
+ * mismo canal que los cierres de Spesen (tabla expense_exports + token).
+ */
+export async function mietertragCsv(mes) {
+  const { rows } = await query(
+    'select objgrp, objcode, m1vname, m1name, total from mietvertraege order by objcode asc',
+  )
+  if (rows.length === 0) return null
+  const esc = (v) => {
+    const s = String(v ?? '')
+    return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const filas = rows.map((v) => [
+    v.objgrp, v.objcode, [v.m1vname, v.m1name].filter(Boolean).join(' '), mes, v.total ?? '',
+  ])
+  const suma = rows.reduce((n, v) => n + Number(v.total ?? 0), 0)
+  const csv = [['ObjGrp', 'ObjCode', 'Mieter', 'Monat', 'Mietzins CHF'], ...filas,
+    ['', '', 'TOTAL', mes, suma]]
+    .map((f) => f.map(esc).join(';')).join('\r\n') + '\r\n'
+  const token = crypto.randomBytes(16).toString('hex')
+  await query(
+    `insert into expense_exports (month, token, csv, gastos, total_cents)
+     values ($1,$2,$3,$4,$5)`,
+    [`Mietertrag ${mes}`, token, csv, rows.length, Math.round(suma * 100)],
+  )
+  return { token, contratos: rows.length, suma }
 }
 
 /** La ficha corta de un contrato, para WhatsApp. */

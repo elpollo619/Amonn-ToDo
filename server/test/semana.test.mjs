@@ -117,6 +117,30 @@ check('el admin puede repartir "todo" (admin)', await processMessage(CRIS, 'dale
   ['Rayna', 'admin'])
 await query('delete from permissions')
 
+console.log('\n7d. MAHNUNG, MIETERTRAG Y BACKUP')
+const cris2 = (await query('select id from users where phone = $1', [CRIS])).rows[0]
+await query("insert into permissions (user_id, perm) values ($1, 'dinero') on conflict do nothing", [cris2.id])
+const { config: cfgQr } = await import('../src/config.js')
+cfgQr.qr.iban = 'CH44 3199 9123 0008 8901 2'
+check('la mahnung sale con contrato e importe',
+  await processMessage(CRIS, 'mahnung a la 35'), ['1. Mahnung', 'B22-035', '800'])
+check('la 2.ª suma el recargo de 50',
+  await processMessage(CRIS, '2. mahnung a Koubaa'), ['2. Mahnung', '2848'])
+check('el mietertrag suma los contratos', await processMessage(CRIS, 'mietertrag 2026-09'),
+  ['2 contratos', '3’598'])
+await query(`insert into mietvertraege (objgrp, objcode, m1vname, m1name, total)
+  values ('B22','B22-036','Rita','Exemplo',750)`)
+check('ambigua pide el código', await processMessage(CRIS, 'mahnung a la B22'), ['código exacto', 'B22-035'])
+cfgQr.qr.iban = ''
+const { volcarBackup } = await import('../src/backup.js')
+const fsB = await import('node:fs')
+const dirB = fsB.mkdtempSync('/tmp/amonn-backup-')
+const b = await volcarBackup(dirB)
+checkIgual('el backup escribe un fichero', b.ok, true)
+checkIgual('con filas de verdad', b.filas > 0, true)
+fsB.rmSync(dirB, { recursive: true, force: true })
+await query('delete from permissions')
+
 console.log('\n7. CONTRATOS SIN GOOGLE, LO DICE CLARO')
 check('explica qué falta', await processMessage(CRIS, 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'),
   ['no está conectado a Google', 'GOOGLE_SA_KEY'])
