@@ -17,6 +17,8 @@ import crypto from 'node:crypto'
 import { config } from './config.js'
 import { query } from './db.js'
 import { buscarVertraege } from './vertraege.js'
+import { nuevaReferenciaQRR } from './cobros.js'
+import { isQRIBAN } from 'swissqrbill/utils'
 
 export const RECARGO_2A = 50 // CHF, según sus contratos
 
@@ -64,6 +66,10 @@ export async function crearMahnung({ que, nivel = 1, mes }) {
   const importe = Number(v.total) + (nivel === 2 ? RECARGO_2A : 0)
 
   const cuenta = config.qr.iban.replace(/\s+/g, '')
+  // Un QR-IBAN EXIGE referencia QRR; sin ella swissqrbill lanza y el
+  // asistente se caía entero al pedirle una Mahnung. Es la misma regla que
+  // ya aplican las facturas (ver cobros.js): con IBAN normal, sin referencia.
+  const referencia = isQRIBAN(cuenta) ? nuevaReferenciaQRR() : null
   const pdf = await new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 70, left: 60, right: 60, bottom: 20 } })
     const trozos = []
@@ -82,16 +88,17 @@ export async function crearMahnung({ que, nivel = 1, mes }) {
       // siempre: la dirección de la Liste no siempre es la postal del
       // inquilino y un dato malo invalida el QR.
       message: `${nivel}. Mahnung Miete ${v.objcode} ${mes}`.slice(0, 140),
+      ...(referencia ? { reference: referencia } : {}),
     }).attachTo(doc)
     doc.end()
   })
 
   const token = crypto.randomBytes(16).toString('hex')
   await query(
-    `insert into qr_bills (token, amount_cents, debtor, message, pdf)
-     values ($1,$2,$3,$4,$5)`,
+    `insert into qr_bills (token, amount_cents, debtor, message, reference, pdf)
+     values ($1,$2,$3,$4,$5,$6)`,
     [token, Math.round(importe * 100), [v.m1vname, v.m1name].filter(Boolean).join(' '),
-      `${nivel}. Mahnung ${v.objcode} ${mes}`, pdf],
+      `${nivel}. Mahnung ${v.objcode} ${mes}`, referencia, pdf],
   )
   return { token, contrato: v, importe, nivel }
 }

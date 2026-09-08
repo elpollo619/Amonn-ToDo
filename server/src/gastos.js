@@ -11,14 +11,14 @@ import { query } from './db.js'
 import { broadcast } from './events.js'
 import { porKey, CATEGORIAS } from './spesen.js'
 
-export async function addGasto({ code, spentOn, merchant = null, concept, amountCents, vat = null, category, personId = null, receiptPath = null, receiptName = null }) {
+export async function addGasto({ code, spentOn, merchant = null, concept, amountCents, vat = null, category, personId = null, receiptPath = null, receiptName = null, km = null }) {
   const cat = porKey(category)
   const { rows } = await query(
     `insert into expenses (code, spent_on, merchant, concept, amount_cents, vat, category, account,
-                           person_id, receipt_path, receipt_name)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
+                           person_id, receipt_path, receipt_name, km)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
     [code, spentOn, merchant, concept, amountCents, vat, category, cat?.cuenta ?? null,
-     personId, receiptPath, receiptName],
+     personId, receiptPath, receiptName, km],
   )
   broadcast()
   return rows[0]
@@ -151,6 +151,71 @@ export async function vorsteuerTrimestre(anno, q) {
       vorsteuerCents: Number.isFinite(t) && t > 0 ? Math.round(bruto * t / (100 + t)) : 0,
     }
   })
+}
+
+// ─── Kilometraje ─────────────────────────────────────────────
+// «120 km a Gampelen» no es una cosa aparte: es una fila del Spesen en la
+// columna URE FZ (cuenta 6200), que es donde la empresa lleva ya el coche.
+// Así hereda sin trabajo el cierre de mes, el CSV y los saldos.
+//
+// La tarifa NO se fija aquí a fuego: va en KM_RAPPEN (rappen por kilómetro)
+// porque es una decisión de la empresa, no del programa. 70 rp/km es la
+// tarifa habitual en Suiza y sirve de valor por defecto.
+export const kmRappen = () => {
+  const n = Number(process.env.KM_RAPPEN)
+  return Number.isFinite(n) && n > 0 ? n : 70
+}
+
+export async function addKilometraje({ km, destino = null, code = 'HAAG', spentOn, personId = null }) {
+  const rappen = kmRappen()
+  const kms = Math.round(Number(km) * 10) / 10
+  const concepto = destino ? `${kms} km ${destino}` : `${kms} km`
+  const g = await addGasto({
+    code, spentOn, concept: concepto,
+    amountCents: Math.round(kms * rappen),
+    category: 'ure_fz', personId, km: kms,
+  })
+  // km viene de la base como numeric(7,1) («120.0»): se devuelve el número.
+  return { ...g, km: kms, rappen }
+}
+
+/** Kilómetros y francos de un periodo. `personId` null = toda la empresa. */
+export async function kmResumen({ desde, hasta, personId = null }) {
+  const { rows } = await query(
+    `select count(*)::int as viajes,
+            coalesce(sum(km), 0)::numeric      as km,
+            coalesce(sum(amount_cents), 0)::int as total_cents
+       from expenses
+      where km is not null and spent_on between $1 and $2
+        and ($3::uuid is null or person_id = $3::uuid)`,
+    [desde, hasta, personId],
+  )
+  return { ...rows[0], km: Number(rows[0].km) }
+}
+
+/**
+ * «¿Cuánto gastamos en IKEA este año?». Busca el texto en el comercio Y en
+ * el concepto: hoy casi todos los gastos entran por WhatsApp con el comercio
+ * dentro del concepto («37.90 Landi Kabelbinder») y merchant vacío.
+ */
+export async function gastoPorComercio(texto, { desde, hasta }) {
+  const { rows } = await query(
+    `select count(*)::int as n, coalesce(sum(amount_cents), 0)::int as total_cents
+       from expenses
+      where spent_on between $2 and $3
+        and (coalesce(merchant, '') ilike '%' || $1 || '%'
+             or concept ilike '%' || $1 || '%')`,
+    [texto, desde, hasta],
+  )
+  const { rows: ult } = await query(
+    `select spent_on, concept, amount_cents from expenses
+      where spent_on between $2 and $3
+        and (coalesce(merchant, '') ilike '%' || $1 || '%'
+             or concept ilike '%' || $1 || '%')
+      order by spent_on desc limit 5`,
+    [texto, desde, hasta],
+  )
+  return { ...rows[0], ultimos: ult }
 }
 
 export { CATEGORIAS }

@@ -354,6 +354,10 @@ create table if not exists expenses (
 );
 create index if not exists expenses_abiertos on expenses (status, spent_on);
 create index if not exists expenses_persona on expenses (person_id, status);
+-- Kilometraje. «120 km a Gampelen» es una fila más del Spesen (columna URE
+-- FZ, cuenta 6200), pero se guarda además el número de kilómetros: sin él,
+-- sumar los km del año obligaría a reventar el texto del concepto.
+alter table expenses add column if not exists km numeric(7,1);
 
 -- Cierres de mes del Spesen. El CSV vive en la base, no en un fichero: así
 -- el enlace de descarga sigue funcionando aunque Watchtower recree el

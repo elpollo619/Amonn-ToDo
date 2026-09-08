@@ -270,8 +270,19 @@ export function parseRange(text, today = todayKey(), lang = 'es') {
   const resto = t.slice(corte)
   if (!UNE.test(resto)) return null
   const segunda = parseDate(resto, today, lang) ?? parseDateAnyLang(resto, today, lang)
-  if (!segunda || segunda.key < primera.key) return null
-  return { start: primera.key, end: segunda.key, matches: [primera.match, segunda.match] }
+  if (!segunda) return null
+  // «del lunes al jueves» dicho un MARTES: el lunes es el de la semana que
+  // viene y el jueves se calcula desde hoy, así que el fin cae antes que el
+  // inicio. Como es un día de la semana (sin cifras, no una fecha escrita),
+  // se empuja siete días: el jueves que se quiere decir es el de después.
+  let end = segunda.key
+  if (end < primera.key && !/\d/.test(segunda.match)) {
+    const d = toDate(end)
+    d.setUTCDate(d.getUTCDate() + 7)
+    end = d.toISOString().slice(0, 10)
+  }
+  if (end < primera.key) return null
+  return { start: primera.key, end, matches: [primera.match, segunda.match] }
 }
 
 // "3 días", "3 Tage", "3 dias" — cuánto TRABAJO lleva, no cuándo vence.

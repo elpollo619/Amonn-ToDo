@@ -119,6 +119,12 @@ const REGLAS = {
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
+    // "120 km a Gampelen" · "80km obra Seewer". Empieza por número: no puede
+    // chocar con los verbos de tarea, que empiezan por palabra.
+    kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kms|kilometros?)\b\s*(?:(?:a|al|hasta|para|en|de)\b\s+)?(.*)$/,
+    kmList: /^(?:kilometros|km|mis kilometros|mis km|cuantos km|kilometraje)(?:\s+(?:de\s+)?(\d{4}))?\??$/,
+    // "¿cuánto gastamos en IKEA este año?" · "gasto en Coop"
+    gastoComercio: /^(?:cuanto (?:gastamos|se gasto|hemos gastado|llevamos)|gasto|gastado)\s+(?:en|con)\s+(.+?)(?:\s+(este ano|este mes|el ano pasado))?\??$/,
     // "resumen semanal": la foto del negocio. Va con apellido ("semanal")
     // porque "resumen" a secas ya significa listar tareas.
     resumenSemanal: /^(?:resumen (?:semanal|de la semana)|como va la semana)\??$/,
@@ -139,7 +145,10 @@ const REGLAS = {
     // "mahnung a la A4-11.1" · "2. mahnung a Koubaa" · "recordatorio de pago a la 204"
     mahnungCmd: /^(?:(?:1\.?|2\.?|primera?|segunda?|erste|zweite)\s+)?(?:mahnung|recordatorio de pago|zahlungserinnerung)\s+(?:a|an|para|fur)\s+.+$/,
     // "mietertrag septiembre" · "mietertrag"
-    mietertragCmd: /^mietertrag(?:\s+(\w+))?\??$/,
+    // El mes se admite como «septiembre» y como «2026-09»: el manual usa la
+    // segunda forma y \w no incluye el guion, así que se caía en «no te he
+    // entendido» justo con el ejemplo documentado.
+    mietertragCmd: /^mietertrag(?:\s+([\w-]+))?\??$/,
     // "mwst q3" · "iva 2026 q2" · "vorsteuer"
     mwstCmd: /^(?:mwst|iva|vorsteuer)(?:\s+(\d{4}))?(?:\s+q?([1-4]))?\??$/,
     // "dale acceso al dinero a Jasmina" · "quita el acceso a los huéspedes a X"
@@ -203,6 +212,9 @@ const REGLAS = {
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
+    kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kilometer)\b\s*(?:(?:nach|zu|zur|zum|bis|fur|auf)\b\s+)?(.*)$/,
+    kmList: /^(?:kilometer|km|meine kilometer|meine km|kilometrierung)(?:\s+(\d{4}))?\??$/,
+    gastoComercio: /^(?:wie ?viel (?:haben wir|wurde)|ausgaben|spesen)\s+(?:bei|fur|von)\s+(.+?)(?:\s+(dieses jahr|diesen monat|letztes jahr))?\??$/,
     resumenSemanal: /^(?:wochenbericht|wochenubersicht|wochen ubersicht|wie lauft die woche)\??$/,
     ausenciaList: /^(?:wer (?:ist|hat) (?:im urlaub|in den ferien|ferien|frei)|abwesenheiten|ferien)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:ist\s+|hat\s+)?(im urlaub|in den ferien|ferien|urlaub|krank|abwesend)\s*(.*)$/,
@@ -267,6 +279,9 @@ const REGLAS = {
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
+    kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kms|quilometros?)\b\s*(?:(?:a|ao|ate|para|em|de)\b\s+)?(.*)$/,
+    kmList: /^(?:quilometros|km|os meus km|quantos km|quilometragem)(?:\s+(?:de\s+)?(\d{4}))?\??$/,
+    gastoComercio: /^(?:quanto (?:gastamos|foi gasto|gastamos ja))\s+(?:no|na|em|com)\s+(.+?)(?:\s+(este ano|este mes|ano passado))?\??$/,
     resumenSemanal: /^(?:resumo (?:semanal|da semana)|como vai a semana)\??$/,
     ausenciaList: /^(?:quem esta de ferias|ausencias|ferias)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(ferias|baixa|licenca|folga)\s*(.*)$/,
@@ -297,6 +312,22 @@ function extractPriority(t, cfg) {
   if (cfg.prioAlta.test(t)) return 'high'
   if (cfg.prioBaja.test(t)) return 'low'
   return null
+}
+
+/**
+ * Al quitar las fechas de un rango («del LUNES al JUEVES») quedan las
+ * preposiciones huérfanas: «Revisar la caldera, del al». Aquí se barren los
+ * conectores que se han quedado seguidos o colgando al final —nunca uno
+ * suelto en medio de una frase, que ahí sí significa algo.
+ */
+function limpiaConectores(s) {
+  const C = '(?:del|de|desde|al|a|hasta|entre|y|e|vom|von|ab|bis|zum|zur|und|ate|para|no|na)'
+  return s
+    .replace(new RegExp(`\\b${C}(?:\\s+${C})+\\b`, 'ig'), ' ')
+    .replace(new RegExp(`[,;]?\\s*\\b${C}\\b\\s*$`, 'i'), '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[\s,;:-]+$/, '')
+    .trim()
 }
 
 function stripPriority(t, cfg) {
@@ -425,6 +456,36 @@ function parseInLang(text, ctx, lang) {
   }
   const lecturas = cfg.contadorList ? t.match(cfg.contadorList) : null
   if (lecturas) return { action: 'contador_list', unidad: lecturas[1] ? lecturas[1].toUpperCase() : null }
+
+  // Kilometraje y consulta por comercio, antes del gasto suelto: "120 km a
+  // Gampelen" no lleva la palabra "gasto", pero "gasto en IKEA" sí, y sin
+  // este orden se apuntaría como un gasto nuevo sin importe.
+  if (cfg.kmList && cfg.kmList.test(t)) {
+    const m = t.match(cfg.kmList)
+    return { action: 'km_list', anno: m[1] ? Number(m[1]) : null }
+  }
+  const kmNuevo = cfg.kmAdd ? t.match(cfg.kmAdd) : null
+  if (kmNuevo) {
+    const destino = kmNuevo[2].trim()
+    return {
+      action: 'km_add',
+      km: Number(kmNuevo[1].replace(',', '.')),
+      // El destino se escribe tal cual lo puso la persona: es un nombre de
+      // sitio ("Gampelen"), no un título de tarea.
+      destino: destino ? restoreCase(destino, raw) : null,
+      texto: t,
+    }
+  }
+  const comercio = cfg.gastoComercio ? t.match(cfg.gastoComercio) : null
+  // Con un importe dentro no es una pregunta, es un gasto: "gasto en Coop
+  // 45.90" se apunta; "gasto en Coop" se responde.
+  if (comercio && !/\d{1,5}[.,]\d{2}\b/.test(t)) {
+    return {
+      action: 'gasto_comercio',
+      comercio: restoreCase(comercio[1].trim(), raw),
+      periodo: comercio[2] ?? null,
+    }
+  }
 
   // El cierre de mes va ANTES que apuntar un gasto: en alemán "spesen august
   // abschliessen" empieza igual que "spesen 45.20 Migros" y se lo comería.
@@ -614,6 +675,7 @@ function parseInLang(text, ctx, lang) {
       inicio = rango.start
       due = { key: rango.end }
       for (const m of rango.matches) rest = rest.replace(m, ' ')
+      rest = limpiaConectores(rest)
     } else {
       due = parseDateAnyLang(rest, ctx.today, lang)
       if (due) rest = rest.replace(due.match, ' ')
@@ -688,6 +750,7 @@ function parseInLang(text, ctx, lang) {
         inicio2 = rango2.start
         due2 = { key: rango2.end }
         for (const m of rango2.matches) rest = rest.replace(m, ' ')
+        rest = limpiaConectores(rest)
       } else {
         due2 = parseDateAnyLang(rest, ctx.today, lang)
         if (due2) rest = rest.replace(due2.match, ' ')

@@ -31,7 +31,7 @@ import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entso
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto } from './contactos.js'
-import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre } from './gastos.js'
+import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
@@ -1000,6 +1000,57 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       const otras = categoriasDe(codigo).filter((c) => c.key !== catKey).slice(0, 6)
       if (otras.length) out += t(lang, 'exp_guessed', { lista: otras.map((c) => `• ${c.col}`).join('\n') })
       return out
+    }
+
+    case 'km_add': {
+      if (!intent.km || intent.km <= 0) return t(lang, 'exp_need_amount')
+      const texto = String(intent.texto ?? '')
+      const codigo = Object.keys(CODIGOS).find((c) => new RegExp(`\\b${c}\\b`, 'i').test(texto)) ?? 'HAAG'
+      // El código del edificio, si venía escrito, no es parte del destino.
+      const destino = intent.destino
+        ? String(intent.destino).replace(new RegExp(`\\b${codigo}\\b`, 'ig'), ' ').replace(/\s{2,}/g, ' ').trim()
+        : null
+      const g = await addKilometraje({
+        km: intent.km, destino: destino || null, code: codigo,
+        spentOn: today, personId: user.id,
+      })
+      const mios = await gastosAbiertos(user.id)
+      const total = mios.reduce((n, x) => n + x.amount_cents, 0)
+      return t(lang, 'km_added', {
+        km: g.km, destino: destino ? t(lang, 'km_dest', { destino }) : '',
+        code: g.code, fecha: String(g.spent_on).slice(0, 10).split('-').reverse().join('/'),
+        importe: chf(g.amount_cents), rappen: g.rappen, saldo: chf(total),
+      })
+    }
+
+    case 'km_list': {
+      const anno = intent.anno ?? Number(today.slice(0, 4))
+      const r = await kmResumen({ desde: `${anno}-01-01`, hasta: `${anno}-12-31` })
+      if (!r.viajes) return t(lang, 'km_vacio', { periodo: anno })
+      return t(lang, 'km_resumen', {
+        periodo: anno, km: r.km, viajes: r.viajes,
+        importe: chf(r.total_cents), rappen: kmRappen(),
+      })
+    }
+
+    case 'gasto_comercio': {
+      const anno = Number(today.slice(0, 4))
+      // "este mes" limita al mes en curso; por defecto se mira el año.
+      const esMes = /mes|monat/i.test(String(intent.periodo ?? ''))
+      const pasado = /pasado|letztes/i.test(String(intent.periodo ?? ''))
+      const y = pasado ? anno - 1 : anno
+      const desde = esMes ? `${today.slice(0, 7)}-01` : `${y}-01-01`
+      const hasta = esMes ? today : `${y}-12-31`
+      const periodo = esMes ? today.slice(0, 7) : String(y)
+      const r = await gastoPorComercio(String(intent.comercio ?? '').trim(), { desde, hasta })
+      if (!r.n) return t(lang, 'comercio_vacio', { comercio: intent.comercio, periodo })
+      const lista = r.ultimos.map((g) => {
+        const f = String(g.spent_on).slice(0, 10).split('-').reverse().slice(0, 2).join('/')
+        return `\n• ${f} ${g.concept} — CHF ${chf(g.amount_cents)}`
+      }).join('')
+      return t(lang, 'comercio_resumen', {
+        comercio: intent.comercio, periodo, importe: chf(r.total_cents), n: r.n, lista,
+      })
     }
 
     case 'gasto_list': {

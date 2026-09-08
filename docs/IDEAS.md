@@ -55,9 +55,14 @@ está hecho; lo de abajo, no.
    desde cualquier sitio, pero la app web solo se ve dentro de la red. En el
    NAS ya corre `cloudflared`, que la publicaría con HTTPS sin abrir puertos.
 
-8. **Más cosas del día a día.** Kilometraje («120 km a Gampelen», columna
-   URE FZ) · horas por obra · «¿cuánto gastamos en IKEA este año?» · control
-   de llaves del Longstay · cerrar el mes de Spesen de una vez.
+8. **Más cosas del día a día.** ~~Kilometraje («120 km a Gampelen», columna
+   URE FZ)~~ **HECHO** (08.09.2026) · ~~«¿cuánto gastamos en IKEA este
+   año?»~~ **HECHO** (08.09.2026) · horas por obra · control de llaves del
+   Longstay · ~~cerrar el mes de Spesen~~ **HECHO**.
+   ⚠️ La tarifa del kilometraje está en `KM_RAPPEN` (rappen por km) con 70
+   por defecto, que es la habitual en Suiza: **falta que Cris diga la que
+   usa de verdad la empresa**; si no es 70, se cambia esa variable en el
+   compose del NAS y ya está.
 
 ## Decisiones tomadas, para no volver a discutirlas
 

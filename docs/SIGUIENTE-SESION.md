@@ -22,6 +22,11 @@
 > el asistente de WhatsApp a ESA misma fuente («¿cuántos llegan hoy?» real
 > sin esperar las credenciales de Apaleo). Buscar también el repo del
 > Cockpit (Vercel de Cris, proyecto "web") para reutilizar su código.
+>
+> **Nuevo el 08.09.2026:** kilometraje y consulta de gasto por comercio, y
+> tres fallos silenciosos corregidos (ver «Arreglado» abajo). 20 baterías de
+> pruebas en verde.
+>
 > Todo lo demás del 05-06.09 está DESPLEGADO y en verde: cobros completos
 > (facturas QR con la cuenta HIAG WIR confirmada, extractos camt, impagos
 > día 25, Mahnwesen, Mietertrag, Vorsteuer), permisos por WhatsApp (admin
@@ -80,6 +85,8 @@ Todo esto está **desplegado y probado con datos reales**:
 | Citas | «Cita con Baumgartner el martes a las 14:00» + calendario `.ics` suscribible |
 | Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
+| Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` (por defecto 70 rp/km, ⚠️ **Cris debe confirmar la de la empresa**); «kilómetros» o «kilómetros 2026» suma el año |
+| Gasto por comercio | «¿cuánto gastamos en IKEA este año?» · «gasto en Coop este mes» → total, número de gastos y los cinco últimos |
 | Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
 | Resumen semanal | «Resumen semanal» a demanda; los lunes 07:00 automático a los teléfonos de `RESUMEN_TO` |
 | Aviso de citas | 1 h antes de cada cita, WhatsApp automático a quien va (cron cada 5 min) |
@@ -177,6 +184,23 @@ chat; no están en el repo).
    (teléfonos, separados por comas, que reciben el resumen del lunes) y
    `RESUMEN_CRON` (por defecto `0 7 * * 1`).
 
+## 4b. Arreglado el 08.09.2026 (fallos silenciosos que ya mordían)
+
+- **«del lunes al jueves» dicho un martes** daba un rango invertido: el
+  lunes era el de la semana siguiente y el jueves el de esta. `parseRange`
+  devolvía `null`, pero el título ya se había limpiado → la tarea nacía
+  como «Revisar la caldera, del al» y **sin plazo**. Ahora el fin se empuja
+  siete días cuando es un día de la semana, y `limpiaConectores()` barre las
+  preposiciones huérfanas.
+- **Pedir una Mahnung reventaba el asistente** si la cuenta es un QR-IBAN:
+  swissqrbill exige referencia QRR y `mahnung.js` no la ponía (las facturas
+  de `cobros.js` sí). Ahora usa la misma regla y guarda la referencia.
+- **«mietertrag 2026-09»** —la forma que documenta este mismo manual— caía
+  en «no te he entendido»: la regla usaba `\w+`, que no admite el guion.
+- Dos pruebas se ataban al entorno (fechas fijas del día en que se
+  escribieron, y el separador de miles de `de-CH`, que cambia según el ICU
+  de cada Node). Ahora comprueban la forma, no la máquina.
+
 ## 5. Pruebas
 
 ```bash
@@ -186,7 +210,7 @@ initdb -D /tmp/pg -U postgres --auth=trust && pg_ctl -D /tmp/pg -o "-p 5433 -k /
 DATABASE_URL="postgres://postgres@127.0.0.1:5433/postgres" WA_ENABLED=false npm run test:db
 ```
 
-**22 baterías** (3 sin base + 19 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
+**26 baterías** (6 sin base + 20 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
 existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido

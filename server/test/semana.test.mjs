@@ -126,8 +126,12 @@ check('la mahnung sale con contrato e importe',
   await processMessage(CRIS, 'mahnung a la 35'), ['1. Mahnung', 'B22-035', '800'])
 check('la 2.ª suma el recargo de 50',
   await processMessage(CRIS, '2. mahnung a Koubaa'), ['2. Mahnung', '2848'])
-check('el mietertrag suma los contratos', await processMessage(CRIS, 'mietertrag 2026-09'),
-  ['2 contratos', '3’598'])
+// El separador de miles de de-CH depende del ICU de cada Node (aquí «'»,
+// en el contenedor «’»): se compara sin él en vez de atar la prueba a una
+// máquina concreta.
+check('el mietertrag suma los contratos',
+  String(await processMessage(CRIS, 'mietertrag 2026-09')).replace(/[’'\u02bc\u2019]/g, ''),
+  ['2 contratos', '3598'])
 await query(`insert into mietvertraege (objgrp, objcode, m1vname, m1name, total)
   values ('B22','B22-036','Rita','Exemplo',750)`)
 check('ambigua pide el código', await processMessage(CRIS, 'mahnung a la B22'), ['código exacto', 'B22-035'])

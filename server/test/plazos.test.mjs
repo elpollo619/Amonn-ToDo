@@ -36,7 +36,14 @@ console.log('\n2. CREAR CON PLAZO POR WHATSAPP')
 check('crea con plazo', await processMessage(CRIS, 'crea una tarea a Isma: revisar la caldera, del lunes al jueves'),
   ['Tarea creada', 'para Isma', '📅 Plazo:', '→'])
 const { rows } = await query("select title, start_date, due_date, work_days from tasks order by created_at desc limit 1")
-check('guarda inicio y fin', JSON.stringify(rows[0]), ['"start_date":"2026-09-07"', '"due_date":"2026-09-10"'])
+// Las fechas se calculan desde HOY DE VERDAD (processMessage no acepta una
+// fecha fija): clavarlas aquí hacía que la prueba se rompiera sola al pasar
+// de semana. Lo que se comprueba es la FORMA: lunes → jueves, tres días.
+const dia = (k) => new Date(`${k}T00:00:00Z`).getUTCDay()
+check('empieza en lunes', String(dia(String(rows[0].start_date).slice(0, 10))), '1')
+check('acaba en jueves', String(dia(String(rows[0].due_date).slice(0, 10))), '4')
+check('y no se lleva las palabras del plazo al título', String(rows[0].title).toLowerCase(), 'revisar la caldera')
+check('sin conectores huérfanos', String(rows[0].title).toLowerCase().includes('del al'), 'false')
 
 console.log('\n3. DÍAS DE TRABAJO')
 await processMessage(CRIS, 'crea una tarea a Isma: pintar la nave, para el viernes, 3 dias de trabajo')
@@ -50,7 +57,8 @@ await processMessage(CRIS, 'Isma')
 check('acepta un plazo', await processMessage(CRIS, 'del lunes al jueves'), ['¿Creo esta tarea?', '→'])
 check('confirma', await processMessage(CRIS, 'sí'), 'Tarea creada')
 const { rows: r3 } = await query("select start_date, due_date from tasks where title ilike '%andamio%'")
-check('guardado con plazo', JSON.stringify(r3[0]), ['"start_date":"2026-09-07"', '"due_date":"2026-09-10"'])
+check('guardado con plazo: empieza en lunes', String(dia(String(r3[0].start_date).slice(0, 10))), '1')
+check('guardado con plazo: acaba en jueves', String(dia(String(r3[0].due_date).slice(0, 10))), '4')
 
 console.log('\n5. LO DE ANTES SIGUE FUNCIONANDO')
 check('fecha suelta', await processMessage(CRIS, 'crea una tarea a Isma: llamar al cliente, para mañana'),
