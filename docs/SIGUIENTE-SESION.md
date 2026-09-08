@@ -1,5 +1,23 @@
 # Empieza por aquí
 
+> **LO PRIMERO (dejado a medias el 06.09.2026):** encender el Tailscale
+> Funnel para que los enlaces del asistente (PDFs de facturas/Mahnungen,
+> CSVs) funcionen desde cualquier móvil. Pasos exactos:
+> 1. Cris debe abrir https://login.tailscale.com/f/funnel?node=nZZciXtdHP11CNTRL
+>    (cuenta **GitHub elpollo619** — ¡NO las de Google!; el tailnet es
+>    tail850d70.ts.net) y pulsar el botón de autorizar. El botón de GitHub
+>    exige clic humano: la automatización no puede pulsarlo.
+> 2. Después, por SSH: `docker exec tailscale tailscale funnel --bg 8080`
+>    → sale la URL pública (https://nas-amonn.tail850d70.ts.net).
+> 3. Añadir `APP_URL: <esa URL>` al compose del NAS (junto a QR_IBAN) y
+>    `cd /volume1/docker && docker compose -p amonn -f docker-compose.yaml up -d server`.
+> Todo lo demás del 05-06.09 está DESPLEGADO y en verde: cobros completos
+> (facturas QR con la cuenta HIAG WIR confirmada, extractos camt, impagos
+> día 25, Mahnwesen, Mietertrag, Vorsteuer), permisos por WhatsApp (admin
+> Cris), secretaria Gemini, precios Casa Reto, espejo huéspedes, meteo,
+> Referenzzinssatz, OCR recibos, alerta de fuga en contadores, backup
+> nocturno y 222 contratos importados. 28 baterías de pruebas.
+
 Instrucciones para Claude Code en una sesión nueva. **Cris no es técnico y
 escribe en español: háblale en español, un paso cada vez, y haz tú mismo todo
 lo que puedas por consola.**
