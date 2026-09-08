@@ -11,6 +11,17 @@
 >    → sale la URL pública (https://nas-amonn.tail850d70.ts.net).
 > 3. Añadir `APP_URL: <esa URL>` al compose del NAS (junto a QR_IBAN) y
 >    `cd /volume1/docker && docker compose -p amonn -f docker-compose.yaml up -d server`.
+> **PISTA GORDA (08.09.2026):** existe un proyecto previo de Cris+Claude:
+> el «N's Hotel Cockpit» en https://web-silk-sigma-66.vercel.app/Cockpit.html
+> (Vercel, protegido: curl da 401 pero el Chrome de Cris entra). Es un panel
+> VIVO del hotel: beneficio del mes, ocupación, llegadas/salidas, in-house,
+> limpieza, Geldeingang, Buchhaltung, Preis-Radar, Housekeeping. O sea: los
+> datos del hotel YA fluyen a alguna fuente. Siguiente paso obvio: abrirlo
+> con las herramientas de Chrome, mirar en la pestaña de red DE DÓNDE saca
+> los datos (¿Supabase? ¿API propia? ¿export de Beds24/Booking?) y conectar
+> el asistente de WhatsApp a ESA misma fuente («¿cuántos llegan hoy?» real
+> sin esperar las credenciales de Apaleo). Buscar también el repo del
+> Cockpit (Vercel de Cris, proyecto "web") para reutilizar su código.
 > Todo lo demás del 05-06.09 está DESPLEGADO y en verde: cobros completos
 > (facturas QR con la cuenta HIAG WIR confirmada, extractos camt, impagos
 > día 25, Mahnwesen, Mietertrag, Vorsteuer), permisos por WhatsApp (admin
