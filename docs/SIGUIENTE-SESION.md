@@ -11,17 +11,46 @@
 >    → sale la URL pública (https://nas-amonn.tail850d70.ts.net).
 > 3. Añadir `APP_URL: <esa URL>` al compose del NAS (junto a QR_IBAN) y
 >    `cd /volume1/docker && docker compose -p amonn -f docker-compose.yaml up -d server`.
-> **PISTA GORDA (08.09.2026):** existe un proyecto previo de Cris+Claude:
-> el «N's Hotel Cockpit» en https://web-silk-sigma-66.vercel.app/Cockpit.html
-> (Vercel, protegido: curl da 401 pero el Chrome de Cris entra). Es un panel
-> VIVO del hotel: beneficio del mes, ocupación, llegadas/salidas, in-house,
-> limpieza, Geldeingang, Buchhaltung, Preis-Radar, Housekeeping. O sea: los
-> datos del hotel YA fluyen a alguna fuente. Siguiente paso obvio: abrirlo
-> con las herramientas de Chrome, mirar en la pestaña de red DE DÓNDE saca
-> los datos (¿Supabase? ¿API propia? ¿export de Beds24/Booking?) y conectar
-> el asistente de WhatsApp a ESA misma fuente («¿cuántos llegan hoy?» real
-> sin esperar las credenciales de Apaleo). Buscar también el repo del
-> Cockpit (Vercel de Cris, proyecto "web") para reutilizar su código.
+> **PISTA GORDA — RESUELTA EL 08.09.2026.** Se siguió el rastro del Cockpit
+> y el resultado cambia el plan: **las credenciales de Apaleo YA EXISTEN y
+> funcionan.** No hay que pedirle nada a nadie. Qué se encontró:
+>
+> - El Cockpit (https://web-silk-sigma-66.vercel.app/Cockpit.html) **no
+>   consulta ninguna API**: es HTML estático, sin `fetch` y sin Supabase, con
+>   los Excel incrustados como `data:` URI. Lo **regenera y republica** cada
+>   hora un pipeline.
+> - Ese pipeline es el repo **`elpollo619/ns-hotel-tool`** (privado):
+>   `scripts/apaleo_sync.py` + `daily_report.py` + `publish_web.py`, y
+>   `.github/workflows/update.yml` lo corre en GitHub Actions con los secrets
+>   `APALEO_CONFIG` y `VERCEL_TOKEN` (puestos el 06.07.2026).
+> - Las credenciales están en el Mac de Cris:
+>   `~/Documents/Claude/Projects/Einkommen N's Hotel/apaleo_config.json`
+>   → app Apaleo **`UCVF-SP-EINKOMMEN_SYNC`**, account `UCVF`.
+>
+> **Probado contra la API de verdad el 08.09.2026** (`identity.apaleo.com`
+> responde, token de 1 h):
+>
+> | Comprobación | Resultado |
+> |---|---|
+> | Scopes reales de la app | **solo `reservations.read` + `accounting.read`** |
+> | `propertyId` | **`NSH`** — ⚠️ en `apaleo_config.json` está **vacío** |
+> | `/inventory/v1/properties` | ✅ 200 (N's Hotel, Allmendstrasse 14, Kerzers) |
+> | `/booking/v1/reservations` | ✅ 200, datos reales (unit `208+210`, `InHouse`) |
+> | `/inventory/v1/units` | ❌ **403** — falta permiso |
+>
+> Consecuencia práctica: **«¿cuántos llegan hoy?» ya puede funcionar hoy
+> mismo**; **«¿qué cuartos están sucios?» NO**, hasta que se añada el permiso
+> de inventario a esa app en Apaleo (Apps → Connected apps → scopes).
+>
+> **Lo único que falta para encenderlo** (no requiere a terceros): añadir al
+> compose del NAS, junto a `QR_IBAN`, estas tres variables y reiniciar
+> `server` — el ID y el secret se copian de `apaleo_config.json`:
+> ```
+> APALEO_CLIENT_ID: UCVF-SP-EINKOMMEN_SYNC
+> APALEO_CLIENT_SECRET: <el de apaleo_config.json — NO ponerlo en el repo>
+> APALEO_PROPERTY_ID: NSH
+> ```
+> El código del asistente ya está adaptado a esta realidad (ver abajo).
 >
 > **Nuevo el 08.09.2026:** kilometraje y consulta de gasto por comercio, y
 > tres fallos silenciosos corregidos (ver «Arreglado» abajo). 20 baterías de
@@ -122,12 +151,23 @@ chat; no están en el repo).
    `\\servidor\…` y un usuario con permiso de escritura.** Cris tiene Claude
    Code en el PC de la oficina, que sí ve esa carpeta: es el camino corto.
 2. **Apaleo + LIKE MAGIC (hotel A14, Kerzers).** ⚡ La empresa **YA PAGA los
-   dos** (aclarado por Cris el 05.09.2026): no hay coste nuevo, solo pedir
-   las llaves de cuentas propias. (a) Apaleo: entrar con LA CUENTA DEL HOTEL
-   en apaleo.dev → Apps → Create app → Simple client → `APALEO_CLIENT_ID`,
-   `APALEO_CLIENT_SECRET`, `APALEO_PROPERTY_ID`; `server/src/apaleo.js` está
-   escrito pero sin probar — **mira primero la respuesta cruda**. Además
-   suscribirse a sus webhooks (autoservicio) para estar al día sin sondear.
+   dos** (aclarado por Cris el 05.09.2026): no hay coste nuevo.
+   (a) ~~Apaleo: crear la app y pedir las llaves~~ **YA NO HACE FALTA**
+   (08.09.2026): la app **`UCVF-SP-EINKOMMEN_SYNC`** existe desde junio,
+   funciona, y sus credenciales están en el Mac de Cris
+   (`~/Documents/Claude/Projects/Einkommen N's Hotel/apaleo_config.json`).
+   `server/src/apaleo.js` ya está **probado contra la cuenta real**: se miró
+   la respuesta cruda y se corrigió con lo que de verdad devuelve. El
+   `propertyId` es **`NSH`** (ojo: en `apaleo_config.json` está vacío).
+   **Solo falta meter las 3 variables en el compose del NAS** (arriba del
+   todo están escritas) y reiniciar `server`.
+   ⚠️ Con los permisos actuales (`reservations.read` + `accounting.read`)
+   funcionan llegadas/salidas/in-house, pero **NO** el estado de limpieza:
+   `/inventory/v1/units` da **403**. Para «¿qué cuartos están sucios?» hay
+   que añadir el scope de inventario a esa app en Apaleo (Apps → Connected
+   apps). El asistente ya lo explica solo en vez de dar error.
+   Pendiente aún: suscribirse a los webhooks (autoservicio) para estar al día
+   sin sondear.
    (b) LIKE MAGIC: pedir al contacto/soporte de LIKE MAGIC credenciales
    OAuth de su Open API (mencionar la «Integration API» para chatbots y los
    webhooks de Unified Messaging): con eso el asistente VERÁ los mensajes
@@ -234,6 +274,22 @@ existen porque un cambio rompió algo silenciosamente.
   señale una tarea existente. Hay pruebas que vigilan que crear siga creando.
 - **Formularios anidados**: pasos y comentarios viven DENTRO del formulario
   de la tarea. Nada de `<form>` dentro.
+- **`Promise.all` con una llamada que puede no tener permiso**: el parte del
+  hotel pedía salidas Y limpieza a la vez; como Apaleo niega la limpieza con
+  un 403, se perdía TAMBIÉN lo que sí teníamos y salía «Apaleo no responde».
+  Lo prescindible va aparte, con su propio `catch` (08.09.2026).
+- **Una prueba puede pasar por el motivo equivocado.** `hotel.test.mjs`
+  comprobaba «¿qué cuartos están sucios?» sin credenciales: la guarda de
+  «no configurado» cortaba al principio, así que la regla de limpieza nunca
+  se ejecutaba. Escondía que el filtro decía `/sucia/` y la pregunta natural
+  —la del propio README— es «suci**os**»: nunca entraba. Si una prueba
+  depende de una guarda temprana, hace falta otra que recorra el camino
+  entero (`hotel_permisos.test.mjs`).
+- **⚠️ FALLO PENDIENTE, ajeno a lo anterior:** `test/plazos.test.mjs` da
+  **4 fallos** desde antes de esta sesión (comprobado en el árbol limpio).
+  Los rangos de fecha se parsean mal: «del … al jueves» deja el inicio vacío
+  («Revisar la caldera, del al jueves») y el plazo se va a la semana
+  siguiente. Parece dependiente de la fecha del día. Merece una sesión.
 
 ## 7. Decisiones tomadas (no volver a discutirlas)
 

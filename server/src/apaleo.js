@@ -56,7 +56,10 @@ export async function apaleoGet(ruta, params = {}) {
   })
   if (!res.ok) {
     const detalle = await res.text().catch(() => '')
-    throw new Error(`Apaleo ${res.status} en ${ruta}: ${detalle.slice(0, 200)}`)
+    const err = new Error(`Apaleo ${res.status} en ${ruta}: ${detalle.slice(0, 200)}`)
+    // El código va aparte: un 403 no es una avería, es un permiso que falta.
+    err.status = res.status
+    throw err
   }
   return res.json()
 }
@@ -81,10 +84,35 @@ export async function salidas(fecha, propertyId = config.apaleo.propertyId) {
   return { reservas: j.reservations ?? [], crudo: j }
 }
 
-/** Habitaciones y su estado de limpieza. */
+/**
+ * Habitaciones y su estado de limpieza.
+ *
+ * ⚠️ COMPROBADO CONTRA LA CUENTA REAL (08.09.2026): con los permisos que hoy
+ * tiene la app de Apaleo (`reservations.read` + `accounting.read`) esta ruta
+ * responde **403**. Para que la limpieza funcione hay que añadir en Apaleo el
+ * scope de inventario a la app `UCVF-SP-EINKOMMEN_SYNC`.
+ *
+ * Por eso el 403 NO se lanza como error: se devuelve `sinPermiso: true`. Así
+ * lo que sí funciona (llegadas, salidas, quién está en casa) sigue
+ * respondiendo aunque la limpieza no esté disponible.
+ */
 export async function habitaciones(propertyId = config.apaleo.propertyId) {
-  const j = await apaleoGet('/inventory/v1/units', { propertyId, pageSize: 200 })
-  return { unidades: j.units ?? [], crudo: j }
+  try {
+    const j = await apaleoGet('/inventory/v1/units', { propertyId, pageSize: 200 })
+    return { unidades: j.units ?? [], sinPermiso: false, crudo: j }
+  } catch (err) {
+    if (err.status === 403) return { unidades: [], sinPermiso: true, crudo: null }
+    throw err
+  }
+}
+
+/**
+ * Las propiedades (hoteles) de la cuenta. Sirve para averiguar el
+ * `propertyId` sin tener que adivinarlo: en la cuenta real devuelve `NSH`.
+ */
+export async function propiedades() {
+  const j = await apaleoGet('/inventory/v1/properties', {})
+  return { propiedades: j.properties ?? [], crudo: j }
 }
 
 /** Cuántas personas llegan: se suman adultos y niños de cada reserva. */

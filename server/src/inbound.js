@@ -924,11 +924,15 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
     case 'hotel': {
       if (!apaleoConfigurado()) return t(lang, 'hotel_off')
       const q = String(intent.texto ?? '')
-      const soloSucias = /sucia|schmutzig|sujo|limpiar|reinig|limpar/.test(q)
+      // «suci» y «suj» a secas, sin terminación: la pregunta natural es «qué
+      // cuartos están SUCIOS» (masculino plural) y con /sucia/ no entraba
+      // nunca — el ejemplo del propio README no funcionaba.
+      const soloSucias = /suci|schmutzig|suj[oa]|limpiar|reinig|limpar/.test(q)
       const soloLlegadas = /llegan|llegada|anreise|chegam|chegada|check/.test(q) && !soloSucias
       try {
         if (soloSucias) {
-          const { unidades } = await habitaciones()
+          const { unidades, sinPermiso } = await habitaciones()
+          if (sinPermiso) return t(lang, 'hotel_hk_noperm')
           const { sucias } = porEstadoDeLimpieza(unidades)
           if (sucias.length === 0) return t(lang, 'hotel_dirty_none')
           return t(lang, 'hotel_dirty', {
@@ -950,11 +954,18 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
           return t(lang, 'hotel_arrivals', { personas, reservas: reservas.length, detalle })
         }
         // Parte completo del día.
-        const [{ reservas: salen }, { unidades }] = await Promise.all([salidas(today), habitaciones()])
-        const { sucias, limpias } = porEstadoDeLimpieza(unidades)
+        //
+        // La limpieza es OPCIONAL: hoy Apaleo la niega por falta de permiso.
+        // Por eso no va dentro del mismo Promise.all que las salidas — si
+        // fuese así, un fallo suyo se llevaría por delante también las
+        // llegadas y las salidas, que sí tenemos.
+        const { reservas: salen } = await salidas(today)
+        const hk = await habitaciones().catch(() => ({ unidades: [], sinPermiso: true }))
+        const base = { personas, llegadas: reservas.length, detalle, salidas: salen.length }
+        if (hk.sinPermiso) return t(lang, 'hotel_today_sin_limpieza', base)
+        const { sucias, limpias } = porEstadoDeLimpieza(hk.unidades)
         return t(lang, 'hotel_today', {
-          personas, llegadas: reservas.length, detalle,
-          salidas: salen.length,
+          ...base,
           sucias: sucias.length,
           listaSucias: sucias.map((u) => u.name ?? u.id).join(', ') || '—',
           limpias: limpias.length,
