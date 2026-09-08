@@ -42,15 +42,25 @@
 > mismo**; **«¿qué cuartos están sucios?» NO**, hasta que se añada el permiso
 > de inventario a esa app en Apaleo (Apps → Connected apps → scopes).
 >
-> **Lo único que falta para encenderlo** (no requiere a terceros): añadir al
-> compose del NAS, junto a `QR_IBAN`, estas tres variables y reiniciar
-> `server` — el ID y el secret se copian de `apaleo_config.json`:
-> ```
-> APALEO_CLIENT_ID: UCVF-SP-EINKOMMEN_SYNC
-> APALEO_CLIENT_SECRET: <el de apaleo_config.json — NO ponerlo en el repo>
-> APALEO_PROPERTY_ID: NSH
-> ```
-> El código del asistente ya está adaptado a esta realidad (ver abajo).
+> ✅ **ENCENDIDO EN EL NAS el 08.09.2026.** Las tres variables ya están en el
+> compose (copia previa en `docker-compose.yaml.bak-apaleo-20260908`):
+> `APALEO_CLIENT_ID: UCVF-SP-EINKOMMEN_SYNC`, `APALEO_CLIENT_SECRET` (el de
+> `apaleo_config.json`, **nunca** en el repo) y `APALEO_PROPERTY_ID: NSH`.
+> Probado en producción contra Apaleo de verdad: **6 llegadas / 9 personas y
+> 4 salidas**, con nombres y habitaciones (208+210, 201, 209, 102, 203) — los
+> mismos números que enseña el Cockpit («Heute An / Ab: 6 / 4»). La limpieza
+> devuelve 403 y el asistente lo explica en vez de romperse, como se diseñó.
+>
+> ⚠️ **INCIDENTE DEL MISMO DÍA, ajeno a esto: la base de datos se cayó.** De
+> 14:05 a 16:05 (hora suiza) el asistente estuvo MUDO. Los 1416 ficheros de
+> `/volume1/docker/data/pgdata` habían pasado a pertenecer a `root`, y
+> Postgres corre como **uid 70**: no podía leer sus propios ficheros
+> (`42501` · `could not open file "global/pg_filenode.map"`). Ojo: el
+> contenedor de la BD seguía marcándose «healthy». Arreglado con
+> `docker run --rm -v /volume1/docker/data/pgdata:/d alpine sh -c "chown -R
+> 70:70 /d && chmod 700 /d"` + reiniciar `db` y `server`.
+> **No se supo qué los reasignó a root.** Si el asistente vuelve a enmudecer,
+> mirar esto primero.
 >
 > **Nuevo el 08.09.2026:** kilometraje y consulta de gasto por comercio, y
 > tres fallos silenciosos corregidos (ver «Arreglado» abajo). 20 baterías de
