@@ -19,7 +19,10 @@ import {
   fetchDashboard, analizarPrecios, fijarPrecio, overridesConfigurados,
   porSemanas, proximosEventos, enviarABeds24, recomendarSemanas, coberturaCompetencia,
 } from '../precios.js'
-import { todayKey } from '../dates.js'
+import { todayKey, addDays } from '../dates.js'
+import {
+  apaleoConfigurado, puedeCambiarPrecios, planesDeTarifa, tarifas, fijarPreciosHotel,
+} from '../apaleo.js'
 
 export const preciosRouter = asyncRouter()
 preciosRouter.use(requireAuth)
@@ -92,5 +95,61 @@ preciosRouter.post('/enviar', async (req, res) => {
     res.json({ ok: true, resultado: r })
   } catch (err) {
     res.status(502).json({ error: err.message })
+  }
+})
+
+// ─── El hotel (Apaleo) ───────────────────────────────────────
+// Casa Reto y el hotel son dos mundos distintos: la casa se alquila entera y
+// su precio vive en PreisPilot; el hotel va por planes de tarifa en Apaleo.
+// Por eso son dos rutas y no una con un parámetro.
+
+preciosRouter.get('/hotel', async (req, res) => {
+  if (!apaleoConfigurado()) {
+    return res.json({ disponible: false, motivo: 'Falta configurar Apaleo en el servidor' })
+  }
+  try {
+    const puede = await puedeCambiarPrecios()
+    if (!puede) {
+      return res.json({
+        disponible: false,
+        // Se distingue del error de verdad: esto se arregla en apaleo.dev, no aquí.
+        motivo: 'A la app de Apaleo le faltan los permisos rates.read y rates.manage',
+        puedeEditar: false,
+      })
+    }
+    const planes = await planesDeTarifa()
+    const hoy = todayKey()
+    const hasta = addDays(hoy, 30)
+    const conTarifas = await Promise.all(planes.slice(0, 6).map(async (p) => ({
+      id: p.id,
+      nombre: p.name ?? p.id,
+      tarifas: (await tarifas(p.id, hoy, hasta)).slice(0, 31),
+    })))
+    res.json({
+      disponible: true,
+      puedeEditar: await puedeEditar(req.userId),
+      desde: hoy,
+      hasta,
+      planes: conTarifas,
+    })
+  } catch (err) {
+    res.status(502).json({ disponible: false, motivo: `Apaleo: ${err.message.slice(0, 160)}` })
+  }
+})
+
+// Fijar precios del hotel. Solo admin, igual que Casa Reto, y con ensayo.
+preciosRouter.post('/hotel/fijar', async (req, res) => {
+  if (!(await puedeEditar(req.userId))) {
+    return res.status(403).json({ error: 'Solo un administrador puede cambiar precios' })
+  }
+  const { ratePlanId, cambios, ensayo } = req.body ?? {}
+  if (!ratePlanId || !cambios || typeof cambios !== 'object') {
+    return res.status(400).json({ error: 'Faltan el plan de tarifa o las fechas' })
+  }
+  try {
+    const r = await fijarPreciosHotel({ ratePlanId, cambios, ensayo: Boolean(ensayo) })
+    res.json({ ok: true, ...r })
+  } catch (err) {
+    res.status(err.status === 403 ? 403 : 502).json({ error: err.message.slice(0, 200) })
   }
 })

@@ -35,12 +35,24 @@ export function Precios() {
   const [hoja, setHoja] = useState<api.PreciosHoja | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [meses, setMeses] = useState(2)
-  const [vista, setVista] = useState<'semanas' | 'noches'>('semanas')
+  const [vista, setVista] = useState<'semanas' | 'noches' | 'hotel'>('semanas')
+  const [hotel, setHotel] = useState<api.HotelPrecios | null>(null)
   // Lo que se está escribiendo en cada fila, sin guardar todavía.
   const [borrador, setBorrador] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [ensayo, setEnsayo] = useState<api.EnvioResultado | null>(null)
+
+  // El hotel se pide aparte y solo al abrir su pestaña: si Apaleo no
+  // responde, no debe retrasar la hoja de Casa Reto.
+  useEffect(() => {
+    if (vista !== 'hotel' || hotel) return
+    let vivo = true
+    api.getPreciosHotel()
+      .then((h) => { if (vivo) setHotel(h) })
+      .catch((e) => { if (vivo) setHotel({ disponible: false, motivo: e instanceof Error ? e.message : 'No se pudo cargar' }) })
+    return () => { vivo = false }
+  }, [vista, hotel])
 
   useEffect(() => {
     let vivo = true
@@ -222,7 +234,59 @@ export function Precios() {
       <div className="precios-tabs">
         <button type="button" className={vista === 'semanas' ? 'es-activa' : ''} onClick={() => setVista('semanas')}>Por semanas</button>
         <button type="button" className={vista === 'noches' ? 'es-activa' : ''} onClick={() => setVista('noches')}>Noche a noche</button>
+        <button type="button" className={vista === 'hotel' ? 'es-activa' : ''} onClick={() => setVista('hotel')}>N's Hotel</button>
       </div>
+
+      {vista === 'hotel' && (
+        <div className="card">
+          <h2 className="card-title">N's Hotel · Kerzers</h2>
+          {!hotel ? (
+            <p className="card-sub" style={{ marginBottom: 0 }}>Preguntando a Apaleo…</p>
+          ) : !hotel.disponible ? (
+            <>
+              <p className="card-sub">
+                Los precios del hotel viven en Apaleo, no en PreisPilot. Todavía no se pueden ver desde aquí:
+              </p>
+              <div className="precios-aviso-comp" style={{ marginBottom: 0 }}>
+                {hotel.motivo}
+                <div style={{ marginTop: 8 }}>
+                  Se arregla en <b>apaleo.dev</b> → Apps → la app del hotel → añadir los permisos
+                  <code> rates.read</code>, <code>rates.manage</code> y <code>availability.read</code>.
+                  En cuanto estén, esta pestaña funciona sola.
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="card-sub">
+                Del {hotel.desde} al {hotel.hasta}, por plan de tarifa.
+                {!hotel.puedeEditar && ' Solo un administrador puede cambiarlos.'}
+              </p>
+              {hotel.planes?.map((plan) => (
+                <div key={plan.id} style={{ marginBottom: 22 }}>
+                  <h3 style={{ fontSize: 15, margin: '0 0 8px' }}>{plan.nombre}</h3>
+                  <div className="precios-tabla-scroll">
+                    <table className="precios-tabla">
+                      <thead><tr><th>Noche</th><th>Precio</th></tr></thead>
+                      <tbody>
+                        {plan.tarifas.map((t) => {
+                          const imp = t.price?.grossAmount ?? t.price?.netAmount ?? t.price?.amount
+                          return (
+                            <tr key={t.from}>
+                              <td className="col-fecha">{etiquetaFecha(String(t.from).slice(0, 10))}</td>
+                              <td className="col-precio"><b>{imp != null ? CHF(imp) : '—'}</b></td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {vista === 'semanas' && (
         <div className="card">

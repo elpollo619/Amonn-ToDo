@@ -130,6 +130,17 @@ const enviarComo = async (token, body) => (await fetch(`${base}/enviar`, {
 })).status
 checkIgual('quien no es admin no puede enviar', await enviarComo(tPeon), 403)
 
+console.log('\n4c. EL HOTEL SE EXPLICA CUANDO NO SE PUEDE')
+// Sin Apaleo configurado, la hoja NO debe dar error: debe decir qué falta.
+const hotel = await (await fetch(`${base}/hotel`, { headers: { Authorization: `Bearer ${tJefa}` } })).json()
+checkIgual('no está disponible', hotel.disponible, false)
+checkIgual('y dice por qué', /Apaleo/.test(String(hotel.motivo)), true)
+checkIgual('quien no es admin tampoco puede fijar', (await (await fetch(`${base}/hotel/fijar`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tPeon}` },
+  body: JSON.stringify({ ratePlanId: 'RP-1', cambios: { '2026-10-10': 200 } }),
+})).status), 403)
+
 console.log('\n5. QUITARLO')
 const quitado = await post(tJefa, { fecha: '2099-01-01', precio: null })
 checkIgual('se quita, 200', quitado.status, 200)

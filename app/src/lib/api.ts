@@ -297,6 +297,19 @@ export type PreciosHoja = {
   editable: boolean
 }
 
+export type HotelPrecios = {
+  disponible: boolean
+  motivo?: string
+  puedeEditar?: boolean
+  desde?: string
+  hasta?: string
+  planes?: { id: string; nombre: string; tarifas: { from: string; price?: { grossAmount?: number; netAmount?: number; amount?: number; currency?: string } }[] }[]
+}
+
+export async function getPreciosHotel(): Promise<HotelPrecios> {
+  return apiFetch<HotelPrecios>('/precios/hotel')
+}
+
 export async function getPrecios(): Promise<PreciosHoja> {
   return apiFetch<PreciosHoja>('/precios')
 }
