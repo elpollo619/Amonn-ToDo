@@ -161,3 +161,102 @@ export function porEstadoDeLimpieza(unidades) {
 export function enMantenimiento(unidades) {
   return unidades.filter((u) => u.status?.maintenance ?? u.maintenance)
 }
+
+// ─── Precios del hotel ───────────────────────────────────────
+// Apaleo guarda los precios en «rate plans» (planes de tarifa), no en la
+// habitación: un plan se aplica a un tipo de habitación y a un rango de
+// fechas. Por eso aquí no se habla de «cuarto 204» sino de plan + fecha.
+//
+// ⚠️ El formato del importe NO se inventa. Se LEE la tarifa que Apaleo tiene
+// hoy y se devuelve la misma estructura con el importe cambiado. La
+// documentación pública no fija los nombres del objeto `price`, y adivinarlos
+// sería exactamente el error contra el que avisa este repo.
+//
+// Todo esto necesita el scope `rates.manage`, que la app aún no tiene: hasta
+// entonces `puedeCambiarPrecios()` devuelve false y nadie llama a lo demás.
+
+export async function planesDeTarifa(propertyId = config.apaleo.propertyId) {
+  const r = await apaleoGet('/rateplan/v1/rate-plans', { propertyId, pageSize: 100 })
+  return r.ratePlans ?? []
+}
+
+export async function tarifas(ratePlanId, desde, hasta) {
+  const r = await apaleoGet(`/rateplan/v1/rate-plans/${encodeURIComponent(ratePlanId)}/rates`, {
+    from: `${dia(desde)}T00:00:00Z`,
+    to: `${dia(hasta)}T00:00:00Z`,
+  })
+  return r.rates ?? []
+}
+
+/**
+ * Copia un objeto de precio cambiando SOLO el importe, sea cual sea el nombre
+ * que use Apaleo (grossAmount, netAmount, amount…). Si no reconoce ninguno,
+ * avisa en vez de mandar un precio que se ignoraría en silencio.
+ */
+export function conNuevoImporte(price, importe) {
+  if (!price || typeof price !== 'object') throw new Error('La tarifa no trae precio')
+  const claves = ['grossAmount', 'netAmount', 'amount', 'value']
+  const clave = claves.find((k) => typeof price[k] === 'number')
+  if (!clave) {
+    throw new Error(`No reconozco el precio de Apaleo: ${Object.keys(price).join(', ')}`)
+  }
+  return { ...price, [clave]: importe }
+}
+
+/** ¿Puede esta app cambiar precios? Depende del scope `rates.manage`. */
+export async function puedeCambiarPrecios() {
+  if (!apaleoConfigurado()) return false
+  try {
+    // Se pregunta por los planes: si falta el permiso, Apaleo responde 403 y
+    // eso se distingue de una avería (que sería 5xx o un fallo de red).
+    await apaleoGet('/rateplan/v1/rate-plans', { propertyId: config.apaleo.propertyId, pageSize: 1 })
+    return true
+  } catch (err) {
+    if (err.status === 403 || err.status === 401) return false
+    throw err
+  }
+}
+
+/**
+ * Fija el precio de unas fechas en un plan de tarifa.
+ *
+ * `cambios` es { 'AAAA-MM-DD': importe }. Se leen las tarifas de esos días,
+ * se cambia el importe conservando el resto (restricciones, moneda, franjas
+ * horarias) y se devuelven con PUT. Las fechas que Apaleo no tenga se avisan
+ * en vez de crearse a ciegas: una tarifa inventada puede dejar una noche a la
+ * venta a un precio que nadie ha decidido.
+ */
+export async function fijarPreciosHotel({ ratePlanId, cambios, ensayo = false }) {
+  const fechas = Object.keys(cambios).sort()
+  if (fechas.length === 0) return { cambiadas: 0, sinTarifa: [], ensayo }
+
+  const existentes = await tarifas(ratePlanId, fechas[0], fechas[fechas.length - 1])
+  const porDia = new Map(existentes.map((r) => [dia(r.from), r]))
+
+  const sinTarifa = []
+  const nuevas = []
+  for (const f of fechas) {
+    const actual = porDia.get(f)
+    if (!actual) { sinTarifa.push(f); continue }
+    nuevas.push({ ...actual, price: conNuevoImporte(actual.price, cambios[f]) })
+  }
+
+  if (ensayo || nuevas.length === 0) {
+    return { cambiadas: nuevas.length, sinTarifa, ensayo: true, muestra: nuevas.slice(0, 3) }
+  }
+
+  const t = await conseguirToken()
+  const res = await fetch(`${API}/rateplan/v1/rate-plans/${encodeURIComponent(ratePlanId)}/rates`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(nuevas),
+    signal: AbortSignal.timeout(60_000),
+  })
+  if (!res.ok) {
+    const detalle = await res.text().catch(() => '')
+    const err = new Error(`Apaleo ${res.status} al fijar precios: ${detalle.slice(0, 200)}`)
+    err.status = res.status
+    throw err
+  }
+  return { cambiadas: nuevas.length, sinTarifa, ensayo: false }
+}
