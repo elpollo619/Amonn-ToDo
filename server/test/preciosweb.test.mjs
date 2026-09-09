@@ -56,7 +56,7 @@ const { rows } = await query(
 )
 const jefa = rows.find((r) => r.email === 'jefa@x.com')
 const peon = rows.find((r) => r.email === 'peon@x.com')
-await darPermiso(jefa.id, 'dinero')
+await darPermiso(jefa.id, 'admin')
 
 const app = express()
 app.use(express.json())
@@ -85,14 +85,22 @@ checkIgual('sin sesión, 401', (await (await fetch(base)).status), 401)
 const vistaPeon = await get(tPeon)
 checkIgual('cualquiera del equipo puede mirar', vistaPeon.status, 200)
 checkIgual('  pero sin permiso no puede editar', vistaPeon.body.puedeEditar, false)
-checkIgual('quien lleva el dinero sí', (await get(tJefa)).body.puedeEditar, true)
+checkIgual('un admin sí', (await get(tJefa)).body.puedeEditar, true)
 checkIgual('trae el calendario', vistaPeon.body.calendario.length, 2)
 checkIgual('y el análisis', vistaPeon.body.analisis.base, 300)
 
-console.log('\n2. QUIÉN PUEDE FIJAR PRECIOS')
-checkIgual('sin el permiso «dinero», 403',
+checkIgual('resume por semanas', vistaPeon.body.semanas.length > 0, true)
+checkIgual('y lista los eventos', vistaPeon.body.eventos[0].nombre, 'Fiesta')
+
+console.log('\n2. SOLO UN ADMIN PUEDE FIJAR PRECIOS')
+checkIgual('sin ser admin, 403',
   (await post(tPeon, { fecha: '2099-01-01', precio: 400 })).status, 403)
 checkIgual('y no se guardó nada', guardado.length, 0)
+
+console.log('\n2b. EL PERMISO «DINERO» YA NO BASTA (decisión de Cris, 09.09.2026)')
+await darPermiso(peon.id, 'dinero')
+checkIgual('quien lleva el dinero pero no es admin, 403',
+  (await post(tPeon, { fecha: '2099-01-01', precio: 400 })).status, 403)
 
 console.log('\n3. LO QUE SE RECHAZA ANTES DE MANDARLO A BEDS24')
 checkIgual('una fecha mal escrita', (await post(tJefa, { fecha: '01/01/2099', precio: 400 })).status, 400)

@@ -153,3 +153,72 @@ export async function fijarPrecio({ fecha, precio, minStay = null, nota = null, 
   if (!out.ok) throw new Error(out.error ?? `PreisPilot respondió ${res.status}`)
   return overrides
 }
+
+// ─── Vista por semanas y eventos ─────────────────────────────
+// Los eventos NO se leen del config.json del motor (vive en otra máquina):
+// se derivan del propio calendario, que ya trae el evento de cada noche. Así
+// lo que se enseña es exactamente lo que se va a cobrar.
+
+const lunesDe = (key) => {
+  const d = new Date(`${key}T00:00:00Z`)
+  // getUTCDay(): 0 = domingo. La semana se cuenta de lunes a domingo.
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7))
+  return d.toISOString().slice(0, 10)
+}
+
+/** Resumen semana a semana: media, mínimo, máximo y qué pasa esa semana. */
+export function porSemanas(calendar, hoy = todayKey(), semanas = 12) {
+  const noches = (calendar ?? []).filter((n) => n.d >= hoy).sort((a, b) => (a.d < b.d ? -1 : 1))
+  const mapa = new Map()
+  for (const n of noches) {
+    const k = lunesDe(n.d)
+    if (!mapa.has(k)) mapa.set(k, { desde: k, noches: [], eventos: new Set() })
+    const s = mapa.get(k)
+    s.noches.push(n)
+    if (n.ev) s.eventos.add(n.ev)
+  }
+  return [...mapa.values()].slice(0, semanas).map((s) => {
+    const precios = s.noches.map((n) => n.p).filter((p) => Number.isFinite(p))
+    const fin = s.noches[s.noches.length - 1].d
+    return {
+      desde: s.desde,
+      hasta: fin,
+      noches: s.noches.length,
+      media: media(precios),
+      min: precios.length ? Math.min(...precios) : 0,
+      max: precios.length ? Math.max(...precios) : 0,
+      finde: media(s.noches.filter((n) => n.we).map((n) => n.p)),
+      entreSemana: media(s.noches.filter((n) => !n.we).map((n) => n.p)),
+      eventos: [...s.eventos],
+    }
+  })
+}
+
+/**
+ * Los próximos eventos, agrupando las noches seguidas que comparten nombre.
+ * Devuelve también qué precio medio tienen y cuánto sube respecto a la media
+ * general: es lo que de verdad interesa mirar antes de tocar nada.
+ */
+export function proximosEventos(calendar, hoy = todayKey(), limite = 12) {
+  const noches = (calendar ?? []).filter((n) => n.d >= hoy).sort((a, b) => (a.d < b.d ? -1 : 1))
+  const normal = media(noches.filter((n) => !n.ev).map((n) => n.p))
+  const bloques = []
+  for (const n of noches) {
+    if (!n.ev) continue
+    const ult = bloques[bloques.length - 1]
+    // Se unen solo si es el MISMO evento y la noche siguiente: dos ediciones
+    // distintas del mismo festival no deben salir como un bloque único.
+    const seguido = ult && ult.nombre === n.ev && addDays(ult.hasta, 1) === n.d
+    if (seguido) { ult.hasta = n.d; ult.precios.push(n.p) }
+    else bloques.push({ nombre: n.ev, desde: n.d, hasta: n.d, precios: [n.p] })
+  }
+  return bloques.slice(0, limite).map((b) => ({
+    nombre: b.nombre,
+    desde: b.desde,
+    hasta: b.hasta,
+    noches: b.precios.length,
+    media: media(b.precios),
+    // Cuánto más caro que una noche normal, en %.
+    sobreNormal: normal ? Math.round((media(b.precios) / normal - 1) * 100) : 0,
+  }))
+}

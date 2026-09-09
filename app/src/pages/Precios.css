@@ -43,3 +43,14 @@
   background: var(--bg); color: var(--text); font-size: 13.5px;
 }
 .btn-sm { padding: 5px 10px; font-size: 12.5px; }
+
+.precios-tabs { display: flex; gap: 6px; margin: 4px 0 14px; }
+.precios-tabs button {
+  padding: 7px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-soft);
+  cursor: pointer;
+}
+.precios-tabs button.es-activa { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.precios-sube { color: var(--danger); font-weight: 600; }
+.precios-baja { color: var(--text-muted); }

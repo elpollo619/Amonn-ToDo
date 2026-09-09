@@ -35,6 +35,7 @@ export function Precios() {
   const [hoja, setHoja] = useState<api.PreciosHoja | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [meses, setMeses] = useState(2)
+  const [vista, setVista] = useState<'semanas' | 'noches'>('semanas')
   // Lo que se está escribiendo en cada fila, sin guardar todavía.
   const [borrador, setBorrador] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState<string | null>(null)
@@ -139,6 +140,73 @@ export function Precios() {
         </div>
       )}
 
+      {hoja.eventos.length > 0 && (
+        <div className="card">
+          <h2 className="card-title">Lo que viene</h2>
+          <p className="card-sub">
+            Los días con evento o fiesta, y cuánto se cobra de más que en una noche normal.
+          </p>
+          <div className="precios-tabla-scroll">
+            <table className="precios-tabla">
+              <thead>
+                <tr><th>Fechas</th><th>Qué pasa</th><th>Noches</th><th>Precio medio</th><th>vs. normal</th></tr>
+              </thead>
+              <tbody>
+                {hoja.eventos.map((e) => (
+                  <tr key={`${e.nombre}-${e.desde}`}>
+                    <td className="col-fecha">{etiquetaFecha(e.desde)} → {etiquetaFecha(e.hasta)}</td>
+                    <td>{e.nombre}</td>
+                    <td>{e.noches}</td>
+                    <td className="col-precio"><b>{CHF(e.media)}</b></td>
+                    <td className={e.sobreNormal >= 0 ? 'precios-sube' : 'precios-baja'}>
+                      {e.sobreNormal >= 0 ? '+' : ''}{e.sobreNormal}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint" style={{ marginBottom: 0 }}>
+            Un evento en temporada baja puede salir por debajo de la media del año aunque
+            lleve recargo: el recargo se aplica sobre el precio de esos días, no sobre el del verano.
+          </p>
+        </div>
+      )}
+
+      <div className="precios-tabs">
+        <button type="button" className={vista === 'semanas' ? 'es-activa' : ''} onClick={() => setVista('semanas')}>Por semanas</button>
+        <button type="button" className={vista === 'noches' ? 'es-activa' : ''} onClick={() => setVista('noches')}>Noche a noche</button>
+      </div>
+
+      {vista === 'semanas' && (
+        <div className="card">
+          <h2 className="card-title">Semana a semana</h2>
+          <p className="card-sub">
+            Cada semana, de lunes a domingo: lo que sale de media, lo más barato y lo más caro.
+          </p>
+          <div className="precios-tabla-scroll">
+            <table className="precios-tabla">
+              <thead>
+                <tr><th>Semana</th><th>Media</th><th>Entre semana</th><th>Finde</th><th>Mín–Máx</th><th>Qué pasa</th></tr>
+              </thead>
+              <tbody>
+                {hoja.semanas.map((w) => (
+                  <tr key={w.desde} className={w.eventos.length ? 'es-fijado' : undefined}>
+                    <td className="col-fecha">{etiquetaFecha(w.desde)} → {etiquetaFecha(w.hasta)}</td>
+                    <td className="col-precio"><b>{CHF(w.media)}</b></td>
+                    <td>{w.entreSemana ? CHF(w.entreSemana) : '—'}</td>
+                    <td>{w.finde ? CHF(w.finde) : '—'}</td>
+                    <td>{CHF(w.min)} – {CHF(w.max)}</td>
+                    <td className="col-porque">{w.eventos.join(' · ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {vista === 'noches' && (
       <div className="card">
         <h2 className="card-title">Las próximas noches</h2>
         <p className="card-sub">
@@ -205,6 +273,7 @@ export function Precios() {
           </button>
         )}
       </div>
+      )}
     </>
   )
 }

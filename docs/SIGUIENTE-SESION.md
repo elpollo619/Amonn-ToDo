@@ -121,6 +121,8 @@ Todo esto está **desplegado y probado con datos reales**:
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
 | Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` = **80 rp/km** (CHF 0.80, confirmada por Cris el 09.09.2026 y puesta en el compose del NAS; el valor por defecto del código es 70); «kilómetros» o «kilómetros 2026» suma el año |
 | Gasto por comercio | «¿cuánto gastamos en IKEA este año?» · «gasto en Coop este mes» → total, número de gastos y los cinco últimos |
+| Hoja de precios (web) | Página **/precios**: el precio de cada noche, el desglose de por qué sale ese, y fijar uno a mano (permiso «dinero»). Va a `casa_overrides` de PreisPilot vía `seed` con `PREISPILOT_PIN` (en el compose del NAS, NUNCA en el navegador); el cron lo respeta y sale a Beds24 en el siguiente pase |
+| Contraseña (web) | En **Perfil** cada uno cambia la suya; se exige la actual aunque la sesión esté abierta |
 | Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
 | Resumen semanal | «Resumen semanal» a demanda; los lunes 07:00 automático a los teléfonos de `RESUMEN_TO` |
 | Aviso de citas | 1 h antes de cada cita, WhatsApp automático a quien va (cron cada 5 min) |
@@ -255,6 +257,24 @@ chat; no están en el repo).
   escribieron, y el separador de miles de `de-CH`, que cambia según el ICU
   de cada Node). Ahora comprueban la forma, no la máquina.
 
+## 4c. La hoja de precios — lo que falta y las trampas (09.09.2026)
+
+- **El hotel A14 NO está en la hoja.** Cris lo pidió, pero sus precios viven
+  en Apaleo (tarifas y planes), que es otro modelo distinto del calendario
+  noche-a-noche de PreisPilot. Es una segunda fase de verdad, no un añadido:
+  hay que decidir qué es «el precio» de una habitación de hotel antes de
+  pintarlo. Las credenciales de Apaleo ya funcionan.
+- ⚠️ **`seed` reescribe la clave entera**, no una fecha: se lee el mapa de
+  overrides completo y se vuelve a guardar completo. Si dos personas fijan
+  precios a la vez, la última pisa a la primera. Con unas pocas fechas
+  compensa la sencillez; con cientos, habrá que cambiarlo.
+- ⚠️ **Recordatorio de PreisPilot:** la casa tiene `numAvail: 0` y CERO
+  reservas en Beds24. Los precios son correctos, pero **la unidad no es
+  reservable**: fijar precios no producirá ninguna reserva hasta que se abra
+  la disponibilidad.
+- Los topes `min`/`max` del motor se validan en el servidor ANTES de mandar
+  nada. Un dedazo (20 en vez de 200) llegaría a Beds24 esa misma noche.
+
 ## 5. Pruebas
 
 ```bash
@@ -264,7 +284,7 @@ initdb -D /tmp/pg -U postgres --auth=trust && pg_ctl -D /tmp/pg -o "-p 5433 -k /
 DATABASE_URL="postgres://postgres@127.0.0.1:5433/postgres" WA_ENABLED=false npm run test:db
 ```
 
-**26 baterías** (6 sin base + 20 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
+**28 baterías** (6 sin base + 22 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
 existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido

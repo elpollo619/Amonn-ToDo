@@ -4,9 +4,12 @@
 // Leer los precios lo puede hacer cualquiera del equipo: saber a cuánto está
 // la casa no es información delicada y ayuda a todos.
 //
-// FIJAR un precio exige el permiso «dinero», el mismo que las facturas y los
-// impagos: lo que se guarda aquí acaba en Beds24 en el siguiente pase del
-// cron y es dinero real.
+// APROBAR un precio es SOLO de admin (decisión de Cris, 09.09.2026). No vale
+// el permiso «dinero»: poner precios no es lo mismo que emitir una factura.
+//
+// Y desde esa misma fecha **nada se envía solo**: el cron de PreisPilot que
+// aplicaba a Beds24 dos veces al día está desactivado (`cron.job` id 1,
+// `active = false`). Los precios los manda una persona, a mano, desde aquí.
 // ============================================================
 import { asyncRouter } from '../util.js'
 import { requireAuth } from '../auth.js'
@@ -14,6 +17,7 @@ import { tienePermiso } from '../permisos.js'
 import { query } from '../db.js'
 import {
   fetchDashboard, analizarPrecios, fijarPrecio, overridesConfigurados,
+  porSemanas, proximosEventos,
 } from '../precios.js'
 import { todayKey } from '../dates.js'
 
@@ -21,7 +25,7 @@ export const preciosRouter = asyncRouter()
 preciosRouter.use(requireAuth)
 
 async function puedeEditar(userId) {
-  return (await tienePermiso(userId, 'dinero')) || (await tienePermiso(userId, 'admin'))
+  return tienePermiso(userId, 'admin')
 }
 
 // El calendario, el análisis y lo que hay fijado a mano.
@@ -34,6 +38,8 @@ preciosRouter.get('/', async (req, res) => {
       analisis,
       overrides: datos?.overrides ?? {},
       calendario: (datos?.calendar ?? []).filter((n) => n.d >= todayKey()),
+      semanas: porSemanas(datos?.calendar, todayKey()),
+      eventos: proximosEventos(datos?.calendar, todayKey()),
       puedeEditar: await puedeEditar(req.userId),
       // Sin PIN la hoja se ve igual, pero el botón de guardar se apaga en vez
       // de fallar al pulsarlo.
@@ -47,7 +53,7 @@ preciosRouter.get('/', async (req, res) => {
 // Fijar o quitar el precio de una noche.
 preciosRouter.post('/override', async (req, res) => {
   if (!(await puedeEditar(req.userId))) {
-    return res.status(403).json({ error: 'Necesitas el permiso «dinero» para cambiar precios' })
+    return res.status(403).json({ error: 'Solo un administrador puede cambiar precios' })
   }
   if (!overridesConfigurados()) {
     return res.status(503).json({ error: 'Falta PREISPILOT_PIN en el servidor' })

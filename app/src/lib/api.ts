@@ -265,6 +265,17 @@ export type NochePrecio = {
 
 export type Override = { price?: number; minStay?: number; note?: string }
 
+export type SemanaPrecio = {
+  desde: string; hasta: string; noches: number
+  media: number; min: number; max: number
+  finde: number; entreSemana: number; eventos: string[]
+}
+
+export type EventoPrecio = {
+  nombre: string; desde: string; hasta: string
+  noches: number; media: number; sobreNormal: number
+}
+
 export type PreciosHoja = {
   propiedad: string
   analisis: {
@@ -276,6 +287,8 @@ export type PreciosHoja = {
   }
   overrides: Record<string, Override>
   calendario: NochePrecio[]
+  semanas: SemanaPrecio[]
+  eventos: EventoPrecio[]
   puedeEditar: boolean
   editable: boolean
 }
