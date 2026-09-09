@@ -18,6 +18,7 @@ import { webhookRouter } from './routes/webhook.js'
 import { calendarRouter } from './routes/calendar.js'
 import { spesenRouter } from './routes/spesen.js'
 import { facturaRouter } from './routes/factura.js'
+import { preciosRouter } from './routes/precios.js'
 import { scheduleReminders, runReminders , scheduleAvisoBasura, scheduleAvisoCitas, scheduleResumenSemanal } from './reminders.js'
 import { scheduleEspejoHuespedes } from './huespedes.js'
 import { scheduleAvisoMeteo } from './meteo.js'
@@ -64,6 +65,7 @@ app.use('/api/tasks', tasksRouter)
 app.use('/api/profiles', profilesRouter)
 app.use('/api/aliases', aliasesRouter)
 app.use('/api/states', statesRouter)
+app.use('/api/precios', preciosRouter)
 // Los pasos cuelgan de /api/tasks/:id/subtasks y de /api/subtasks/:id.
 app.use('/api', subtasksRouter)
 app.use('/api', commentsRouter)

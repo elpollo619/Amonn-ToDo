@@ -88,3 +88,68 @@ export function analizarPrecios({ status, calendar, lastApply }, hoy = todayKey(
     consejos,
   }
 }
+
+// ─── Precios fijados a mano ──────────────────────────────────
+// PreisPilot guarda los overrides en `pp_state.casa_overrides`, con la forma
+// {"AAAA-MM-DD": {price, minStay?, note?}}. Se leen con `dashboard` y se
+// escriben con `seed`, que pide el PIN. El PIN NO sale del servidor: la hoja
+// web habla con nosotros y nosotros con PreisPilot.
+//
+// Importante: desde el 08.09.2026 el cron de PreisPilot RESPETA estos
+// precios, así que fijar uno aquí ya no dura solo hasta el siguiente pase.
+
+export function overridesConfigurados() {
+  return Boolean(config.preispilot.pin)
+}
+
+/** Todo lo fijado a mano, tal cual está hoy. */
+export async function leerOverrides() {
+  const d = await fetchDashboard()
+  return d?.overrides ?? {}
+}
+
+/**
+ * Fija (o quita, con price null) el precio de una noche. Devuelve el mapa
+ * completo ya guardado.
+ *
+ * Se lee el mapa entero y se reescribe entero porque `seed` es un upsert de
+ * la clave: no hay forma de tocar una sola fecha. Es un dato pequeño (unas
+ * pocas fechas), así que compensa la sencillez.
+ */
+export async function fijarPrecio({ fecha, precio, minStay = null, nota = null, quien = null }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha ?? ''))) {
+    throw new Error('La fecha debe ser AAAA-MM-DD')
+  }
+  if (!config.preispilot.pin) throw new Error('Falta PREISPILOT_PIN en el servidor')
+
+  const overrides = await leerOverrides()
+  if (precio === null || precio === undefined) {
+    delete overrides[fecha]
+  } else {
+    const p = Number(precio)
+    if (!Number.isFinite(p) || p <= 0) throw new Error('Precio inválido')
+    // Los límites del propio motor: fijar 20 CHF por un dedazo sería caro.
+    const { status } = await fetchDashboard()
+    const min = Number(status?.min ?? 0)
+    const max = Number(status?.max ?? 0)
+    if (min && p < min) throw new Error(`El mínimo configurado es CHF ${min}`)
+    if (max && p > max) throw new Error(`El máximo configurado es CHF ${max}`)
+    overrides[fecha] = {
+      price: p,
+      ...(minStay ? { minStay: Number(minStay) } : {}),
+      // Se deja constancia de quién lo tocó: dentro de un mes nadie recuerda
+      // por qué esa noche vale 420.
+      ...(nota || quien ? { note: [nota, quien && `(${quien})`].filter(Boolean).join(' ') } : {}),
+    }
+  }
+
+  const res = await fetch(`${config.preispilot.baseUrl}/seed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: config.preispilot.pin, key: 'casa_overrides', value: overrides }),
+    signal: AbortSignal.timeout(20_000),
+  })
+  const out = await res.json().catch(() => ({}))
+  if (!out.ok) throw new Error(out.error ?? `PreisPilot respondió ${res.status}`)
+  return overrides
+}

@@ -129,6 +129,18 @@ export function IconMail({ size = 20 }: { size?: number }) {
 }
 
 /** Tablero por columnas (kanban). */
+export function IconPrecios({ size = 20 }: { size?: number }) {
+  // Etiqueta de precio: se lee como «tarifa» de un vistazo y encaja con el
+  // resto del juego (trazo 1.8, sin relleno).
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.6 13.4 12.5 21.5a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V4.5a2 2 0 0 1 2-2h8.4a2 2 0 0 1 1.4.6l6.9 6.9a2 2 0 0 1 0 2.8Z" />
+      <circle cx="7.5" cy="7.5" r="1.4" />
+    </svg>
+  )
+}
+
 export function IconBoard({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"

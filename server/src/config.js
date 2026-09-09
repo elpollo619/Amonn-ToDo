@@ -68,6 +68,13 @@ export const config = {
   preispilot: {
     dashboardUrl: process.env.PREISPILOT_URL ??
       'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
+    // Base de las Edge Functions: de ahí salen `dashboard` (leer) y `seed`
+    // (guardar los precios fijados a mano).
+    baseUrl: process.env.PREISPILOT_BASE ??
+      'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1',
+    // El PIN vive SOLO en el servidor. Sin él la hoja de precios se ve pero
+    // no deja fijar nada, en vez de fallar al guardar.
+    pin: process.env.PREISPILOT_PIN ?? null,
   },
   // QR-Rechnung. Sin QR_IBAN, la orden «factura …» explica qué falta.
   // ⚠️ Confirmar el IBAN con Cris antes de ponerlo: es adonde va el dinero.

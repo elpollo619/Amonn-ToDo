@@ -10,6 +10,7 @@ import { Timeline } from './pages/Timeline'
 import { Calendar } from './pages/Calendar'
 import { Team } from './pages/Team'
 import { Profile } from './pages/Profile'
+import { Precios } from './pages/Precios'
 
 function AppRoutes() {
   const { user, loading } = useAuth()
@@ -33,6 +34,7 @@ function AppRoutes() {
           <Route path="tiempo" element={<Timeline />} />
           <Route path="calendario" element={<Calendar />} />
           <Route path="equipo" element={<Team />} />
+          <Route path="precios" element={<Precios />} />
           <Route path="perfil" element={<Profile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

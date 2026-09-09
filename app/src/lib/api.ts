@@ -254,6 +254,49 @@ export async function listProfiles(): Promise<Profile[]> {
  * Cambiar la propia contraseña. Exige la actual a propósito: ver el
  * comentario del endpoint en server/src/routes/profiles.js.
  */
+export type NochePrecio = {
+  d: string            // fecha AAAA-MM-DD
+  p: number            // precio final en CHF
+  w?: string           // día de la semana, como lo manda PreisPilot (Mo, Di…)
+  ev?: string          // evento de ese día, si lo hay
+  we?: number          // 1 si es fin de semana
+  br?: { t: string; v: number; f?: number | null }[]   // desglose del cálculo
+}
+
+export type Override = { price?: number; minStay?: number; note?: string }
+
+export type PreciosHoja = {
+  propiedad: string
+  analisis: {
+    base: number | null; min: number | null; max: number | null
+    media7: number; media30: number; eventosProx30: number
+    ultimoEnvio?: string | null; aplicado?: boolean
+    diasDesdeCalculo?: number | null
+    consejos: { tipo: string; [k: string]: unknown }[]
+  }
+  overrides: Record<string, Override>
+  calendario: NochePrecio[]
+  puedeEditar: boolean
+  editable: boolean
+}
+
+export async function getPrecios(): Promise<PreciosHoja> {
+  return apiFetch<PreciosHoja>('/precios')
+}
+
+/** Fijar el precio de una noche. `precio: null` quita el precio fijado. */
+export async function fijarPrecio(
+  fecha: string,
+  precio: number | null,
+  nota?: string,
+): Promise<Record<string, Override>> {
+  const r = await apiFetch<{ ok: true; overrides: Record<string, Override> }>('/precios/override', {
+    method: 'POST',
+    body: JSON.stringify({ fecha, precio, nota: nota ?? null }),
+  })
+  return r.overrides
+}
+
 export async function changePassword(
   id: string,
   currentPassword: string,
