@@ -65,6 +65,14 @@ export const config = {
   // PreisPilot: el motor de precios de Casa Reto (Supabase, proyecto
   // hansamonn-vermietung). Su función `dashboard` es pública, por eso la
   // URL puede ir aquí como valor por defecto: no es un secreto.
+  // WorkPulse (Hetzner, https://workpulse.ch) es el sistema donde viven los
+  // datos de negocio desde 09.09.2026. El asistente entra con un usuario de
+  // SERVICIO propio, nunca con la cuenta de una persona.
+  workpulse: {
+    url: (process.env.WORKPULSE_URL ?? 'https://workpulse.ch').replace(/\/+$/, ''),
+    email: process.env.WORKPULSE_EMAIL ?? null,
+    password: process.env.WORKPULSE_PASSWORD ?? null,
+  },
   preispilot: {
     dashboardUrl: process.env.PREISPILOT_URL ??
       'https://teioztcidolgyqlwzlrb.supabase.co/functions/v1/dashboard',
