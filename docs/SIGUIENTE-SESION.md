@@ -259,6 +259,31 @@ chat; no están en el repo).
 
 ## 4c. La hoja de precios — lo que falta y las trampas (09.09.2026)
 
+🔴 **CAMBIO DE POLÍTICA (09.09.2026, decisión de Cris): los precios ya NO se
+aplican solos.** El job de pg_cron `preispilot-apply-casa-reto` (cron.job id
+1) está **`active = false`**. Se reactiva con
+`select cron.alter_job(1, active := true);` en el Supabase de PreisPilot.
+Ahora los precios llegan a Beds24 SOLO cuando un **admin** pulsa «Aprobar y
+enviar» en /precios. Consecuencia: **si nadie pulsa, Beds24 se queda con los
+últimos precios enviados.** Conviene mirarlo de vez en cuando.
+Aprobar precios exige **admin**, ya no el permiso «dinero».
+
+🔴 **NO existe ningún radar de competencia automático**, pese a que se creía
+que sí. Lo único que hay es `data/comp-data.json` en `preispilot-engine`,
+**rellenado a mano, con 6 fechas**. Medido sobre el calendario real: solo
+**6 de 364 noches** llevan el paso `Wettbewerb`. Por eso la hoja enseña un
+nivel de fiabilidad (alta/media/baja) por semana en vez de un número seco.
+Para tener exactitud de verdad hacen falta datos de mercado (PriceLabs,
+AirDNA…) o alguien rellenando esa tabla a conciencia. **Raspar Booking o
+Airbnb no es el camino**: va contra sus términos y se rompe cada dos por
+tres.
+
+⚠️ **El botón «volver a mirar la competencia a fondo» que pidió Cris no se
+pudo hacer**, por lo de arriba: no hay fuente que consultar. Y *recalcular*
+el calendario tampoco se puede desde el NAS: el motor (`gen-calendar.js`)
+vive en el contenedor de Cowork, no en Supabase. Lo que sí se hizo es el
+botón de **enviar** lo ya calculado, con ensayo previo.
+
 - **El hotel A14 NO está en la hoja.** Cris lo pidió, pero sus precios viven
   en Apaleo (tarifas y planes), que es otro modelo distinto del calendario
   noche-a-noche de PreisPilot. Es una segunda fase de verdad, no un añadido:
