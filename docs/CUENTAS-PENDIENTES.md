@@ -7,7 +7,7 @@ diagrama de unión con WorkPulse: artifact «Un solo sistema».
 | # | Qué | Estado |
 |---|-----|--------|
 | 1 | **Beds24** — abrir la disponibilidad de Casa Reto | 🔴 lo más urgente |
-| 2 | **Apaleo** — scopes `rates.manage`, `rates.read`, `availability.read` | 🔴 bloquea precios del hotel |
+| 2 | **Apaleo** — scopes `rates.manage`, `rates.read`, `availability.read` | 🔴 el código YA está listo y esperando |
 | 3 | **PriceLabs** — Market Dashboard suelto (~9 CHF/mes) | 🟡 decidido, sin contratar |
 | 4 | ~~WorkPulse — usuario de servicio~~ | ✅ **HECHO** 09.09.2026 |
 | 5 | **Google** — cuenta de servicio (Drive + Docs) | 🟡 desde sept 2026 |
@@ -20,7 +20,11 @@ diagrama de unión con WorkPulse: artifact «Un solo sistema».
 no es reservable. Mientras siga así, ningún trabajo sobre precios produce
 ingresos. Gratis de arreglar y va antes que todo lo demás.
 
-**2. Apaleo.** El token actual solo tiene `accounting.read` y
+**2. Apaleo.** El código de precios del hotel está escrito, probado y
+desplegado: se enciende SOLO en cuanto lleguen los permisos, sin tocar nada
+más. Comprobado contra el Apaleo real el 09.09.2026: `puedeCambiarPrecios()`
+devuelve `false`.
+El token actual solo tiene `accounting.read` y
 `reservations.read` (comprobado el 09.09.2026 decodificando el JWT). Para
 escribir precios: apaleo.dev → cuenta del hotel → Apps →
 `UCVF-SP-EINKOMMEN_SYNC` → añadir `rates.manage`, `rates.read`,

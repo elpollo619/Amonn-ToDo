@@ -121,6 +121,8 @@ Todo esto está **desplegado y probado con datos reales**:
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
 | Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` = **80 rp/km** (CHF 0.80, confirmada por Cris el 09.09.2026 y puesta en el compose del NAS; el valor por defecto del código es 70); «kilómetros» o «kilómetros 2026» suma el año |
 | Gasto por comercio | «¿cuánto gastamos en IKEA este año?» · «gasto en Coop este mes» → total, número de gastos y los cinco últimos |
+| Precios del hotel | Pestaña **N's Hotel** en /precios: planes de tarifa de Apaleo y fijar precios (`server/src/apaleo.js` → `fijarPreciosHotel`). ⚠️ **Apagado hasta que la app de Apaleo tenga `rates.manage`**; hasta entonces la pestaña explica qué falta en vez de dar error |
+| Puente con WorkPulse | `server/src/workpulse.js` — entra con el usuario de servicio `asistente@hansamonn.ch` y crea gastos en WorkPulse. Probado en producción desde el NAS. Aún NO se usa para guardar: espera a la migración de las 30 columnas |
 | Hoja de precios (web) | Página **/precios**: el precio de cada noche, el desglose de por qué sale ese, y fijar uno a mano (permiso «dinero»). Va a `casa_overrides` de PreisPilot vía `seed` con `PREISPILOT_PIN` (en el compose del NAS, NUNCA en el navegador); el cron lo respeta y sale a Beds24 en el siguiente pase |
 | Contraseña (web) | En **Perfil** cada uno cambia la suya; se exige la actual aunque la sesión esté abierta |
 | Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
@@ -300,6 +302,30 @@ botón de **enviar** lo ya calculado, con ensayo previo.
 - Los topes `min`/`max` del motor se validan en el servidor ANTES de mandar
   nada. Un dedazo (20 en vez de 200) llegaría a Beds24 esa misma noche.
 
+## 4d. Lo que está escrito pero AÚN NO ENCENDIDO (09.09.2026)
+
+Dos cosas terminadas y probadas que esperan una acción de Cris. Ninguna
+necesita más código: se encienden solas cuando llegue el permiso.
+
+1. **Precios del hotel** (`apaleo.js`). Espera los scopes `rates.manage`,
+   `rates.read` y `availability.read`. `puedeCambiarPrecios()` lo detecta
+   solo: hoy devuelve `false` contra el Apaleo real (comprobado), y pasará a
+   `true` sin tocar nada.
+   ⚠️ Detalle que decide si funciona: **el formato del importe no se
+   inventa**. Se lee la tarifa actual y se devuelve la misma estructura con
+   el importe cambiado, porque la documentación pública no fija los nombres
+   del objeto `price`. Mandar `amount` donde Apaleo espera `grossAmount` se
+   aceptaría y el precio NO cambiaría — fallo silencioso sobre dinero.
+2. **Gastos en WorkPulse** (`workpulse.js`). Espera a que se aplique la
+   migración `20260909120000_spesen_konten_haag` (rama
+   `feat/spesen-katalog-haag` del repo workpulse) y a fusionarla. Hasta
+   entonces los gastos siguen guardándose en el NAS a propósito: no se
+   cambia dónde vive un dato de la empresa hasta que exista la tabla al otro
+   lado.
+   ⚠️ En WorkPulse hay **dos migraciones más acumuladas sin aplicar**
+   (nextcloud y HAAG modules, según su CLAUDE.md). Van todas juntas: hacerlo
+   acompañado, no a ciegas.
+
 ## 5. Pruebas
 
 ```bash
@@ -309,7 +335,7 @@ initdb -D /tmp/pg -U postgres --auth=trust && pg_ctl -D /tmp/pg -o "-p 5433 -k /
 DATABASE_URL="postgres://postgres@127.0.0.1:5433/postgres" WA_ENABLED=false npm run test:db
 ```
 
-**28 baterías** (6 sin base + 22 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
+**31 baterías** (8 sin base + 23 con base), todas en verde. Si tocas el asistente, ejecútalas: varias
 existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido
