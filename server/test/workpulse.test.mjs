@@ -69,6 +69,15 @@ await crearGasto({
 checkIgual('los km, aparte del importe', gastos[1].kilometers, 120)
 checkIgual('y el importe en francos', gastos[1].amount, 96)
 
+console.log('\n3b. LA COLUMNA CONTABLE VIAJA HASTA WORKPULSE')
+await crearGasto({
+  concepto: 'Migros Putzmittel', categoria: 'SONSTIGES',
+  importeCents: 945, fecha: '2026-09-09', kontoKey: 'b22_reinigung',
+})
+checkIgual('va la columna real', gastos[2].kontoKey, 'b22_reinigung')
+// Sin ella, el gasto llegaría a la contabilidad sin saber a qué cuenta va.
+checkIgual('sin columna, no se inventa el campo', gastos[0].kontoKey, undefined)
+
 console.log('\n4. NO SE VUELVE A ENTRAR SI NO HACE FALTA')
 await listarGastos()
 checkIgual('sigue una sola entrada', logins, 1)
@@ -80,9 +89,9 @@ const g3 = await crearGasto({
   concepto: 'Coop Kaffee', categoria: 'MAHLZEIT',
   importeCents: 1250, fecha: '2026-09-09',
 })
-checkIgual('el gasto entra igual', g3.id, 'sp-3')
+checkIgual('el gasto entra igual', g3.id, 'sp-4')
 checkIgual('volviendo a entrar', logins, 2)
-checkIgual('y quedan los tres', gastos.length, 3)
+checkIgual('y quedan los cuatro', gastos.length, 4)
 
 console.log('\n6. UNA CONTRASEÑA MALA SE DICE CLARO')
 _olvidarSesion()

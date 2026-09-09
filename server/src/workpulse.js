@@ -102,12 +102,21 @@ async function conSesion(ruta, opciones = {}) {
 // ─── Gastos (Spesen) ─────────────────────────────────────────
 // Primer módulo que se muda, por ser el que más se duplicaba.
 
-export async function crearGasto({ concepto, categoria, importeCents, fecha, km = null, recibo = null }) {
+/**
+ * Crea un gasto en WorkPulse.
+ *
+ * `kontoKey` es la columna real del Spesen («ure_allg», «b22_reinigung»…), la
+ * misma clave que usa el catálogo del asistente. WorkPulse la conoce desde
+ * 09.09.2026 y de ella saca la cuenta contable, el edificio y el IVA. Sin
+ * ella el gasto se guarda igual, pero llega a la contabilidad sin cuenta.
+ */
+export async function crearGasto({ concepto, categoria, importeCents, fecha, km = null, recibo = null, kontoKey = null }) {
   return conSesion('/spesen', {
     method: 'POST',
     body: {
       description: concepto,
       category: categoria,
+      ...(kontoKey ? { kontoKey } : {}),
       // WorkPulse trabaja en francos con decimales; el asistente, en céntimos.
       amount: Number((importeCents / 100).toFixed(2)),
       currency: 'CHF',
