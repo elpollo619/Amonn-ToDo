@@ -1,16 +1,11 @@
 # Empieza por aquí
 
-> **LO PRIMERO (dejado a medias el 06.09.2026):** encender el Tailscale
-> Funnel para que los enlaces del asistente (PDFs de facturas/Mahnungen,
-> CSVs) funcionen desde cualquier móvil. Pasos exactos:
-> 1. Cris debe abrir https://login.tailscale.com/f/funnel?node=nZZciXtdHP11CNTRL
->    (cuenta **GitHub elpollo619** — ¡NO las de Google!; el tailnet es
->    tail850d70.ts.net) y pulsar el botón de autorizar. El botón de GitHub
->    exige clic humano: la automatización no puede pulsarlo.
-> 2. Después, por SSH: `docker exec tailscale tailscale funnel --bg 8080`
->    → sale la URL pública (https://nas-amonn.tail850d70.ts.net).
-> 3. Añadir `APP_URL: <esa URL>` al compose del NAS (junto a QR_IBAN) y
->    `cd /volume1/docker && docker compose -p amonn -f docker-compose.yaml up -d server`.
+> **FUNNEL ENCENDIDO (09.09.2026).** La app es pública en
+> **https://nas-amonn.tail850d70.ts.net** y `APP_URL` ya está en el compose
+> del NAS, así que los enlaces del asistente (PDFs de facturas y Mahnungen,
+> CSVs de gastos) se abren desde cualquier móvil. Para apagarlo:
+> `docker exec tailscale tailscale funnel --https=443 off`.
+>
 > **PISTA GORDA — RESUELTA EL 08.09.2026.** Se siguió el rastro del Cockpit
 > y el resultado cambia el plan: **las credenciales de Apaleo YA EXISTEN y
 > funcionan.** No hay que pedirle nada a nadie. Qué se encontró:
@@ -124,7 +119,7 @@ Todo esto está **desplegado y probado con datos reales**:
 | Citas | «Cita con Baumgartner el martes a las 14:00» + calendario `.ics` suscribible |
 | Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
-| Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` (por defecto 70 rp/km, ⚠️ **Cris debe confirmar la de la empresa**); «kilómetros» o «kilómetros 2026» suma el año |
+| Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` = **80 rp/km** (CHF 0.80, confirmada por Cris el 09.09.2026 y puesta en el compose del NAS; el valor por defecto del código es 70); «kilómetros» o «kilómetros 2026» suma el año |
 | Gasto por comercio | «¿cuánto gastamos en IKEA este año?» · «gasto en Coop este mes» → total, número de gastos y los cinco últimos |
 | Cierre de mes | «Cierra los gastos de agosto» → CSV descargable (enlace con token) + gastos marcados como exportados |
 | Resumen semanal | «Resumen semanal» a demanda; los lunes 07:00 automático a los teléfonos de `RESUMEN_TO` |

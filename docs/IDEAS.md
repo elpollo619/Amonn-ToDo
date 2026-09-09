@@ -51,18 +51,18 @@ está hecho; lo de abajo, no.
    código A14-nnn y llaves. Generar el MV en PDF, crear la carpeta
    `A14-nnn Nombre` y dejar también la RG con su QR suizo.
 
-7. **El tablero web desde fuera.** Los trabajadores ya entran por WhatsApp
-   desde cualquier sitio, pero la app web solo se ve dentro de la red. En el
-   NAS ya corre `cloudflared`, que la publicaría con HTTPS sin abrir puertos.
+7. ~~**El tablero web desde fuera.**~~ **HECHO** (09.09.2026): resuelto con
+   el **Tailscale Funnel**, no con cloudflared. La app está en
+   https://nas-amonn.tail850d70.ts.net y `APP_URL` apunta ahí.
 
 8. **Más cosas del día a día.** ~~Kilometraje («120 km a Gampelen», columna
    URE FZ)~~ **HECHO** (08.09.2026) · ~~«¿cuánto gastamos en IKEA este
    año?»~~ **HECHO** (08.09.2026) · horas por obra · control de llaves del
    Longstay · ~~cerrar el mes de Spesen~~ **HECHO**.
-   ⚠️ La tarifa del kilometraje está en `KM_RAPPEN` (rappen por km) con 70
-   por defecto, que es la habitual en Suiza: **falta que Cris diga la que
-   usa de verdad la empresa**; si no es 70, se cambia esa variable en el
-   compose del NAS y ya está.
+   La tarifa del kilometraje es **CHF 0.80/km** (confirmada por Cris el
+   09.09.2026): `KM_RAPPEN: 80` en el compose del NAS. El valor por defecto
+   del código sigue siendo 70, así que si algún día se recrea el compose sin
+   esa variable, los kilómetros se pagarían de menos: mantenerla.
 
 ## Decisiones tomadas, para no volver a discutirlas
 
