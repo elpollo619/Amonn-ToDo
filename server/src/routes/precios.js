@@ -17,7 +17,7 @@ import { tienePermiso } from '../permisos.js'
 import { query } from '../db.js'
 import {
   fetchDashboard, analizarPrecios, fijarPrecio, overridesConfigurados,
-  porSemanas, proximosEventos,
+  porSemanas, proximosEventos, enviarABeds24, recomendarSemanas, coberturaCompetencia,
 } from '../precios.js'
 import { todayKey } from '../dates.js'
 
@@ -38,7 +38,8 @@ preciosRouter.get('/', async (req, res) => {
       analisis,
       overrides: datos?.overrides ?? {},
       calendario: (datos?.calendar ?? []).filter((n) => n.d >= todayKey()),
-      semanas: porSemanas(datos?.calendar, todayKey()),
+      semanas: recomendarSemanas(datos?.calendar, todayKey()),
+      competencia: coberturaCompetencia(datos?.calendar, todayKey()),
       eventos: proximosEventos(datos?.calendar, todayKey()),
       puedeEditar: await puedeEditar(req.userId),
       // Sin PIN la hoja se ve igual, pero el botón de guardar se apaga en vez
@@ -70,5 +71,26 @@ preciosRouter.post('/override', async (req, res) => {
     res.json({ ok: true, overrides })
   } catch (err) {
     res.status(400).json({ error: err.message })
+  }
+})
+
+// Aprobar los precios y mandarlos a Beds24. Solo admin, y solo a mano: es
+// el sustituto del cron que se apagó el 09.09.2026.
+preciosRouter.post('/enviar', async (req, res) => {
+  if (!(await puedeEditar(req.userId))) {
+    return res.status(403).json({ error: 'Solo un administrador puede enviar precios a Beds24' })
+  }
+  if (!overridesConfigurados()) {
+    return res.status(503).json({ error: 'Falta PREISPILOT_PIN en el servidor' })
+  }
+  try {
+    const r = await enviarABeds24({
+      meses: Number(req.body?.meses) || 12,
+      // El ensayo enseña qué se enviaría sin escribir nada en Beds24.
+      ensayo: Boolean(req.body?.ensayo),
+    })
+    res.json({ ok: true, resultado: r })
+  } catch (err) {
+    res.status(502).json({ error: err.message })
   }
 })

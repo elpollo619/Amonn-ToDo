@@ -90,6 +90,9 @@ checkIgual('trae el calendario', vistaPeon.body.calendario.length, 2)
 checkIgual('y el análisis', vistaPeon.body.analisis.base, 300)
 
 checkIgual('resume por semanas', vistaPeon.body.semanas.length > 0, true)
+checkIgual('con horquilla recomendada', vistaPeon.body.semanas[0].suelo < vistaPeon.body.semanas[0].techo, true)
+checkIgual('y dice cuánto fiarse', vistaPeon.body.semanas[0].confianza, 'media')
+checkIgual('cuenta la cobertura de competencia', vistaPeon.body.competencia.total, 2)
 checkIgual('y lista los eventos', vistaPeon.body.eventos[0].nombre, 'Fiesta')
 
 console.log('\n2. SOLO UN ADMIN PUEDE FIJAR PRECIOS')
@@ -118,6 +121,14 @@ checkIgual('con el precio puesto', ok.body.overrides['2099-01-01'].price, 400)
 checkIgual('y deja constancia de quién fue',
   ok.body.overrides['2099-01-01'].note.includes('Jefa'), true)
 checkIgual('llegó a PreisPilot una vez', guardado.length, 1)
+
+console.log('\n4b. ENVIAR A BEDS24: SOLO ADMIN Y SOLO A MANO')
+const enviarComo = async (token, body) => (await fetch(`${base}/enviar`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  body: JSON.stringify(body ?? {}),
+})).status
+checkIgual('quien no es admin no puede enviar', await enviarComo(tPeon), 403)
 
 console.log('\n5. QUITARLO')
 const quitado = await post(tJefa, { fecha: '2099-01-01', precio: null })

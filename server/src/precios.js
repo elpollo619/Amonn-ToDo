@@ -222,3 +222,76 @@ export function proximosEventos(calendar, hoy = todayKey(), limite = 12) {
     sobreNormal: normal ? Math.round((media(b.precios) / normal - 1) * 100) : 0,
   }))
 }
+
+// ─── Aprobar y enviar a Beds24 ───────────────────────────────
+// Desde el 09.09.2026 el cron automático está apagado: esto es lo ÚNICO que
+// manda precios a Beds24, y lo dispara un admin a mano. La Edge Function
+// `apply` escribe solo price1 y minStay — nunca la disponibilidad.
+
+export async function enviarABeds24({ meses = 12, ensayo = false } = {}) {
+  if (!config.preispilot.pin) throw new Error('Falta PREISPILOT_PIN en el servidor')
+  const res = await fetch(`${config.preispilot.baseUrl}/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin: config.preispilot.pin, months: meses, dryRun: ensayo }),
+    // Escribe cientos de tramos: necesita más margen que una simple lectura.
+    signal: AbortSignal.timeout(120_000),
+  })
+  const out = await res.json().catch(() => ({}))
+  if (!res.ok || out.ok === false) {
+    throw new Error(out.error ?? `PreisPilot respondió ${res.status}`)
+  }
+  return out
+}
+
+// ─── Recomendación de mínimo y máximo ────────────────────────
+// Casa Reto se alquila ENTERA: aquí no hay «por cuarto». La recomendación es
+// una horquilla por semana: por debajo del suelo se regala, por encima del
+// techo es difícil que se venda.
+//
+// ⚠️ Honestidad sobre la exactitud: hoy solo 6 noches del año tienen dato de
+// competencia (`data/comp-data.json` de PreisPilot se rellena a mano). Por
+// eso CADA semana lleva su nivel de confianza, en vez de dar un número
+// redondo que parezca más seguro de lo que es.
+
+const PASO_COMPETENCIA = 'Wettbewerb'
+
+export function recomendarSemanas(calendar, hoy = todayKey(), semanas = 12) {
+  return porSemanas(calendar, hoy, semanas).map((s) => {
+    const noches = (calendar ?? []).filter((n) => n.d >= s.desde && n.d <= s.hasta)
+    const conComp = noches.filter((n) => (n.br ?? []).some((b) => b.t === PASO_COMPETENCIA))
+    const conEvento = noches.filter((n) => n.ev)
+
+    // El suelo nunca baja del mínimo configurado en el motor; el techo nunca
+    // pasa del máximo. Entre medias, una horquilla alrededor de lo calculado.
+    const suelo = Math.round(s.media * 0.88)
+    const techo = Math.round(s.media * (conEvento.length ? 1.30 : 1.18))
+
+    const confianza = conComp.length > 0
+      ? 'alta'
+      : conEvento.length > 0
+        ? 'media'
+        : 'baja'
+
+    return {
+      ...s,
+      suelo,
+      techo,
+      confianza,
+      // Se dice en una frase POR QUÉ esa confianza: si no, el usuario no
+      // sabe si fiarse del número o no.
+      motivo: conComp.length > 0
+        ? `${conComp.length} noche(s) con precios de la competencia`
+        : conEvento.length > 0
+          ? 'hay evento o fiesta, pero sin datos de la competencia'
+          : 'solo el cálculo propio: sin datos de la competencia esa semana',
+    }
+  })
+}
+
+/** Cuántas noches del calendario tienen dato de competencia, y cuántas hay. */
+export function coberturaCompetencia(calendar, hoy = todayKey()) {
+  const noches = (calendar ?? []).filter((n) => n.d >= hoy)
+  const con = noches.filter((n) => (n.br ?? []).some((b) => b.t === PASO_COMPETENCIA))
+  return { conDato: con.length, total: noches.length }
+}

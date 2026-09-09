@@ -39,6 +39,8 @@ export function Precios() {
   // Lo que se está escribiendo en cada fila, sin guardar todavía.
   const [borrador, setBorrador] = useState<Record<string, string>>({})
   const [guardando, setGuardando] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [ensayo, setEnsayo] = useState<api.EnvioResultado | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -77,6 +79,24 @@ export function Precios() {
       show(e instanceof Error ? e.message : 'No se pudo guardar')
     } finally {
       setGuardando(null)
+    }
+  }
+
+  async function enviar(soloEnsayo: boolean) {
+    setEnviando(true)
+    try {
+      const r = await api.enviarPrecios(soloEnsayo)
+      if (soloEnsayo) {
+        setEnsayo(r)
+      } else {
+        setEnsayo(null)
+        show(`Enviado a Beds24: ${r.ranges ?? 0} tramos, ${r.days ?? 0} días.`)
+        api.getPrecios().then(setHoja).catch(() => {})
+      }
+    } catch (e) {
+      show(e instanceof Error ? e.message : 'No se pudo enviar')
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -127,10 +147,36 @@ export function Precios() {
         </p>
       </div>
 
+      {hoja.puedeEditar && hoja.editable && (
+        <div className="card precios-enviar">
+          <h2 className="card-title">Enviar los precios a Beds24</h2>
+          <p className="card-sub">
+            Desde el 09.09.2026 <b>no se envía nada solo</b>: los precios llegan a Beds24
+            cuando tú lo apruebas aquí. Mira primero el ensayo, que no escribe nada.
+          </p>
+          <div className="precios-botones">
+            <button type="button" className="btn btn-ghost" disabled={enviando} onClick={() => enviar(true)}>
+              {enviando ? 'Comprobando…' : 'Ver qué se enviaría'}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={enviando} onClick={() => enviar(false)}>
+              {enviando ? 'Enviando…' : 'Aprobar y enviar a Beds24'}
+            </button>
+          </div>
+          {ensayo && (
+            <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>
+              Se enviarían <b>{ensayo.ranges ?? 0} tramos</b> y <b>{ensayo.days ?? 0} días</b>
+              {ensayo.from && <> ({ensayo.from} → {ensayo.to})</>}
+              {ensayo.overridesApplied ? <>, de ellos <b>{ensayo.overridesApplied}</b> fijados a mano</> : null}.
+              No se ha escrito nada todavía.
+            </p>
+          )}
+        </div>
+      )}
+
       {!hoja.puedeEditar && (
         <div className="card precios-aviso">
-          Puedes mirar los precios, pero para cambiarlos hace falta el permiso
-          <b> «dinero»</b>. Pídeselo a Cris por WhatsApp: «dale acceso al dinero a …».
+          Puedes mirar los precios, pero <b>solo un administrador</b> puede cambiarlos
+          y enviarlos a Beds24.
         </div>
       )}
       {hoja.puedeEditar && !hoja.editable && (
@@ -182,21 +228,36 @@ export function Precios() {
         <div className="card">
           <h2 className="card-title">Semana a semana</h2>
           <p className="card-sub">
-            Cada semana, de lunes a domingo: lo que sale de media, lo más barato y lo más caro.
+            Cada semana, de lunes a domingo: lo que sale de media y la horquilla recomendada.
+            Por debajo del suelo regalas la casa; por encima del techo es difícil que se venda.
           </p>
+          <div className="precios-aviso-comp">
+            ⚠️ <b>Cuánto fiarse de esto.</b> Solo <b>{hoja.competencia.conDato}</b> de{' '}
+            <b>{hoja.competencia.total}</b> noches tienen precios de la competencia
+            (se rellenan a mano). Donde pone <b>baja</b>, la horquilla sale solo de nuestro
+            propio cálculo, sin mirar lo que cobran los vecinos.
+          </div>
           <div className="precios-tabla-scroll">
             <table className="precios-tabla">
               <thead>
-                <tr><th>Semana</th><th>Media</th><th>Entre semana</th><th>Finde</th><th>Mín–Máx</th><th>Qué pasa</th></tr>
+                <tr><th>Semana</th><th>Media</th><th>No bajes de</th><th>No pases de</th><th>Fiabilidad</th><th>Qué pasa</th></tr>
               </thead>
               <tbody>
                 {hoja.semanas.map((w) => (
                   <tr key={w.desde} className={w.eventos.length ? 'es-fijado' : undefined}>
                     <td className="col-fecha">{etiquetaFecha(w.desde)} → {etiquetaFecha(w.hasta)}</td>
-                    <td className="col-precio"><b>{CHF(w.media)}</b></td>
-                    <td>{w.entreSemana ? CHF(w.entreSemana) : '—'}</td>
-                    <td>{w.finde ? CHF(w.finde) : '—'}</td>
-                    <td>{CHF(w.min)} – {CHF(w.max)}</td>
+                    <td className="col-precio">
+                      <b>{CHF(w.media)}</b>
+                      <span className="precios-detalle">
+                        entre semana {w.entreSemana ? CHF(w.entreSemana) : '—'} · finde {w.finde ? CHF(w.finde) : '—'}
+                      </span>
+                    </td>
+                    <td className="col-precio"><b>{CHF(w.suelo)}</b></td>
+                    <td className="col-precio"><b>{CHF(w.techo)}</b></td>
+                    <td>
+                      <span className={`precios-conf es-${w.confianza}`}>{w.confianza}</span>
+                      <span className="precios-detalle">{w.motivo}</span>
+                    </td>
                     <td className="col-porque">{w.eventos.join(' · ') || '—'}</td>
                   </tr>
                 ))}

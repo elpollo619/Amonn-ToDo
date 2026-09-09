@@ -269,6 +269,9 @@ export type SemanaPrecio = {
   desde: string; hasta: string; noches: number
   media: number; min: number; max: number
   finde: number; entreSemana: number; eventos: string[]
+  suelo: number; techo: number
+  confianza: 'alta' | 'media' | 'baja'
+  motivo: string
 }
 
 export type EventoPrecio = {
@@ -289,6 +292,7 @@ export type PreciosHoja = {
   calendario: NochePrecio[]
   semanas: SemanaPrecio[]
   eventos: EventoPrecio[]
+  competencia: { conDato: number; total: number }
   puedeEditar: boolean
   editable: boolean
 }
@@ -308,6 +312,20 @@ export async function fijarPrecio(
     body: JSON.stringify({ fecha, precio, nota: nota ?? null }),
   })
   return r.overrides
+}
+
+export type EnvioResultado = {
+  ok?: boolean; days?: number; ranges?: number
+  from?: string; to?: string; overridesApplied?: number
+}
+
+/** Aprobar los precios y mandarlos a Beds24. `ensayo` no escribe nada. */
+export async function enviarPrecios(ensayo = false): Promise<EnvioResultado> {
+  const r = await apiFetch<{ ok: true; resultado: EnvioResultado }>('/precios/enviar', {
+    method: 'POST',
+    body: JSON.stringify({ ensayo, meses: 12 }),
+  })
+  return r.resultado
 }
 
 export async function changePassword(
