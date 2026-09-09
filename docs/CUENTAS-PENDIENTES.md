@@ -9,7 +9,7 @@ diagrama de unión con WorkPulse: artifact «Un solo sistema».
 | 1 | **Beds24** — abrir la disponibilidad de Casa Reto | 🔴 lo más urgente |
 | 2 | **Apaleo** — scopes `rates.manage`, `rates.read`, `availability.read` | 🔴 bloquea precios del hotel |
 | 3 | **PriceLabs** — Market Dashboard suelto (~9 CHF/mes) | 🟡 decidido, sin contratar |
-| 4 | **WorkPulse** — usuario de servicio para el asistente | 🟡 bloquea la unificación |
+| 4 | ~~WorkPulse — usuario de servicio~~ | ✅ **HECHO** 09.09.2026 |
 | 5 | **Google** — cuenta de servicio (Drive + Docs) | 🟡 desde sept 2026 |
 | 6 | **Netzlaufwerk** — ruta `\\servidor\…` + usuario con escritura | 🟡 desde sept 2026 |
 | 7 | **Treuhänder** — `sfbbuch.csv` de ejemplo, Steuerschlüssel, plan de cuentas | 🟡 |
@@ -32,8 +32,11 @@ las demás (incumpliría su contrato, cobran por habitación). En su lugar,
 los pone nuestro tool. ⚠️ Sus datos son de Airbnb/VRBO: valen para Casa Reto,
 solo orientan para el hotel. Aparte, hay prueba de 30 días gratis sin tarjeta.
 
-**4. WorkPulse.** Usuario de servicio propio (no el de Cris) con permiso sobre
-Spesen, para `/api/auth/app-login`. Así lo que entra por WhatsApp queda firmado
-como «asistente» y se puede revocar solo.
+**4. WorkPulse — HECHO (09.09.2026).** Cris creó `asistente@hansamonn.ch` con
+rol `EMPLOYEE` (sin permisos de admin, que es lo correcto). Las credenciales
+están en el compose del NAS como `WORKPULSE_URL`, `WORKPULSE_EMAIL` y
+`WORKPULSE_PASSWORD`. Probado de punta a punta: entra, lee y crea gastos, y el
+gasto de prueba se borró. El puente funciona desde el NAS contra
+https://workpulse.ch.
 
 **5–7.** Ver `SIGUIENTE-SESION.md`, sección «Lo que falta».
