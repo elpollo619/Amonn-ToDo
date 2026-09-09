@@ -120,15 +120,44 @@ export function contarPersonas(reservas) {
   return reservas.reduce((n, r) => n + (r.adults ?? 0) + (r.childrenAges?.length ?? 0), 0)
 }
 
-/** Separa las habitaciones por su estado de limpieza. */
+/**
+ * Separa las habitaciones por su estado de limpieza.
+ *
+ * Los estados salen de la especificación oficial de Apaleo
+ * (`api.apaleo.com/swagger/inventory-v1/swagger.json`, `UnitStatusModel`), y
+ * son **exactamente tres**:
+ *
+ *   `Clean` · `CleanToBeInspected` · `Dirty`
+ *
+ * ⚠️ El comentario anterior decía «Clean / Dirty / CleaningInProgress /
+ * Inspected»: dos de esos cuatro no existen. Se escribió de memoria, sin
+ * mirar la fuente, y habría contado mal las habitaciones el día que se
+ * concediera el permiso `units.read`. Si hay que tocar esto, mirar el
+ * swagger, no la memoria.
+ *
+ * Una habitación por inspeccionar ya está limpia (solo falta que la gobernanta
+ * la revise), así que cuenta como limpia y además se devuelve aparte por si
+ * se quiere mostrar el matiz.
+ */
 export function porEstadoDeLimpieza(unidades) {
-  const sucias = [], limpias = [], otras = []
+  const sucias = [], limpias = [], porInspeccionar = [], otras = []
   for (const u of unidades) {
-    // Apaleo usa condition: Clean / Dirty / CleaningInProgress / Inspected
     const c = String(u.condition ?? u.status?.condition ?? '').toLowerCase()
     if (c === 'dirty') sucias.push(u)
-    else if (c === 'clean' || c === 'inspected') limpias.push(u)
+    else if (c === 'cleantobeinspected') { limpias.push(u); porInspeccionar.push(u) }
+    else if (c === 'clean') limpias.push(u)
     else otras.push(u)
   }
-  return { sucias, limpias, otras }
+  return { sucias, limpias, porInspeccionar, otras }
+}
+
+/**
+ * Habitaciones fuera de servicio por avería o mantenimiento. Apaleo lo trae
+ * en `status.maintenance` de cada unidad.
+ *
+ * Útil de verdad: en septiembre de 2026 las habitaciones 206 y 207 llevaban
+ * semanas con una fuga de agua y eso no lo veía nadie desde el móvil.
+ */
+export function enMantenimiento(unidades) {
+  return unidades.filter((u) => u.status?.maintenance ?? u.maintenance)
 }

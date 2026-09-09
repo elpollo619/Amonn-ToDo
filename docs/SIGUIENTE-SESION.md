@@ -173,9 +173,18 @@ chat; no están en el repo).
    todo están escritas) y reiniciar `server`.
    ⚠️ Con los permisos actuales (`reservations.read` + `accounting.read`)
    funcionan llegadas/salidas/in-house, pero **NO** el estado de limpieza:
-   `/inventory/v1/units` da **403**. Para «¿qué cuartos están sucios?» hay
-   que añadir el scope de inventario a esa app en Apaleo (Apps → Connected
-   apps). El asistente ya lo explica solo en vez de dar error.
+   `/inventory/v1/units` da **403**. El asistente ya lo explica solo en vez
+   de dar error.
+   **Para encender la limpieza, Cris tiene que marcar un permiso** en
+   app.apaleo.com → Apps → Connected apps → app `UCVF-SP-EINKOMMEN_SYNC`
+   (¡editar la que ya hay, no crear otra!) → scopes → **`units.read`**
+   (vale también `setup.read`; nada de `*.manage` ni `admin`). No hay que
+   volver a copiar el secret: los permisos se aplican en el siguiente token,
+   como mucho una hora. Comprobado en el swagger oficial
+   `api.apaleo.com/swagger/inventory-v1/swagger.json`.
+   Ese permiso trae por unidad: `status.condition`, `status.isOccupied` y
+   `status.maintenance` (habitaciones fuera de servicio → función
+   `enMantenimiento()`, pensada para casos como la fuga de la 206/207).
    Pendiente aún: suscribirse a los webhooks (autoservicio) para estar al día
    sin sondear.
    (b) LIKE MAGIC: pedir al contacto/soporte de LIKE MAGIC credenciales

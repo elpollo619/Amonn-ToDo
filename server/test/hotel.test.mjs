@@ -4,7 +4,7 @@
 // en vez de romperse.
 import { initDb, query, pool } from '../src/db.js'
 import { processMessage } from '../src/inbound.js'
-import { contarPersonas, porEstadoDeLimpieza, apaleoConfigurado } from '../src/apaleo.js'
+import { contarPersonas, porEstadoDeLimpieza, enMantenimiento, apaleoConfigurado } from '../src/apaleo.js'
 import { config } from '../src/config.js'
 
 const CRIS = '+41765683445'
@@ -31,18 +31,33 @@ checkIgual('sin reservas, cero', contarPersonas([]), 0)
 checkIgual('una reserva sin datos no rompe', contarPersonas([{}]), 0)
 
 console.log('\n2. SEPARAR SUCIAS DE LIMPIAS')
+// Los estados son los TRES de la especificación oficial de Apaleo
+// (swagger inventory-v1, UnitStatusModel): Clean, CleanToBeInspected, Dirty.
+// Antes esta prueba usaba «CleaningInProgress» e «Inspected», que Apaleo no
+// devuelve nunca: comprobaba un comportamiento que no iba a darse jamás.
 const unidades = [
   { name: '101', condition: 'Clean' },
   { name: '102', condition: 'Dirty' },
-  { name: '103', condition: 'CleaningInProgress' },
-  { name: '104', condition: 'Inspected' },
+  { name: '103', condition: 'CleanToBeInspected' },
+  { name: '104', status: { condition: 'Clean' } },
   { name: '105', status: { condition: 'Dirty' } },
+  { name: '106', condition: 'LoQueSea' },
 ]
-const { sucias, limpias, otras } = porEstadoDeLimpieza(unidades)
+const { sucias, limpias, porInspeccionar, otras } = porEstadoDeLimpieza(unidades)
 checkIgual('dos sucias', sucias.length, 2)
-checkIgual('inspeccionada cuenta como limpia', limpias.length, 2)
-checkIgual('la que se está limpiando no es ni una cosa ni otra', otras.length, 1)
+checkIgual('la que espera inspección ya está limpia', limpias.length, 3)
+checkIgual('y además se puede ver aparte', porInspeccionar.map((u) => u.name).join(','), '103')
+checkIgual('un estado desconocido no se cuela en ningún lado', otras.length, 1)
 checkIgual('funciona aunque el estado venga anidado', sucias.map((u) => u.name).join(','), '102,105')
+
+console.log('\n2b. HABITACIONES EN MANTENIMIENTO (la fuga de la 206/207)')
+checkIgual('las saca de status.maintenance',
+  enMantenimiento([
+    { name: '205', status: { condition: 'Clean' } },
+    { name: '206', status: { condition: 'Dirty', maintenance: { id: 'm1' } } },
+    { name: '207', status: { condition: 'Dirty', maintenance: { id: 'm2' } } },
+  ]).map((u) => u.name).join(','), '206,207')
+checkIgual('sin averías, lista vacía', enMantenimiento([{ name: '205', status: {} }]).length, 0)
 
 console.log('\n3. SIN CREDENCIALES LO DICE, NO SE ROMPE')
 await initDb()
