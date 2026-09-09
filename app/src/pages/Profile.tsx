@@ -23,6 +23,13 @@ export function Profile() {
   const [testResult, setTestResult] = useState<{ candidates: number; sent: number } | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
   const [wa, setWa] = useState<api.WhatsAppStatus | null>(null)
+  // Cambio de contraseña. Va aparte del formulario del perfil a propósito:
+  // guardar el nombre y cambiar la contraseña son dos decisiones distintas.
+  const [passActual, setPassActual] = useState('')
+  const [passNueva, setPassNueva] = useState('')
+  const [passRepetida, setPassRepetida] = useState('')
+  const [passSaving, setPassSaving] = useState(false)
+  const [passError, setPassError] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -34,6 +41,27 @@ export function Profile() {
 
   const phoneTrim = phone.trim()
   const phoneLooksOk = phoneTrim === '' || /^\+\d{8,15}$/.test(phoneTrim.replace(/[\s-]/g, ''))
+
+  async function handlePassword(e: FormEvent) {
+    e.preventDefault()
+    setPassError(null)
+    if (passNueva.length < 8) {
+      setPassError('La contraseña nueva debe tener al menos 8 caracteres.'); return
+    }
+    if (passNueva !== passRepetida) {
+      setPassError('Las dos contraseñas nuevas no coinciden.'); return
+    }
+    setPassSaving(true)
+    try {
+      await api.changePassword(user!.id, passActual, passNueva)
+      setPassActual(''); setPassNueva(''); setPassRepetida('')
+      show('Contraseña cambiada. Úsala la próxima vez que entres.')
+    } catch (err) {
+      setPassError(err instanceof Error ? err.message : 'No se pudo cambiar la contraseña')
+    } finally {
+      setPassSaving(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -237,6 +265,47 @@ export function Profile() {
               {testError ? <span style={{ color: 'var(--danger)' }}>{testError}</span> : testMessage()}
             </p>
           )}
+        </section>
+
+        <section className="card">
+          <h2 className="card-title">Cambiar la contraseña</h2>
+          <p className="card-sub">
+            Es la que usas para entrar aquí, junto con tu correo <b>{user.email}</b>.
+            La web se ve desde internet, así que conviene una que solo sepas tú
+            y no reutilizarla en otros sitios.
+          </p>
+          <form onSubmit={handlePassword}>
+            <div className="field">
+              <label htmlFor="pass-actual">Contraseña actual</label>
+              <input
+                id="pass-actual" type="password" autoComplete="current-password"
+                value={passActual} onChange={(e) => setPassActual(e.target.value)}
+              />
+              <span className="hint">Se pide por seguridad: evita que alguien te la cambie si te dejas la sesión abierta.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="pass-nueva">Contraseña nueva</label>
+              <input
+                id="pass-nueva" type="password" autoComplete="new-password"
+                value={passNueva} onChange={(e) => setPassNueva(e.target.value)}
+              />
+              <span className="hint">Ocho caracteres como mínimo. Tres palabras seguidas y un número es fácil de recordar y difícil de acertar.</span>
+            </div>
+            <div className="field">
+              <label htmlFor="pass-repetida">Repite la nueva</label>
+              <input
+                id="pass-repetida" type="password" autoComplete="new-password"
+                value={passRepetida} onChange={(e) => setPassRepetida(e.target.value)}
+              />
+            </div>
+            {passError && <div className="error-box">{passError}</div>}
+            <button
+              type="submit" className="btn btn-primary"
+              disabled={passSaving || !passActual || !passNueva || !passRepetida}
+            >
+              {passSaving ? 'Cambiando…' : 'Cambiar contraseña'}
+            </button>
+          </form>
         </section>
 
         <section className="card" style={{ padding: 14 }}>

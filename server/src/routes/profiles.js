@@ -1,6 +1,6 @@
 import { asyncRouter } from '../util.js'
 import { query } from '../db.js'
-import { requireAuth, publicUser } from '../auth.js'
+import { requireAuth, publicUser, hashPassword, verifyPassword } from '../auth.js'
 import { LANGS } from '../i18n.js'
 
 export const profilesRouter = asyncRouter()
@@ -45,4 +45,31 @@ profilesRouter.patch('/:id', async (req, res) => {
     values,
   )
   res.json(publicUser(rows[0]))
+})
+
+// Cambiar la propia contraseña.
+//
+// Se exige la ACTUAL aunque la sesión ya esté abierta: si alguien pilla el
+// móvil desbloqueado, que no pueda dejar a su dueño fuera de su cuenta.
+// Tampoco se dice si falló el usuario o la contraseña, por costumbre.
+profilesRouter.post('/:id/password', async (req, res) => {
+  if (req.params.id !== req.userId) {
+    return res.status(403).json({ error: 'Solo puedes cambiar tu propia contraseña' })
+  }
+  const actual = String(req.body?.current_password ?? '')
+  const nueva = String(req.body?.new_password ?? '')
+  if (nueva.length < 8) {
+    return res.status(400).json({ error: 'La contraseña nueva debe tener al menos 8 caracteres' })
+  }
+  if (nueva === actual) {
+    return res.status(400).json({ error: 'La contraseña nueva tiene que ser distinta de la actual' })
+  }
+  const { rows } = await query('select password_hash from users where id = $1', [req.userId])
+  if (rows.length === 0) return res.status(404).json({ error: 'No encuentro tu usuario' })
+  if (!(await verifyPassword(actual, rows[0].password_hash))) {
+    return res.status(400).json({ error: 'La contraseña actual no es correcta' })
+  }
+  await query('update users set password_hash = $1 where id = $2',
+    [await hashPassword(nueva), req.userId])
+  res.json({ ok: true })
 })

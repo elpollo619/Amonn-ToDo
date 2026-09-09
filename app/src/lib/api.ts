@@ -250,6 +250,22 @@ export async function listProfiles(): Promise<Profile[]> {
   return apiFetch<Profile[]>('/profiles')
 }
 
+/**
+ * Cambiar la propia contraseña. Exige la actual a propósito: ver el
+ * comentario del endpoint en server/src/routes/profiles.js.
+ */
+export async function changePassword(
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (isDemo) throw new Error('En la demo no se pueden cambiar contraseñas')
+  await apiFetch<{ ok: true }>(`/profiles/${id}/password`, {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  })
+}
+
 export async function updateProfile(
   id: string,
   patch: Partial<Profile>,
