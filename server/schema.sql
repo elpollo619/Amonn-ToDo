@@ -337,6 +337,18 @@ alter table contacts add column if not exists notes text;
 alter table contacts add column if not exists is_responsible boolean not null default false;
 create index if not exists contacts_status on contacts (lower(coalesce(status,'')));
 
+-- Registro de decisiones: "guarda que decidimos la variante B en Seewer".
+-- Memoria de qué se decidió, quién y para qué proyecto/inmueble. Se consulta
+-- luego con "¿qué decisiones hay de Seewer?".
+create table if not exists decisions (
+  id          uuid primary key default gen_random_uuid(),
+  text        text not null,
+  project     text,                       -- Seewer, 770 Bremgarten, Löwen...
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists decisions_project on decisions (lower(coalesce(project,'')));
+
 -- Spesen: gastos adelantados que hay que devolver a quien los pagó.
 -- Una fila aquí = una fila en el Excel de Spesen.
 create table if not exists expenses (

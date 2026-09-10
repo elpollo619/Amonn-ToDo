@@ -31,6 +31,7 @@ import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entso
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
+import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
@@ -1465,6 +1466,25 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return t(lang, 'contact_many', {
         total: encontrados.length,
         lista: encontrados.map(formatContacto).join('\n\n'),
+      })
+    }
+
+    case 'decision_add': {
+      // "guarda que decidimos la variante B en Seewer"
+      const d = await addDecision({ text: intent.texto, userId: user.id })
+      return t(lang, 'decision_saved', { ficha: formatDecision(d, lang) })
+    }
+
+    case 'decision_list': {
+      // "¿qué decisiones hay de Seewer?" · "últimas decisiones"
+      const decisiones = await listDecisions(intent.que, 10)
+      if (decisiones.length === 0) {
+        return intent.que ? t(lang, 'decision_none_q', { que: intent.que }) : t(lang, 'decision_none')
+      }
+      return t(lang, 'decision_list', {
+        titulo: intent.que ? intent.que : '',
+        total: decisiones.length,
+        lista: decisiones.map((x) => formatDecision(x, lang)).join('\n'),
       })
     }
 

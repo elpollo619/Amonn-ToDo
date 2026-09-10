@@ -123,6 +123,9 @@ const REGLAS = {
     // "contactos de R. Baumgartner AG" · "contactos de la empresa X" (plural: no
     // choca con "contacto de X", que es buscar uno).
     contactoEmpresa: /contactos\s+(?:de\s+(?:la\s+empresa\s+|la\s+obra\s+)?|para\s+)(.+?)\??$/i,
+    // Registro de decisiones. add: sobre el crudo (conserva mayúsculas).
+    decisionAdd: /^(?:(?:guarda(?:r)?|apunta(?:r)?|anota(?:r)?|registra(?:r)?)\s+que\s+)?(?:(?:hemos|ya)\s+)?(?:decidido|decidimos|acordamos|acordado|quedamos\s+en)\s+(?:que\s+)?(.+)$|^decisi[oó]n(?:es)?\s*[:\-]\s*(.+)$/i,
+    decisionList: /^(?:qu[eé]\s+decisiones(?:\s+hay)?|decisiones|[uú]ltimas\s+decisiones|qu[eé]\s+se\s+decidi[oó])\b(?:\s+(?:de|del|de\s+la|sobre|para)\s+(.+?))?\s*\??$/,
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
@@ -221,6 +224,8 @@ const REGLAS = {
     contactoNuevoGuiado: /(?:füge|fuege|f[uü]g)\s+(.+?)\s+(?:zu den kontakten|in die kontakte)\b|kontakt hinzuf[uü]gen\s*[:,-]?\s*(.+)$/i,
     // "Kontakte von R. Baumgartner AG" · "Kontakte der Firma X"
     contactoEmpresa: /kontakte\s+(?:von\s+|vom\s+|der firma\s+|von der firma\s+)(.+?)\??$/i,
+    decisionAdd: /^(?:(?:halte\s+fest,?\s+)?(?:dass\s+)?)?(?:wir\s+)?(?:haben\s+)?(?:entschieden|beschlossen)\s+(?:,?\s*dass\s+)?(.+)$|^entscheidung(?:en)?\s*[:\-]\s*(.+)$/i,
+    decisionList: /^(?:welche\s+entscheidungen|entscheidungen|letzte\s+entscheidungen)\b(?:\s+(?:von|vom|zu|[üu]ber|f[üu]r)\s+(.+?))?\s*\??$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kilometer)\b\s*(?:(?:nach|zu|zur|zum|bis|fur|auf)\b\s+)?(.*)$/,
@@ -292,6 +297,8 @@ const REGLAS = {
     contactoNuevoGuiado: /(?:adiciona(?:r)?|regista(?:r)?|p[õo]e)\s+(?:o\s+|a\s+)?(.+?)\s+(?:aos|nos|à lista de|na lista de)\s+contactos?\b/i,
     // "contactos da empresa X" · "contactos da obra Y"
     contactoEmpresa: /contactos\s+d[aeo]\s+(?:empresa\s+|obra\s+)?(.+?)\??$/i,
+    decisionAdd: /^(?:(?:guarda(?:r)?\s+que\s+)?)?(?:decidimos|decidido|ficou\s+decidido|ficamos\s+em)\s+(?:que\s+)?(.+)$|^decis[aã]o\s*[:\-]\s*(.+)$/i,
+    decisionList: /^(?:que\s+decis[oõ]es|decis[oõ]es|[uú]ltimas\s+decis[oõ]es)\b(?:\s+(?:de|do|da|sobre|para)\s+(.+?))?\s*\??$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kms|quilometros?)\b\s*(?:(?:a|ao|ate|para|em|de)\b\s+)?(.*)$/,
@@ -530,6 +537,16 @@ function parseInLang(text, ctx, lang) {
   // ANTES que contactoBuscar, que se queda con el singular "contacto de X".
   const porEmpresa = cfg.contactoEmpresa ? raw.match(cfg.contactoEmpresa) : null
   if (porEmpresa) return { action: 'contacto_empresa', empresa: porEmpresa[1].trim() }
+
+  // Registro de decisiones. "¿qué decisiones hay de X?" (listar) va antes que
+  // guardar, y guardar se lee del crudo para conservar mayúsculas y acentos.
+  const decisionLista = cfg.decisionList ? t.match(cfg.decisionList) : null
+  if (decisionLista) return { action: 'decision_list', que: (decisionLista[1] ?? '').trim() || null }
+  const decisionNueva = cfg.decisionAdd ? raw.match(cfg.decisionAdd) : null
+  if (decisionNueva) {
+    const texto = (decisionNueva[1] ?? decisionNueva[2] ?? '').trim()
+    if (texto) return { action: 'decision_add', texto }
+  }
 
   const contactoNuevo = cfg.contactoAdd ? t.match(cfg.contactoAdd) : null
   if (contactoNuevo) {
