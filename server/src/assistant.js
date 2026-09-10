@@ -126,6 +126,9 @@ const REGLAS = {
     // Registro de decisiones. add: sobre el crudo (conserva mayúsculas).
     decisionAdd: /^(?:(?:guarda(?:r)?|apunta(?:r)?|anota(?:r)?|registra(?:r)?)\s+que\s+)?(?:(?:hemos|ya)\s+)?(?:decidido|decidimos|acordamos|acordado|quedamos\s+en)\s+(?:que\s+)?(.+)$|^decisi[oó]n(?:es)?\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:qu[eé]\s+decisiones(?:\s+hay)?|decisiones|[uú]ltimas\s+decisiones|qu[eé]\s+se\s+decidi[oó])\b(?:\s+(?:de|del|de\s+la|sobre|para)\s+(.+?))?\s*\??$/,
+    // Dinero entrado (abonos ya importados de un camt).
+    dineroBusca: /^(?:pag[oó]|ha\s+pagado|entr[oó]\s+algo\s+de|pagos?\s+de)\s+(.+?)\s*\??$/,
+    dineroLista: /^(?:qu[eé]\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|(?:dinero|pagos|abonos|cobros|ingresos)\s+entrad[oa]s?|cu[aá]nto\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|entradas?\s+de\s+dinero|abonos)\b\s*(.*)$/,
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
@@ -226,6 +229,8 @@ const REGLAS = {
     contactoEmpresa: /kontakte\s+(?:von\s+|vom\s+|der firma\s+|von der firma\s+)(.+?)\??$/i,
     decisionAdd: /^(?:(?:halte\s+fest,?\s+)?(?:dass\s+)?)?(?:wir\s+)?(?:haben\s+)?(?:entschieden|beschlossen)\s+(?:,?\s*dass\s+)?(.+)$|^entscheidung(?:en)?\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:welche\s+entscheidungen|entscheidungen|letzte\s+entscheidungen)\b(?:\s+(?:von|vom|zu|[üu]ber|f[üu]r)\s+(.+?))?\s*\??$/,
+    dineroBusca: /^(?:hat\s+(.+?)\s+bezahlt|zahlung(?:en)?\s+von\s+(.+?))\s*\??$/,
+    dineroLista: /^(?:was\s+ist\s+eingegangen|welche\s+zahlungen|geldeingang|wie\s+viel\s+ist\s+eingegangen|eing[äa]nge)\b\s*(.*)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kilometer)\b\s*(?:(?:nach|zu|zur|zum|bis|fur|auf)\b\s+)?(.*)$/,
@@ -299,6 +304,8 @@ const REGLAS = {
     contactoEmpresa: /contactos\s+d[aeo]\s+(?:empresa\s+|obra\s+)?(.+?)\??$/i,
     decisionAdd: /^(?:(?:guarda(?:r)?\s+que\s+)?)?(?:decidimos|decidido|ficou\s+decidido|ficamos\s+em)\s+(?:que\s+)?(.+)$|^decis[aã]o\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:que\s+decis[oõ]es|decis[oõ]es|[uú]ltimas\s+decis[oõ]es)\b(?:\s+(?:de|do|da|sobre|para)\s+(.+?))?\s*\??$/,
+    dineroBusca: /^(?:(.+?)\s+pagou|pagamento\s+de\s+(.+?)|entrou\s+algo\s+de\s+(.+?))\s*\??$/,
+    dineroLista: /^(?:que\s+entrou|quanto\s+entrou|pagamentos\s+entrados|entradas\s+de\s+dinheiro)\b\s*(.*)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kms|quilometros?)\b\s*(?:(?:a|ao|ate|para|em|de)\b\s+)?(.*)$/,
@@ -547,6 +554,16 @@ function parseInLang(text, ctx, lang) {
     const texto = (decisionNueva[1] ?? decisionNueva[2] ?? '').trim()
     if (texto) return { action: 'decision_add', texto }
   }
+
+  // Dinero entrado (abonos importados de un camt). Buscar por pagador va antes
+  // que listar por periodo.
+  const dineroB = cfg.dineroBusca ? raw.replace(/^[¿¡\s]+/, '').match(cfg.dineroBusca) : null
+  if (dineroB) {
+    const quien = (dineroB[1] ?? dineroB[2] ?? dineroB[3] ?? '').trim()
+    if (quien) return { action: 'dinero_entrado', busqueda: quien }
+  }
+  const dineroL = cfg.dineroLista ? t.match(cfg.dineroLista) : null
+  if (dineroL) return { action: 'dinero_entrado', periodo: (dineroL[1] ?? '').trim() || null }
 
   const contactoNuevo = cfg.contactoAdd ? t.match(cfg.contactoAdd) : null
   if (contactoNuevo) {

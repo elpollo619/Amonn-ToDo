@@ -46,7 +46,7 @@ import { textoDePdf, leerRecibo } from './recibo.js'
 import { leerReciboConGemini } from './vision.js'
 import { cobrosConfigurados, parseFactura, crearFactura } from './cobros.js'
 import { buscarVertraege, sumaAlquileres, formatVertrag } from './vertraege.js'
-import { esCamt, parseCamt, conciliarPagos } from './camt.js'
+import { esCamt, parseCamt, conciliarPagos, consultarEntradas, formatEntrada, totalChf } from './camt.js'
 import { estadoDeCobros, formatImpagos } from './impagos.js'
 import { parseMahnung, crearMahnung } from './mahnung.js'
 import { mietertragCsv } from './vertraege.js'
@@ -277,6 +277,43 @@ function resolverPersona(texto, users, sender, lang, aliases = []) {
 }
 
 // ─── Continuar una conversación a medias ──────────────────────
+/**
+ * Traduce "esta semana", "este mes", "mes pasado", un nombre de mes… a un
+ * rango { desde, hasta } (YYYY-MM-DD). Sin texto → este mes. Trabaja sobre el
+ * texto ya normalizado (sin acentos).
+ */
+function parsePeriodo(txt, today) {
+  const [Y, M, D] = String(today).split('-').map(Number)
+  const iso = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  const ult = (y, m) => new Date(y, m, 0).getDate()
+  const s = (txt || '').toLowerCase().trim()
+  const mesActual = { desde: iso(Y, M, 1), hasta: iso(Y, M, ult(Y, M)), label: 'este mes' }
+  if (!s) return mesActual
+  if (/\bhoy\b|heute|hoje/.test(s)) return { desde: today, hasta: today, label: 'hoy' }
+  const dow = (new Date(Y, M - 1, D).getDay() + 6) % 7 // 0 = lunes
+  const dstr = (dt) => iso(dt.getFullYear(), dt.getMonth() + 1, dt.getDate())
+  if (/semana\s+pasada|letzte\s+woche|semana\s+passada/.test(s)) {
+    return { desde: dstr(new Date(Y, M - 1, D - dow - 7)), hasta: dstr(new Date(Y, M - 1, D - dow - 1)), label: 'la semana pasada' }
+  }
+  if (/esta\s+semana|diese\s+woche/.test(s)) {
+    return { desde: dstr(new Date(Y, M - 1, D - dow)), hasta: dstr(new Date(Y, M - 1, D - dow + 6)), label: 'esta semana' }
+  }
+  if (/mes\s+pasado|letzten?\s+monat|m[eê]s\s+passado/.test(s)) {
+    const y = M === 1 ? Y - 1 : Y, m = M === 1 ? 12 : M - 1
+    return { desde: iso(y, m, 1), hasta: iso(y, m, ult(y, m)), label: 'el mes pasado' }
+  }
+  if (/este\s+a[nñ]o|dieses\s+jahr|este\s+ano/.test(s)) return { desde: iso(Y, 1, 1), hasta: iso(Y, 12, 31), label: 'este año' }
+  const meses = {
+    enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+    januar: 1, februar: 2, marz: 3, april: 4, mai: 5, juni: 6, juli: 7, august: 8, september: 9, oktober: 10, november: 11, dezember: 12,
+    janeiro: 1, fevereiro: 2, marco: 3, maio: 5, junho: 6, julho: 7, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
+  }
+  for (const [k, m] of Object.entries(meses)) {
+    if (new RegExp(`\\b${k}\\b`).test(s)) { const y = m > M ? Y - 1 : Y; return { desde: iso(y, m, 1), hasta: iso(y, m, ult(y, m)), label: k } }
+  }
+  return mesActual
+}
+
 /** Arranca el alta guiada de un contacto: guarda el borrador y pregunta la empresa. */
 async function iniciarAltaContacto(phone, user, name, lang) {
   const nombre = String(name ?? '').trim()
@@ -1486,6 +1523,20 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         total: decisiones.length,
         lista: decisiones.map((x) => formatDecision(x, lang)).join('\n'),
       })
+    }
+
+    case 'dinero_entrado': {
+      // "¿qué entró esta semana?" · "¿pagó Müller?" — solo permiso 'dinero'.
+      if (!(await tienePermiso(user.id, 'dinero'))) return t(lang, 'camt_unauthorized')
+      if (intent.busqueda) {
+        const { rows, totalCents } = await consultarEntradas({ busqueda: intent.busqueda, limite: 20 })
+        if (!rows.length) return t(lang, 'dinero_none_q', { que: intent.busqueda })
+        return t(lang, 'dinero_list_q', { que: intent.busqueda, total: totalChf(totalCents), lista: rows.map(formatEntrada).join('\n') })
+      }
+      const p = parsePeriodo(intent.periodo, today)
+      const { rows, totalCents } = await consultarEntradas({ desde: p.desde, hasta: p.hasta, limite: 40 })
+      if (!rows.length) return t(lang, 'dinero_none', { periodo: p.label })
+      return t(lang, 'dinero_list', { periodo: p.label, total: totalChf(totalCents), n: rows.length, lista: rows.map(formatEntrada).join('\n') })
     }
 
     case 'contacto_empresa': {

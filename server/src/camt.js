@@ -115,3 +115,41 @@ export async function conciliarPagos(entradas) {
   }
   return resumen
 }
+
+// ============================================================
+// Consultar el "dinero entrado" ya importado (bank_entries). Solo lectura;
+// para "¿qué entró esta semana?" y "¿pagó X?". Los datos los llena
+// conciliarPagos cuando se reenvía un camt al asistente.
+// ============================================================
+
+/** Abonos entre dos fechas (YYYY-MM-DD, opcionales) y/o que casen con `busqueda`. */
+export async function consultarEntradas({ desde = null, hasta = null, busqueda = null, limite = 30 } = {}) {
+  const q = busqueda ? `%${String(busqueda).trim().toLowerCase()}%` : null
+  const { rows } = await query(
+    `select booked_on, amount_cents, reference, payer from bank_entries
+      where ($1::date is null or booked_on >= $1::date)
+        and ($2::date is null or booked_on <= $2::date)
+        and ($3::text is null or lower(coalesce(payer,'')) like $3 or lower(coalesce(reference,'')) like $3)
+      order by booked_on desc nulls last, amount_cents desc
+      limit $4`,
+    [desde, hasta, q, limite],
+  )
+  const totalCents = rows.reduce((s, r) => s + (r.amount_cents || 0), 0)
+  return { rows, totalCents }
+}
+
+const chf = (cents) => (Number(cents || 0) / 100).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+function fechaCorta(iso) {
+  if (!iso) return '—'
+  const [y, m, d] = String(iso).slice(0, 10).split('-')
+  return `${d}.${m}.${y.slice(2)}`
+}
+
+/** Una línea de abono para WhatsApp. */
+export function formatEntrada(e) {
+  const quien = e.payer || e.reference || '—'
+  return `• ${fechaCorta(e.booked_on)} · CHF ${chf(e.amount_cents)} · ${quien}`
+}
+
+export const totalChf = chf
