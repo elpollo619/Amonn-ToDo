@@ -10,6 +10,7 @@ import crypto from 'node:crypto'
 import { query } from './db.js'
 import { broadcast } from './events.js'
 import { porKey, CATEGORIAS } from './spesen.js'
+import { crearGasto as crearGastoWorkpulse, workpulseConfigurado } from './workpulse.js'
 
 export async function addGasto({ code, spentOn, merchant = null, concept, amountCents, vat = null, category, personId = null, receiptPath = null, receiptName = null, km = null }) {
   const cat = porKey(category)
@@ -21,7 +22,22 @@ export async function addGasto({ code, spentOn, merchant = null, concept, amount
      personId, receiptPath, receiptName, km],
   )
   broadcast()
-  return rows[0]
+  const g = rows[0]
+  // Puente #1: el gasto también va a la contabilidad de WorkPulse ("el
+  // sistema"). Best-effort y sin bloquear: si WorkPulse no responde, el gasto
+  // ya quedó guardado en Amonn y no se pierde.
+  if (workpulseConfigurado()) {
+    crearGastoWorkpulse({
+      concepto: g.concept,
+      categoria: g.category,
+      importeCents: g.amount_cents,
+      fecha: g.spent_on,
+      km: g.km ?? null,
+      recibo: g.receipt_name ?? null,
+      kontoKey: g.category,
+    }).catch((e) => console.error('[workpulse] gasto no enviado:', e.message))
+  }
+  return g
 }
 
 /** Gastos aún no exportados, con el nombre de quien los pagó. */
