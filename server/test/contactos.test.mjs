@@ -87,6 +87,15 @@ const lista = check('lista todos los de la empresa', await processMessage(CRIS, 
 checkIgual('el responsable va primero', lista.indexOf('Cristian Amaya') < lista.indexOf('Reto Baumgartner'), true)
 check('empresa sin contactos lo dice', await processMessage(CRIS, 'contactos de Inexistente SA'), 'No hay contactos')
 
+console.log('\n7. TODO JUNTO EN UN MENSAJE (multilínea, por forma)')
+const multi = 'nuevo contacto: Max Muster\nMuster Bau AG\nmax@musterbau.ch\n031 111 22 33\n079 222 33 44\nresponsable'
+check('reconoce nombre/empresa/tel/mail/responsable', await processMessage(CRIS, multi),
+  ['Contacto guardado', 'Max Muster', '⭐', 'Muster Bau AG', '031 111 22 33', '079 222 33 44', 'max@musterbau.ch'])
+const mx = (await buscarContactos('Max Muster'))[0]
+checkIgual('oficina en phone', mx.phone, '031 111 22 33')
+checkIgual('privado en mobile', mx.mobile, '079 222 33 44')
+checkIgual('marcado responsable', mx.is_responsible, true)
+
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de contactos pasan\n' : `\n❌ ${fallos} fallo(s)\n`)
 process.exit(fallos === 0 ? 0 : 1)

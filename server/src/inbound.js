@@ -1484,25 +1484,34 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       return iniciarAltaContacto(phone, user, intent.name, lang)
 
     case 'contacto_add': {
-      // Formato libre separado por comas: nombre, empresa, teléfono, correo.
-      // Se reconoce cada trozo por su forma, no por su posición: así da igual
-      // el orden en que se escriban.
-      const trozos = String(intent.texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+      // Formato libre "todo junto": en varias líneas O separado por comas.
+      // Se reconoce cada trozo por su FORMA, no por su posición: da igual el
+      // orden. Email (lleva @), teléfono (dígitos; el 1º oficina, el 2º móvil),
+      // "responsable" (marca la estrella), y el resto nombre → empresa.
+      const trozos = String(intent.texto ?? '').split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean)
       if (trozos.length === 0) return t(lang, 'contact_need_name')
-      const datos = { name: null, company: null, phone: null, email: null }
+      const datos = { name: null, company: null, phone: null, mobile: null, email: null, is_responsible: false }
       for (const tr of trozos) {
         if (/@/.test(tr) && !datos.email) { datos.email = tr; continue }
-        if (/^\+?[\d\s().-]{7,}$/.test(tr) && !datos.phone) { datos.phone = tr.replace(/\s+/g, ' '); continue }
+        if (/^\+?[\d\s().\-/]{6,}$/.test(tr)) {
+          const num = tr.replace(/\s+/g, ' ').trim()
+          if (!datos.phone) { datos.phone = num; continue }
+          if (!datos.mobile) { datos.mobile = num; continue }
+          continue
+        }
+        if (/^(responsable|verantwortlich|respons[aá]vel|ansprechpartner|contacto principal)$/i.test(tr)) {
+          datos.is_responsible = true; continue
+        }
         if (!datos.name) { datos.name = tr; continue }
         if (!datos.company) { datos.company = tr; continue }
       }
       if (!datos.name) return t(lang, 'contact_need_name')
-      // Si solo dieron el nombre (sin empresa/tel/email), es un alta guiada:
+      // Si SOLO dieron el nombre (sin empresa/tel/email), es un alta guiada:
       // "nuevo contacto: Cristian Amaya" → preguntamos el resto uno a uno.
-      if (!datos.company && !datos.phone && !datos.email) {
+      if (!datos.company && !datos.phone && !datos.mobile && !datos.email && !datos.is_responsible) {
         return iniciarAltaContacto(phone, user, datos.name, lang)
       }
-      const c = await addContact({ ...datos, mobile: datos.phone })
+      const c = await addContact(datos)
       return t(lang, 'contact_added', { ficha: formatContacto(c) })
     }
 

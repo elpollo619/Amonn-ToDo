@@ -536,7 +536,9 @@ function parseInLang(text, ctx, lang) {
     // Aquí hace falta el texto TAL CUAL se escribió: restoreCase sirve para
     // títulos de tarea, pero a un contacto le rompe el nombre ("Serge gerber"),
     // se come las diéresis y capitaliza el correo, que deja de ser válido.
-    const enCrudo = raw.match(/(?:contacto|kontakt|kontakte)\s*[:,-]?\s*(.+)$/i)
+    // [\s\S]+ para capturar también los saltos de línea: así "nuevo contacto:"
+    // con todo junto en varias líneas llega entero al handler.
+    const enCrudo = raw.match(/(?:contacto|kontakt|kontakte)\s*[:,-]?\s*([\s\S]+)$/i)
     const texto = (enCrudo ? enCrudo[1] : contactoNuevo[1]).trim()
     return { action: 'contacto_add', texto }
   }
