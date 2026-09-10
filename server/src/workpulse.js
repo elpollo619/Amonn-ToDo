@@ -130,3 +130,51 @@ export async function crearGasto({ concepto, categoria, importeCents, fecha, km 
 export async function listarGastos() {
   return conSesion('/spesen')
 }
+
+// ============================================================
+// Puente #2: Tareas → Aufgaben de WorkPulse (una dirección). Amonn crea/actualiza;
+// WorkPulse es el registro. El responsable se mapea por email (misma persona en
+// los dos sistemas).
+// ============================================================
+
+let _usuariosWp = null // cache email(minúsculas) → id de usuario en WorkPulse
+async function usuarioWpPorEmail(email) {
+  if (!email) return null
+  if (!_usuariosWp) {
+    try {
+      const lista = await conSesion('/users')
+      const arr = Array.isArray(lista) ? lista : (lista?.users || lista?.data || lista?.items || [])
+      _usuariosWp = new Map(arr.filter((u) => u.email).map((u) => [String(u.email).toLowerCase(), u.id]))
+    } catch { _usuariosWp = new Map() }
+  }
+  return _usuariosWp.get(String(email).toLowerCase()) || null
+}
+export function _olvidarUsuariosWp() { _usuariosWp = null }
+
+const PRIO_WP = { low: 'LOW', medium: 'MEDIUM', high: 'HIGH', urgent: 'URGENT' }
+const EST_WP = { open: 'OPEN', in_progress: 'IN_PROGRESS', done: 'DONE', cancelled: 'CANCELLED' }
+
+/** Crea la Aufgabe espejo en WorkPulse. Devuelve la respuesta (con .id). */
+export async function crearAufgabe({ title, description = null, priority = null, dueDate = null, assigneeEmail = null }) {
+  const assignedToId = await usuarioWpPorEmail(assigneeEmail)
+  return conSesion('/aufgaben', {
+    method: 'POST',
+    body: {
+      title,
+      ...(description ? { description } : {}),
+      priority: PRIO_WP[String(priority || '').toLowerCase()] || 'MEDIUM',
+      // WorkPulse valida ISO datetime; la tarea de Amonn guarda YYYY-MM-DD.
+      ...(dueDate ? { dueDate: new Date(dueDate).toISOString() } : {}),
+      ...(assignedToId ? { assignedToId } : {}),
+    },
+  })
+}
+
+/** Actualiza estado/prioridad de la Aufgabe espejo. */
+export async function actualizarAufgabe(id, { status = null, priority = null } = {}) {
+  const body = {}
+  if (status && EST_WP[String(status).toLowerCase()]) body.status = EST_WP[String(status).toLowerCase()]
+  if (priority && PRIO_WP[String(priority).toLowerCase()]) body.priority = PRIO_WP[String(priority).toLowerCase()]
+  if (Object.keys(body).length === 0) return null
+  return conSesion(`/aufgaben/${id}`, { method: 'PATCH', body })
+}

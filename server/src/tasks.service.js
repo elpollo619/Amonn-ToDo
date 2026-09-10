@@ -5,6 +5,15 @@ import { resolveState, defaultStateFor } from './states.service.js'
 import { SUBTASK_COUNTS_SQL } from './subtasks.service.js'
 import { broadcast } from './events.js'
 import { notifyTaskAssigned } from './notify.js'
+import { crearAufgabe, actualizarAufgabe, workpulseConfigurado } from './workpulse.js'
+
+/** Puente #2: refleja el cambio de estado en la Aufgabe de WorkPulse (best-effort). */
+function espejarEstadoWorkpulse(task) {
+  if (workpulseConfigurado() && task?.workpulse_id) {
+    actualizarAufgabe(task.workpulse_id, { status: task.status })
+      .catch((e) => console.error('[workpulse] aufgabe no actualizada:', e.message))
+  }
+}
 
 export const STATUSES = ['open', 'in_progress', 'done']
 export const PRIORITIES = ['low', 'medium', 'high']
@@ -54,6 +63,27 @@ export async function createTask(input, createdBy, { source = 'app' } = {}) {
     const [assignee, creator] = await Promise.all([getUser(task.assignee_id), getUser(createdBy)])
     notifyTaskAssigned(task, assignee, creator).catch(() => {})
   }
+  // Puente #2: crear la Aufgabe espejo en WorkPulse y guardar su id (para no
+  // duplicar). Best-effort y en segundo plano: si falla, la tarea ya está en
+  // Amonn y no se pierde.
+  if (workpulseConfigurado()) {
+    ;(async () => {
+      try {
+        const assignee = task.assignee_id ? await getUser(task.assignee_id) : null
+        const wp = await crearAufgabe({
+          title: task.title,
+          description: task.description,
+          priority: task.priority,
+          dueDate: task.due_date,
+          assigneeEmail: assignee?.email,
+        })
+        const wpId = wp?.id ?? wp?.aufgabe?.id
+        if (wpId) await query('update tasks set workpulse_id = $2 where id = $1', [task.id, wpId])
+      } catch (e) {
+        console.error('[workpulse] aufgabe no creada:', e.message)
+      }
+    })()
+  }
   return task
 }
 
@@ -73,6 +103,7 @@ export async function setTaskState(id, state) {
     [id, state.id, state.kind],
   )
   broadcast()
+  espejarEstadoWorkpulse(rows[0])
   return rows[0] ?? null
 }
 
@@ -89,6 +120,7 @@ export async function completeTask(id) {
     [id, hecho?.id ?? null],
   )
   broadcast()
+  espejarEstadoWorkpulse(rows[0])
   return rows[0] ?? null
 }
 

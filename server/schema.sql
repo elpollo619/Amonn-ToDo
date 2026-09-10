@@ -86,6 +86,9 @@ create index if not exists aliases_kind_phrase_idx on aliases (kind, phrase);
 alter table tasks add column if not exists start_date date;
 alter table tasks add column if not exists work_days  numeric(4,1);
 create index if not exists tasks_start_idx on tasks(start_date);
+-- Puente con WorkPulse: id de la Aufgabe espejo en WorkPulse (para no
+-- duplicar: se crea una vez y luego se actualiza).
+alter table tasks add column if not exists workpulse_id text;
 
 -- ─── Estados propios del taller (paso 2 del rediseño) ─────────────────
 -- Cada equipo define sus estados ("Esperando material", "Pendiente de
