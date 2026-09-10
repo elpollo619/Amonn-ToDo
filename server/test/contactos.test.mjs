@@ -54,6 +54,39 @@ check('con correo, aunque venga en otro orden',
   await processMessage(CRIS, 'guarda contacto: ueli.zihlmann@fensterbaumeler.ch, Ueli Zihlmann, Fensterbaumeler AG'),
   ['Ueli Zihlmann', 'ueli.zihlmann@fensterbaumeler.ch'])
 
+console.log('\n4. ALTA GUIADA PASO A PASO')
+check('arranca y pregunta la empresa', await processMessage(CRIS, 'agrega a Cristian Amaya a la lista de contactos'),
+  ['Cristian Amaya', 'empresa'])
+check('pregunta el correo', await processMessage(CRIS, 'R. Baumgartner AG'), 'Correo')
+check('pregunta tel. de oficina', await processMessage(CRIS, 'cris@baumgartner.ch'), 'oficina')
+check('pregunta tel. privado', await processMessage(CRIS, '+41 62 000 00 00'), 'privado')
+check('pregunta si es responsable', await processMessage(CRIS, '-'), 'responsable')
+check('guarda y marca al responsable', await processMessage(CRIS, 'sí'),
+  ['Contacto guardado', 'Cristian Amaya', '⭐', 'R. Baumgartner AG', 'cris@baumgartner.ch'])
+const nuevo = (await buscarContactos('Cristian Amaya'))[0]
+checkIgual('is_responsible = true', nuevo.is_responsible, true)
+checkIgual('empresa guardada', nuevo.company, 'R. Baumgartner AG')
+checkIgual('tel. oficina en phone', nuevo.phone, '+41 62 000 00 00')
+checkIgual('privado vacío (saltado con "-")', nuevo.mobile, null)
+
+console.log('\n5. "NUEVO CONTACTO: X" (solo nombre) TAMBIÉN ARRANCA EL FLUJO')
+check('solo nombre → pregunta empresa', await processMessage(CRIS, 'nuevo contacto: Luis Pérez'),
+  ['Luis Pérez', 'empresa'])
+await processMessage(CRIS, 'Gipser AG')
+await processMessage(CRIS, '-')
+await processMessage(CRIS, '-')
+await processMessage(CRIS, '079 111 22 33')
+check('responsable "no" → sin estrella', await processMessage(CRIS, 'no'), ['Contacto guardado', 'Luis Pérez'])
+const luis = (await buscarContactos('Luis Pérez'))[0]
+checkIgual('no responsable', luis.is_responsible, false)
+checkIgual('privado en mobile', luis.mobile, '079 111 22 33')
+
+console.log('\n6. LISTAR CONTACTOS POR EMPRESA')
+const lista = check('lista todos los de la empresa', await processMessage(CRIS, 'contactos de R. Baumgartner AG'),
+  ['Contactos de', 'Cristian Amaya', 'Reto Baumgartner'])
+checkIgual('el responsable va primero', lista.indexOf('Cristian Amaya') < lista.indexOf('Reto Baumgartner'), true)
+check('empresa sin contactos lo dice', await processMessage(CRIS, 'contactos de Inexistente SA'), 'No hay contactos')
+
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de contactos pasan\n' : `\n❌ ${fallos} fallo(s)\n`)
 process.exit(fallos === 0 ? 0 : 1)

@@ -30,7 +30,7 @@ import { transcribir, transcripcionDisponible } from './transcribe.js'
 import { NOMBRES as BASURA_NOMBRES, proximaDe, proximas, masDias } from './entsorgung.js'
 import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
-import { addContact, buscarContactos, formatContacto } from './contactos.js'
+import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
@@ -276,12 +276,56 @@ function resolverPersona(texto, users, sender, lang, aliases = []) {
 }
 
 // ─── Continuar una conversación a medias ──────────────────────
+/** Arranca el alta guiada de un contacto: guarda el borrador y pregunta la empresa. */
+async function iniciarAltaContacto(phone, user, name, lang) {
+  const nombre = String(name ?? '').trim()
+  if (!nombre) return t(lang, 'contact_need_name')
+  await setPending(phone, user.id, { esperando: 'contacto', paso: 'company', datos: { name: nombre } })
+  return t(lang, 'contact_ask_company', { nombre })
+}
+
 async function continuarPendiente(phone, user, lang, pending, texto, users, today, aliases = []) {
   const t0 = normalize(texto)
   // Cancelar en cualquier momento.
   if (/^(cancela|cancelar|olvidalo|dejalo|abbrechen|vergiss es|cancel|esquece)\b/.test(t0)) {
     await clearPending(phone)
     return t(lang, 'cancelled')
+  }
+
+  // Alta guiada de contacto: empresa → email → tel. oficina → tel. privado →
+  // responsable → guardar. Cada paso admite "-" / "saltar" para dejarlo vacío.
+  if (pending.esperando === 'contacto') {
+    const datos = pending.datos ?? {}
+    // "-" o "." solos, o palabras de "sin dato": dejan el campo vacío.
+    const salta = /^[-.]+$/.test(t0) || /^(saltar|skip|nada|ningun[ao]|kein|nenhum|nao|no)\b/.test(t0)
+    const valor = salta ? null : String(texto ?? '').trim()
+    const preguntar = async (paso, clave) => {
+      await setPending(phone, user.id, { esperando: 'contacto', paso, datos })
+      return t(lang, clave, { nombre: datos.name })
+    }
+    switch (pending.paso) {
+      case 'company':
+        datos.company = valor
+        return preguntar('email', 'contact_ask_email')
+      case 'email':
+        datos.email = valor
+        return preguntar('office', 'contact_ask_office')
+      case 'office':
+        datos.phone = valor
+        return preguntar('private', 'contact_ask_private')
+      case 'private':
+        datos.mobile = valor
+        return preguntar('responsible', 'contact_ask_responsible')
+      case 'responsible': {
+        datos.is_responsible = /^(si|yes|ja|sim|claro|correcto|exacto|jawohl)\b/.test(t0)
+        await clearPending(phone)
+        const c = await addContact(datos)
+        return t(lang, 'contact_added', { ficha: formatContacto(c) })
+      }
+      default:
+        await clearPending(phone)
+        return null
+    }
   }
 
   // "¿Cuál de estas?" tras no saber a qué tarea se refería. No es un
@@ -1424,6 +1468,21 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       })
     }
 
+    case 'contacto_empresa': {
+      // "muéstrame los contactos de R. Baumgartner AG"
+      const encontrados = await listByCompany(intent.empresa, 25)
+      if (encontrados.length === 0) return t(lang, 'contact_company_none', { empresa: intent.empresa })
+      return t(lang, 'contact_company_list', {
+        empresa: intent.empresa,
+        total: encontrados.length,
+        lista: encontrados.map(formatContacto).join('\n\n'),
+      })
+    }
+
+    case 'contacto_nuevo':
+      // "agrega a Cristian Amaya a contactos" → alta guiada paso a paso.
+      return iniciarAltaContacto(phone, user, intent.name, lang)
+
     case 'contacto_add': {
       // Formato libre separado por comas: nombre, empresa, teléfono, correo.
       // Se reconoce cada trozo por su forma, no por su posición: así da igual
@@ -1438,6 +1497,11 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         if (!datos.company) { datos.company = tr; continue }
       }
       if (!datos.name) return t(lang, 'contact_need_name')
+      // Si solo dieron el nombre (sin empresa/tel/email), es un alta guiada:
+      // "nuevo contacto: Cristian Amaya" → preguntamos el resto uno a uno.
+      if (!datos.company && !datos.phone && !datos.email) {
+        return iniciarAltaContacto(phone, user, datos.name, lang)
+      }
       const c = await addContact({ ...datos, mobile: datos.phone })
       return t(lang, 'contact_added', { ficha: formatContacto(c) })
     }

@@ -11,16 +11,36 @@
 import { query } from './db.js'
 import { broadcast } from './events.js'
 
-export async function addContact({ name, company = null, role = null, bkp = null, project = null, phone = null, mobile = null, email = null, address = null, status = null, notes = null }) {
+export async function addContact({ name, company = null, role = null, bkp = null, project = null, phone = null, mobile = null, email = null, address = null, status = null, notes = null, is_responsible = false }) {
   const limpio = String(name ?? '').trim()
   if (!limpio) throw Object.assign(new Error('Falta el nombre'), { status: 400 })
   const { rows } = await query(
-    `insert into contacts (name, company, role, bkp, project, phone, mobile, email, address, status, notes)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
-    [limpio, company, role, bkp, project, phone, mobile, email, address, status, notes],
+    `insert into contacts (name, company, role, bkp, project, phone, mobile, email, address, status, notes, is_responsible)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+    [limpio, company, role, bkp, project, phone, mobile, email, address, status, notes, Boolean(is_responsible)],
   )
   broadcast()
   return rows[0]
+}
+
+/**
+ * Todos los contactos de una empresa. A diferencia de buscarContactos (que
+ * busca "a lo ancho" por nombre/oficio/proyecto), aquí se lista una empresa
+ * concreta: "muéstrame los contactos de R. Baumgartner AG". Los responsables
+ * van primero, y luego los que tienen teléfono.
+ */
+export async function listByCompany(empresa, limite = 25) {
+  const q = `%${String(empresa ?? '').trim().toLowerCase()}%`
+  const { rows } = await query(
+    `select * from contacts
+      where lower(coalesce(company,'')) like $1
+      order by is_responsible desc,
+               (case when coalesce(mobile, phone) is not null then 0 else 1 end),
+               length(name) asc
+      limit $2`,
+    [q, limite],
+  )
+  return rows
 }
 
 /**
@@ -44,11 +64,17 @@ export async function buscarContactos(texto, limite = 5) {
 
 /** Cómo se enseña un contacto por WhatsApp. */
 export function formatContacto(c) {
-  const l = [`👤 ${c.name}`]
+  const nombre = c.is_responsible ? `👤 ${c.name} ⭐` : `👤 ${c.name}`
+  const l = [nombre]
   if (c.company && c.company !== c.name) l.push(`🏢 ${c.company}`)
   if (c.role) l.push(`🔧 ${c.role}`)
-  const tel = c.mobile || c.phone
-  if (tel) l.push(`📞 ${tel}`)
+  // Oficina y privado por separado, pero sin repetir si es el mismo número.
+  if (c.phone && c.mobile && c.phone !== c.mobile) {
+    l.push(`📞 ${c.phone} (Büro)`)
+    l.push(`📱 ${c.mobile} (privat)`)
+  } else if (c.mobile || c.phone) {
+    l.push(`📞 ${c.mobile || c.phone}`)
+  }
   if (c.email) l.push(`✉️ ${c.email}`)
   if (c.project) l.push(`🏗️ ${c.project}`)
   if (c.status) l.push(`📋 ${c.status}`)

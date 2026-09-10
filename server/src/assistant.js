@@ -116,6 +116,13 @@ const REGLAS = {
     contactoBuscar: /^(?:(?:el\s+)?(?:telefono|numero|mail|email|correo|contacto|datos)\s+(?:de|del|de la)\s+|quien es\s+|buscar?\s+(?:contacto\s+)?)(.+?)\??$/,
     // "guarda contacto: Reto Baumgartner, R. Baumgartner AG, +41 79 938 50 71"
     contactoAdd: /^(?:guarda(?:r)?|anade|anadir|agrega(?:r)?|nuevo)\s+(?:el\s+)?contacto\s*[:,-]?\s*(.+)$/,
+    // Alta guiada (sobre el crudo, para conservar el nombre): "agrega a Cristian
+    // Amaya a la lista de contactos" · "añade a X a contactos". El agente pregunta
+    // empresa/email/teléfono/responsable uno a uno.
+    contactoNuevoGuiado: /(?:agregar?|añad(?:e|ir)|anad(?:e|ir)|pon|registrar?)\s+a\s+(.+?)\s+(?:a|en)\s+(?:la\s+)?(?:lista\s+de\s+)?contactos?\b/i,
+    // "contactos de R. Baumgartner AG" · "contactos de la empresa X" (plural: no
+    // choca con "contacto de X", que es buscar uno).
+    contactoEmpresa: /contactos\s+(?:de\s+(?:la\s+empresa\s+|la\s+obra\s+)?|para\s+)(.+?)\??$/i,
     // "gasto 37.90 Landi Kabelbinder" · "spesen a14 45.20 Migros"
     gastoAdd: /^(?:gasto|gastos|spesen|spese|ticket|recibo)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:que se me debe|cuanto se me debe|mis gastos|mis spesen|resumen de gastos|saldo)\b\??$/,
@@ -210,6 +217,10 @@ const REGLAS = {
     citaList: /^(?:welche termine|meine termine|nachste termine|agenda|termine)\b\??$/,
     contactoBuscar: /^(?:(?:die\s+)?(?:telefon|nummer|mail|email|kontakt|daten)\s+(?:von|vom)\s+|wer ist\s+|such(?:e)?\s+(?:kontakt\s+)?)(.+?)\??$/,
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
+    // "füge Cristian Amaya zu den Kontakten hinzu" · "Kontakt hinzufügen: X"
+    contactoNuevoGuiado: /(?:füge|fuege|f[uü]g)\s+(.+?)\s+(?:zu den kontakten|in die kontakte)\b|kontakt hinzuf[uü]gen\s*[:,-]?\s*(.+)$/i,
+    // "Kontakte von R. Baumgartner AG" · "Kontakte der Firma X"
+    contactoEmpresa: /kontakte\s+(?:von\s+|vom\s+|der firma\s+|von der firma\s+)(.+?)\??$/i,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:was schuldet ihr mir|meine spesen|meine auslagen|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kilometer)\b\s*(?:(?:nach|zu|zur|zum|bis|fur|auf)\b\s+)?(.*)$/,
@@ -277,6 +288,10 @@ const REGLAS = {
     citaList: /^(?:que reunioes|minhas reunioes|proximas reunioes|agenda)\b\??$/,
     contactoBuscar: /^(?:(?:o\s+)?(?:telefone|numero|mail|email|contacto|dados)\s+(?:de|do|da)\s+|quem e\s+|procura(?:r)?\s+(?:contacto\s+)?)(.+?)\??$/,
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
+    // "adiciona o Cristian Amaya aos contactos" · "regista X nos contactos"
+    contactoNuevoGuiado: /(?:adiciona(?:r)?|regista(?:r)?|p[õo]e)\s+(?:o\s+|a\s+)?(.+?)\s+(?:aos|nos|à lista de|na lista de)\s+contactos?\b/i,
+    // "contactos da empresa X" · "contactos da obra Y"
+    contactoEmpresa: /contactos\s+d[aeo]\s+(?:empresa\s+|obra\s+)?(.+?)\??$/i,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
     gastoList: /^(?:quanto me devem|as minhas despesas|saldo)\b\??$/,
     kmAdd: /^(\d{1,4}(?:[.,]\d)?)\s*(?:km|kms|quilometros?)\b\s*(?:(?:a|ao|ate|para|em|de)\b\s+)?(.*)$/,
@@ -502,6 +517,19 @@ function parseInLang(text, ctx, lang) {
       importe: imp ? Number(`${imp[1]}.${imp[2] ?? '00'}`) : null,
     }
   }
+
+  // Alta guiada: "agrega a Cristian Amaya a la lista de contactos". Se lee del
+  // crudo para conservar el nombre (mayúsculas y acentos). Va ANTES que el alta
+  // en una línea y que la búsqueda.
+  const guiado = cfg.contactoNuevoGuiado ? raw.match(cfg.contactoNuevoGuiado) : null
+  if (guiado) {
+    const nombre = (guiado[1] ?? guiado[2] ?? '').trim()
+    if (nombre) return { action: 'contacto_nuevo', name: nombre }
+  }
+  // "contactos de la empresa X" (plural): listar todos los de una empresa. Va
+  // ANTES que contactoBuscar, que se queda con el singular "contacto de X".
+  const porEmpresa = cfg.contactoEmpresa ? raw.match(cfg.contactoEmpresa) : null
+  if (porEmpresa) return { action: 'contacto_empresa', empresa: porEmpresa[1].trim() }
 
   const contactoNuevo = cfg.contactoAdd ? t.match(cfg.contactoAdd) : null
   if (contactoNuevo) {

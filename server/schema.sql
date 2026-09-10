@@ -332,6 +332,9 @@ create index if not exists contacts_empresa on contacts (lower(company));
 -- no añade columnas nuevas. Hay que pedirlas explícitamente.
 alter table contacts add column if not exists status text;
 alter table contacts add column if not exists notes text;
+-- Persona responsable / de contacto de la empresa (marcada en el alta guiada
+-- por WhatsApp). Permite luego pedir "los responsables de X".
+alter table contacts add column if not exists is_responsible boolean not null default false;
 create index if not exists contacts_status on contacts (lower(coalesce(status,'')));
 
 -- Spesen: gastos adelantados que hay que devolver a quien los pagó.
