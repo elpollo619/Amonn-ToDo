@@ -10,6 +10,7 @@
 // ============================================================
 import { query } from './db.js'
 import { broadcast } from './events.js'
+import { crearKontakt, workpulseConfigurado } from './workpulse.js'
 
 export async function addContact({ name, company = null, role = null, bkp = null, project = null, phone = null, mobile = null, email = null, address = null, status = null, notes = null, is_responsible = false }) {
   const limpio = String(name ?? '').trim()
@@ -20,7 +21,25 @@ export async function addContact({ name, company = null, role = null, bkp = null
     [limpio, company, role, bkp, project, phone, mobile, email, address, status, notes, Boolean(is_responsible)],
   )
   broadcast()
-  return rows[0]
+  const c = rows[0]
+  // Puente #3: crear el Kontakt espejo en WorkPulse y guardar su id (para no
+  // duplicar). Best-effort y en segundo plano.
+  if (workpulseConfigurado()) {
+    ;(async () => {
+      try {
+        const wp = await crearKontakt({
+          name: c.name, company: c.company, email: c.email, phone: c.phone,
+          mobile: c.mobile, role: c.role, address: c.address, notes: c.notes,
+          isResponsible: c.is_responsible,
+        })
+        const wpId = wp?.id ?? wp?.kontakt?.id
+        if (wpId) await query('update contacts set workpulse_id = $2 where id = $1', [c.id, wpId])
+      } catch (e) {
+        console.error('[workpulse] kontakt no creado:', e.message)
+      }
+    })()
+  }
+  return c
 }
 
 /**

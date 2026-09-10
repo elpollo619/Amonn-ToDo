@@ -338,6 +338,8 @@ alter table contacts add column if not exists notes text;
 -- Persona responsable / de contacto de la empresa (marcada en el alta guiada
 -- por WhatsApp). Permite luego pedir "los responsables de X".
 alter table contacts add column if not exists is_responsible boolean not null default false;
+-- Puente con WorkPulse: id del Kontakt espejo (para no duplicar).
+alter table contacts add column if not exists workpulse_id text;
 create index if not exists contacts_status on contacts (lower(coalesce(status,'')));
 
 -- Registro de decisiones: "guarda que decidimos la variante B en Seewer".

@@ -178,3 +178,44 @@ export async function actualizarAufgabe(id, { status = null, priority = null } =
   if (Object.keys(body).length === 0) return null
   return conSesion(`/aufgaben/${id}`, { method: 'PATCH', body })
 }
+
+// ============================================================
+// Puente #3: Contactos → Kontakt de WorkPulse (una dirección).
+// ============================================================
+
+function partirNombre(name, company) {
+  const p = String(name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (p.length >= 2) return { firstName: p[0], lastName: p.slice(1).join(' ') }
+  if (p.length === 1) return { firstName: p[0], lastName: '—' }
+  const c = String(company ?? 'Kontakt').split(/\s+/).filter(Boolean)
+  return c.length >= 2 ? { firstName: c[0], lastName: c.slice(1).join(' ') } : { firstName: c[0] || 'Kontakt', lastName: '—' }
+}
+
+function tipoKontakt({ company = '', role = '' }) {
+  const hay = `${company} ${role}`.toLowerCase()
+  if (/gemeinde|beh[öo]rde|bkw|swisscom|sunrise|amt|kanton/.test(hay)) return 'GEMEINDE'
+  if (/baumeister/.test(hay)) return 'BAUMEISTER'
+  if (/lieferant|storen|k[üu]che|lift|aufzug/.test(hay)) return 'LIEFERANT'
+  return 'EXTERN'
+}
+
+/** Crea el Kontakt espejo en WorkPulse. Devuelve la respuesta (con .id). */
+export async function crearKontakt({ name, company = null, email = null, phone = null, mobile = null, role = null, address = null, notes = null, isResponsible = false }) {
+  const { firstName, lastName } = partirNombre(name, company)
+  const nota = [notes, isResponsible ? 'Ansprechperson' : null].filter(Boolean).join(' · ') || undefined
+  return conSesion('/kontakte', {
+    method: 'POST',
+    body: {
+      firstName,
+      lastName,
+      company: company || 'Ohne Firma',
+      contactType: tipoKontakt({ company: company || '', role: role || '' }),
+      ...(email ? { email } : {}),
+      ...(phone ? { phone } : {}),
+      ...(mobile ? { mobile } : {}),
+      ...(role ? { role } : {}),
+      ...(address ? { address } : {}),
+      ...(nota ? { notes: nota } : {}),
+    },
+  })
+}
