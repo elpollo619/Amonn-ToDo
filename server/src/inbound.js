@@ -34,6 +34,7 @@ import { addContact, buscarContactos, formatContacto, listByCompany } from './co
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal, componerResumenDiario } from './reminders.js'
+import { traducir, redactarBorrador } from './redactar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
@@ -1171,6 +1172,21 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
 
     case 'resumen_diario':
       return componerResumenDiario(lang)
+
+    // Traducir un texto. NUNCA envía nada: devuelve la traducción para revisar.
+    case 'traducir': {
+      const out = await traducir(intent.texto, intent.idioma)
+      if (!out) return t(lang, 'ia_off')
+      return t(lang, 'traducir_head') + out
+    }
+
+    // Redactar un borrador (mensaje/correo). Tampoco envía nada: se devuelve
+    // el texto con una nota recordando que hay que revisarlo antes de mandarlo.
+    case 'borrador': {
+      const out = await redactarBorrador({ para: intent.para, tema: intent.tema, idioma: lang })
+      if (!out) return t(lang, 'ia_off')
+      return t(lang, 'borrador_head') + out + t(lang, 'borrador_pie')
+    }
 
     case 'ausencia_add': {
       const r = resolverPersona(String(intent.quien ?? ''), users, user, lang, aliases)

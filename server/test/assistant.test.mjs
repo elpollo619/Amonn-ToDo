@@ -178,6 +178,30 @@ check('diario de', 'Tagesbericht', 'de', { action: 'resumen_diario' })
 check('diario pt', 'resumo de hoje', 'pt', { action: 'resumen_diario' })
 check('semanal sigue siendo semanal', 'resumen semanal', 'es', { action: 'resumen_semanal' })
 
+console.log('\nTRADUCIR — captura idioma destino y texto (nunca envía nada)')
+check('al alemán con dos puntos', 'traduce esto al alemán: hola', 'es',
+  { action: 'traducir', idioma: 'alemán', texto: 'hola' })
+check('al francés sin dos puntos', 'traduce al francés hola', 'es',
+  { action: 'traducir', idioma: 'francés', texto: 'hola' })
+check('conserva acentos y mayúsculas del texto', 'traduce al inglés: Llegamos a las 15, Grüsse', 'es',
+  { action: 'traducir', idioma: 'inglés', texto: 'Llegamos a las 15, Grüsse' })
+check('en alemán (übersetze ins Französische)', 'übersetze ins Französische: hallo', 'de',
+  { action: 'traducir', idioma: 'francés', texto: 'hallo' })
+check('en portugués (traduz para inglês)', 'traduz para inglês: olá', 'pt',
+  { action: 'traducir', idioma: 'inglés', texto: 'olá' })
+
+console.log('\nBORRADOR — captura destinatario y tema (nunca envía nada)')
+check('respuesta para X con dos puntos', 'prepara una respuesta para Timon: confirmar la cita del jueves', 'es',
+  { action: 'borrador', para: 'Timon', tema: 'confirmar la cita del jueves' })
+check('correo a X sobre tema', 'escribe un correo a Reto sobre la factura de octubre', 'es',
+  { action: 'borrador', para: 'Reto', tema: 'la factura de octubre' })
+check('en alemán (schreib eine Nachricht an X)', 'schreib eine Nachricht an Isma: die Heizung ist repariert', 'de',
+  { action: 'borrador', para: 'Isma', tema: 'die Heizung ist repariert' })
+check('en portugués (prepara uma resposta para X)', 'prepara uma resposta para Ana: confirmar a reunião', 'pt',
+  { action: 'borrador', para: 'Ana', tema: 'confirmar a reunião' })
+check('"crea una tarea" NO es un borrador', 'crea una tarea a Isma: revisar la caldera, para el viernes', 'es',
+  { action: 'create_task' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

@@ -19,6 +19,19 @@ import { NOMBRES_PERMISO as NOMBRES_PERMISO_RULES } from './permisos.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
+// Idioma destino de una traducción → nombre para el prompt de Gemini. Las
+// claves están normalizadas (sin acentos, minúsculas) porque la orden se
+// compara contra texto normalizado, y cubren cómo se nombra cada idioma en
+// español, alemán, portugués, italiano, francés e inglés.
+const IDIOMAS = {
+  aleman: 'alemán', alema: 'alemán', deutsch: 'alemán', alemao: 'alemán', tedesco: 'alemán', german: 'alemán',
+  frances: 'francés', francais: 'francés', franzosisch: 'francés', franzosische: 'francés', francese: 'francés', french: 'francés',
+  ingles: 'inglés', englisch: 'inglés', english: 'inglés', inglese: 'inglés', anglais: 'inglés',
+  italiano: 'italiano', italienisch: 'italiano', italien: 'italiano', italian: 'italiano',
+  espanol: 'español', castellano: 'español', spanisch: 'español', espagnol: 'español', spagnolo: 'español', espanhol: 'español', spanish: 'español',
+  portugues: 'portugués', portugiesisch: 'portugués', portuguese: 'portugués', portugais: 'portugués', portoghese: 'portugués',
+}
+
 // ─── Personas: buscar por nombre ──────────────────────────────
 /**
  * Encuentra a una persona del equipo por cómo la nombran ("cristian",
@@ -143,6 +156,15 @@ const REGLAS = {
     resumenSemanal: /^(?:resumen (?:semanal|de la semana)|como va la semana)\??$/,
     // "resumen diario / de hoy": la foto del día (tareas, citas, hotel, impagos).
     resumenDiario: /^(?:resumen (?:diario|de hoy|del dia)|que (?:requiere|necesita) (?:mi|tu) atencion(?: hoy)?|que tengo hoy|mi dia|agenda de hoy)\??$/,
+    // "traduce esto al alemán: <texto>" · "traduce al francés <texto>". Devuelve
+    // el idioma destino (\w+, ya normalizado) y el texto. El texto se re-extrae
+    // del crudo con traducirRaw para conservar mayúsculas y acentos.
+    traducir: /^(?:traduce(?:me)?|traducir|traduccion(?: de)?)\s+(?:esto\s+)?(?:al?|para|en)\s+(\w+)\s*[:,-]?\s*(.+)$/,
+    traducirRaw: /^(?:traduce\w*|traducir|traducci[oó]n(?:\s+de)?)\s+(?:esto\s+)?(?:al?|para|en)\s+\S+\s*[:,-]?\s*([\s\S]+)$/i,
+    // "prepara una respuesta para Timon: <tema>" · "escribe un correo a X sobre
+    // <tema>". para (destinatario) y tema se re-extraen del crudo (borradorRaw).
+    borrador: /^(?:prepara(?:me)?|redacta(?:me)?|escribe(?:me)?|redactar|escribir)\s+(?:una?\s+|el\s+|un\s+)?(?:respuesta|mensaje|correo|email|e-mail|mail|carta|nota|texto|contestacion)\s+(?:para|a|al)\s+(.+?)\s*(?:[:,-]|\s+sobre\s+)\s*(.+)$/,
+    borradorRaw: /(?:respuesta|mensaje|correo|e-?mail|mail|carta|nota|texto|contestaci[oó]n)\s+(?:para|a|al)\s+(.+?)\s*(?:[:,-]|\s+sobre\s+)\s*([\s\S]+)$/i,
     // "Rayna de vacaciones del 10 al 15" · "quién está de vacaciones"
     ausenciaList: /^(?:quien esta (?:de vacaciones|de baja|fuera|ausente)|ausencias|vacaciones)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(vacaciones|baja|permiso|libre)\s*(.*)$/,
@@ -240,6 +262,12 @@ const REGLAS = {
     gastoComercio: /^(?:wie ?viel (?:haben wir|wurde)|ausgaben|spesen)\s+(?:bei|fur|von)\s+(.+?)(?:\s+(dieses jahr|diesen monat|letztes jahr))?\??$/,
     resumenSemanal: /^(?:wochenbericht|wochenubersicht|wochen ubersicht|wie lauft die woche)\??$/,
     resumenDiario: /^(?:tagesbericht|tagesubersicht|tages ubersicht|was ist heute wichtig|was brauche ich heute|mein tag)\??$/,
+    // "übersetze ins Französische: <texto>" (normalizado: "ubersetze ins franzosische").
+    traducir: /^(?:ubersetze|ubersetzen|ubersetz)\s+(?:das\s+)?(?:ins?|auf|nach)\s+(\w+)\s*[:,-]?\s*(.+)$/,
+    traducirRaw: /^(?:[uü]bersetz\w*)\s+(?:das\s+)?(?:ins?|auf|nach)\s+\S+\s*[:,-]?\s*([\s\S]+)$/i,
+    // "schreib eine Nachricht an X: <tema>" · "verfasse eine Mail an X über <tema>".
+    borrador: /^(?:schreib(?:e|en)?|verfasse?|entwirf|formuliere?)\s+(?:eine?\s+|einen\s+|den\s+)?(?:antwort|nachricht|mail|email|e-mail|brief|notiz|text)\s+(?:an|fur)\s+(.+?)\s*(?:[:,-]|\s+uber\s+)\s*(.+)$/,
+    borradorRaw: /(?:antwort|nachricht|mail|e-?mail|brief|notiz|text)\s+(?:an|f[uü]r)\s+(.+?)\s*(?:[:,-]|\s+[uü]ber\s+)\s*([\s\S]+)$/i,
     ausenciaList: /^(?:wer (?:ist|hat) (?:im urlaub|in den ferien|ferien|frei)|abwesenheiten|ferien)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:ist\s+|hat\s+)?(im urlaub|in den ferien|ferien|urlaub|krank|abwesend)\s*(.*)$/,
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
@@ -316,6 +344,12 @@ const REGLAS = {
     gastoComercio: /^(?:quanto (?:gastamos|foi gasto|gastamos ja))\s+(?:no|na|em|com)\s+(.+?)(?:\s+(este ano|este mes|ano passado))?\??$/,
     resumenSemanal: /^(?:resumo (?:semanal|da semana)|como vai a semana)\??$/,
     resumenDiario: /^(?:resumo (?:diário|diario|de hoje|do dia)|o que preciso (?:ver )?hoje|meu dia|agenda de hoje)\??$/,
+    // "traduz para inglês: <texto>" (normalizado: "traduz para ingles").
+    traducir: /^(?:traduz(?:e|ir)?|traducao(?: de)?)\s+(?:isto\s+)?(?:para|em|ao)\s+(?:o\s+)?(\w+)\s*[:,-]?\s*(.+)$/,
+    traducirRaw: /^(?:traduz\w*|traduc[aã]o(?:\s+de)?)\s+(?:isto\s+)?(?:para|em|ao)\s+(?:o\s+)?\S+\s*[:,-]?\s*([\s\S]+)$/i,
+    // "prepara uma resposta para X: <tema>" · "escreve um email a X sobre <tema>".
+    borrador: /^(?:prepara(?:me)?|redige|redigir|escreve?|escrever)\s+(?:uma?\s+|o\s+|um\s+)?(?:resposta|mensagem|correio|email|e-mail|mail|carta|nota|texto)\s+(?:para|a|ao)\s+(.+?)\s*(?:[:,-]|\s+sobre\s+)\s*(.+)$/,
+    borradorRaw: /(?:resposta|mensagem|correio|e-?mail|mail|carta|nota|texto)\s+(?:para|a|ao)\s+(.+?)\s*(?:[:,-]|\s+sobre\s+)\s*([\s\S]+)$/i,
     ausenciaList: /^(?:quem esta de ferias|ausencias|ferias)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(ferias|baixa|licenca|folga)\s*(.*)$/,
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
@@ -397,6 +431,27 @@ function parseInLang(text, ctx, lang) {
 
   if (cfg.meteoCmd && cfg.meteoCmd.test(t)) return { action: 'meteo' }
   if (cfg.zinsCmd && cfg.zinsCmd.test(t)) return { action: 'zins' }
+
+  // Traducciones y borradores (Fase 1). Van ANTES que crear/listar: comparten
+  // algún verbo suelto con ellas ("escribe", "prepara") pero se resuelven aquí
+  // de forma determinista. NUNCA envían nada: solo devuelven el texto.
+  const tradu = cfg.traducir ? t.match(cfg.traducir) : null
+  if (tradu) {
+    const idioma = IDIOMAS[tradu[1]] ?? tradu[1]
+    // El texto a traducir se re-extrae del crudo para conservar acentos y
+    // mayúsculas (lo normalizado destrozaría "Grüsse" o "olá").
+    const enCrudo = cfg.traducirRaw ? raw.match(cfg.traducirRaw) : null
+    const texto = (enCrudo?.[1] ?? tradu[2] ?? '').trim()
+    if (texto) return { action: 'traducir', idioma, texto }
+  }
+  const borra = cfg.borrador ? t.match(cfg.borrador) : null
+  if (borra) {
+    // Igual que la traducción: destinatario y tema se leen del crudo.
+    const enCrudo = cfg.borradorRaw ? raw.match(cfg.borradorRaw) : null
+    const para = (enCrudo?.[1] ?? borra[1] ?? '').trim()
+    const tema = (enCrudo?.[2] ?? borra[2] ?? '').trim()
+    if (tema) return { action: 'borrador', para: para || null, tema, idioma: lang }
+  }
 
   // Mensajes de huéspedes. La respuesta necesita el texto TAL CUAL (va a un
   // huésped): se re-extrae del crudo, como en los contactos.
