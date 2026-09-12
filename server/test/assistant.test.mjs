@@ -202,6 +202,21 @@ check('en portugués (prepara uma resposta para X)', 'prepara uma resposta para 
 check('"crea una tarea" NO es un borrador', 'crea una tarea a Isma: revisar la caldera, para el viernes', 'es',
   { action: 'create_task' })
 
+console.log('\nBÚSQUEDA GLOBAL — captura el término y no pisa intenciones existentes')
+check('busca es', 'busca la caldera', 'es', { action: 'buscar', texto: 'la caldera' })
+check('qué sabemos de X', 'qué sabemos de Seewer', 'es', { action: 'buscar', texto: 'Seewer' })
+check('info de X', 'info de la caldera', 'es', { action: 'buscar', texto: 'la caldera' })
+check('conserva mayúsculas/acentos', 'busca Müller AG', 'es', { action: 'buscar', texto: 'Müller AG' })
+check('suche de', 'suche Heizung', 'de', { action: 'buscar', texto: 'Heizung' })
+check('was wissen wir über X', 'was wissen wir über Seewer', 'de', { action: 'buscar', texto: 'Seewer' })
+check('procura pt', 'procura a caldeira', 'pt', { action: 'buscar', texto: 'a caldeira' })
+check('o que sabemos sobre X', 'o que sabemos sobre Seewer', 'pt', { action: 'buscar', texto: 'Seewer' })
+// La búsqueda NO debe pisar las intenciones específicas ya existentes:
+check('contrato de Koubaa sigue siendo contrato', 'contrato de Koubaa', 'es',
+  { action: 'vertrag_info', que: 'koubaa' })
+check('tareas de Isma siguen siendo lista', 'tareas de Isma', 'es', { action: 'list_tasks', who: 'isma' })
+check('resumen de hoy sigue siendo diario', 'resumen de hoy', 'es', { action: 'resumen_diario' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

@@ -126,7 +126,9 @@ const REGLAS = {
     citaAdd: /^(?:cita|reunion|visita|termin|agenda(?:r)?)\s*(?:con\s+)?(.*)$/,
     citaList: /^(?:que citas|mis citas|proximas citas|agenda|citas)\b\??$/,
     // "teléfono de Baumgartner" · "contacto del gipser"
-    contactoBuscar: /^(?:(?:el\s+)?(?:telefono|numero|mail|email|correo|contacto|datos)\s+(?:de|del|de la)\s+|quien es\s+|buscar?\s+(?:contacto\s+)?)(.+?)\??$/,
+    // El verbo suelto "busca X" ya NO cae aquí (lo coge la búsqueda global, que
+    // también mira contactos): para buscar SOLO en contactos, "buscar contacto X".
+    contactoBuscar: /^(?:(?:el\s+)?(?:telefono|numero|mail|email|correo|contacto|datos)\s+(?:de|del|de la)\s+|quien es\s+|buscar?\s+contacto\s+)(.+?)\??$/,
     // "guarda contacto: Reto Baumgartner, R. Baumgartner AG, +41 79 938 50 71"
     contactoAdd: /^(?:guarda(?:r)?|anade|anadir|agrega(?:r)?|nuevo)\s+(?:el\s+)?contacto\s*[:,-]?\s*(.+)$/,
     // Alta guiada (sobre el crudo, para conservar el nombre): "agrega a Cristian
@@ -156,6 +158,11 @@ const REGLAS = {
     resumenSemanal: /^(?:resumen (?:semanal|de la semana)|como va la semana)\??$/,
     // "resumen diario / de hoy": la foto del día (tareas, citas, hotel, impagos).
     resumenDiario: /^(?:resumen (?:diario|de hoy|del dia)|que (?:requiere|necesita) (?:mi|tu) atencion(?: hoy)?|que tengo hoy|mi dia|agenda de hoy)\??$/,
+    // Búsqueda global (Fase 1): "busca la caldera" · "qué sabemos de Seewer" ·
+    // "info de X" · "información sobre X". El término se re-extrae del crudo con
+    // buscarRaw para conservar mayúsculas y acentos.
+    buscar: /^(?:busca(?:r|me)?|que sabemos (?:de|sobre|acerca de)|informacion (?:de|sobre|acerca de)|info (?:de|sobre))\s+(.+?)\s*\??$/,
+    buscarRaw: /(?:busca\w*|sabemos\s+(?:de|sobre|acerca\s+de)|informaci[oó]n\s+(?:de|sobre|acerca\s+de)|info\s+(?:de|sobre))\s+([\s\S]+?)\s*[?¿]*$/i,
     // "traduce esto al alemán: <texto>" · "traduce al francés <texto>". Devuelve
     // el idioma destino (\w+, ya normalizado) y el texto. El texto se re-extrae
     // del crudo con traducirRaw para conservar mayúsculas y acentos.
@@ -245,7 +252,7 @@ const REGLAS = {
     compraList: /^(?:was (?:fehlt|brauchen wir|müssen wir kaufen)|einkaufsliste|einkauf)\b\??$/,
     citaAdd: /^(?:termin|besprechung|sitzung|besuch)\s*(?:mit\s+)?(.*)$/,
     citaList: /^(?:welche termine|meine termine|nachste termine|agenda|termine)\b\??$/,
-    contactoBuscar: /^(?:(?:die\s+)?(?:telefon|nummer|mail|email|kontakt|daten)\s+(?:von|vom)\s+|wer ist\s+|such(?:e)?\s+(?:kontakt\s+)?)(.+?)\??$/,
+    contactoBuscar: /^(?:(?:die\s+)?(?:telefon|nummer|mail|email|kontakt|daten)\s+(?:von|vom)\s+|wer ist\s+|such(?:e)?\s+kontakt\s+)(.+?)\??$/,
     contactoAdd: /^(?:speicher(?:e)?|neuer|fuge)\s+(?:den\s+)?kontakt\s*[:,-]?\s*(.+)$/,
     // "füge Cristian Amaya zu den Kontakten hinzu" · "Kontakt hinzufügen: X"
     contactoNuevoGuiado: /(?:füge|fuege|f[uü]g)\s+(.+?)\s+(?:zu den kontakten|in die kontakte)\b|kontakt hinzuf[uü]gen\s*[:,-]?\s*(.+)$/i,
@@ -262,6 +269,9 @@ const REGLAS = {
     gastoComercio: /^(?:wie ?viel (?:haben wir|wurde)|ausgaben|spesen)\s+(?:bei|fur|von)\s+(.+?)(?:\s+(dieses jahr|diesen monat|letztes jahr))?\??$/,
     resumenSemanal: /^(?:wochenbericht|wochenubersicht|wochen ubersicht|wie lauft die woche)\??$/,
     resumenDiario: /^(?:tagesbericht|tagesubersicht|tages ubersicht|was ist heute wichtig|was brauche ich heute|mein tag)\??$/,
+    // Búsqueda global: "suche Heizung" · "was wissen wir über X" · "infos zu X".
+    buscar: /^(?:suche?|was wissen wir (?:uber|zu|von)|infos? (?:uber|zu|von))\s+(.+?)\s*\??$/,
+    buscarRaw: /(?:such\w*|wissen wir\s+(?:[üu]ber|zu|von)|infos?\s+(?:[üu]ber|zu|von))\s+([\s\S]+?)\s*\??$/i,
     // "übersetze ins Französische: <texto>" (normalizado: "ubersetze ins franzosische").
     traducir: /^(?:ubersetze|ubersetzen|ubersetz)\s+(?:das\s+)?(?:ins?|auf|nach)\s+(\w+)\s*[:,-]?\s*(.+)$/,
     traducirRaw: /^(?:[uü]bersetz\w*)\s+(?:das\s+)?(?:ins?|auf|nach)\s+\S+\s*[:,-]?\s*([\s\S]+)$/i,
@@ -327,7 +337,7 @@ const REGLAS = {
     compraList: /^(?:o que (?:falta|precisamos)|lista de compras|compras)\b\??$/,
     citaAdd: /^(?:reuniao|encontro|visita|marcacao|agendar)\s*(?:com\s+)?(.*)$/,
     citaList: /^(?:que reunioes|minhas reunioes|proximas reunioes|agenda)\b\??$/,
-    contactoBuscar: /^(?:(?:o\s+)?(?:telefone|numero|mail|email|contacto|dados)\s+(?:de|do|da)\s+|quem e\s+|procura(?:r)?\s+(?:contacto\s+)?)(.+?)\??$/,
+    contactoBuscar: /^(?:(?:o\s+)?(?:telefone|numero|mail|email|contacto|dados)\s+(?:de|do|da)\s+|quem e\s+|procura(?:r)?\s+contacto\s+)(.+?)\??$/,
     contactoAdd: /^(?:guarda(?:r)?|adiciona(?:r)?|novo)\s+(?:o\s+)?contacto\s*[:,-]?\s*(.+)$/,
     // "adiciona o Cristian Amaya aos contactos" · "regista X nos contactos"
     contactoNuevoGuiado: /(?:adiciona(?:r)?|regista(?:r)?|p[õo]e)\s+(?:o\s+|a\s+)?(.+?)\s+(?:aos|nos|à lista de|na lista de)\s+contactos?\b/i,
@@ -344,6 +354,9 @@ const REGLAS = {
     gastoComercio: /^(?:quanto (?:gastamos|foi gasto|gastamos ja))\s+(?:no|na|em|com)\s+(.+?)(?:\s+(este ano|este mes|ano passado))?\??$/,
     resumenSemanal: /^(?:resumo (?:semanal|da semana)|como vai a semana)\??$/,
     resumenDiario: /^(?:resumo (?:diário|diario|de hoje|do dia)|o que preciso (?:ver )?hoje|meu dia|agenda de hoje)\??$/,
+    // Búsqueda global: "procura X" · "o que sabemos sobre X" · "info de X".
+    buscar: /^(?:procura(?:r)?|busca(?:r)?|o que sabemos (?:sobre|de|acerca de)|informacao (?:sobre|de)|info (?:sobre|de))\s+(.+?)\s*\??$/,
+    buscarRaw: /(?:procura\w*|busca\w*|sabemos\s+(?:sobre|de|acerca\s+de)|informa[cç][aã]o\s+(?:sobre|de)|info\s+(?:sobre|de))\s+([\s\S]+?)\s*\??$/i,
     // "traduz para inglês: <texto>" (normalizado: "traduz para ingles").
     traducir: /^(?:traduz(?:e|ir)?|traducao(?: de)?)\s+(?:isto\s+)?(?:para|em|ao)\s+(?:o\s+)?(\w+)\s*[:,-]?\s*(.+)$/,
     traducirRaw: /^(?:traduz\w*|traduc[aã]o(?:\s+de)?)\s+(?:isto\s+)?(?:para|em|ao)\s+(?:o\s+)?\S+\s*[:,-]?\s*([\s\S]+)$/i,
@@ -893,6 +906,19 @@ function parseInLang(text, ctx, lang) {
       }
     }
   }
+
+  // Búsqueda global (Fase 1). Va la ÚLTIMA de las reglas, después de todas las
+  // intenciones específicas (contactos, contratos, decisiones, listas de
+  // tareas…) para no pisarlas, y antes solo del fallback a Gemini/desconocido.
+  // Así "busca X" cubre lo NO cubierto por una intención concreta; el término
+  // se re-extrae del crudo (buscarRaw) para conservar acentos y mayúsculas.
+  const busca = cfg.buscar ? t.match(cfg.buscar) : null
+  if (busca) {
+    const enCrudo = cfg.buscarRaw ? raw.match(cfg.buscarRaw) : null
+    const texto = (enCrudo?.[1] ?? busca[1] ?? '').trim().replace(/[?¿]+$/, '').trim()
+    if (texto) return { action: 'buscar', texto }
+  }
+
   return { action: 'unknown' }
 }
 

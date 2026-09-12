@@ -35,6 +35,7 @@ import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal, componerResumenDiario } from './reminders.js'
 import { traducir, redactarBorrador } from './redactar.js'
+import { buscarGlobal, formatBusqueda } from './buscar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
@@ -1172,6 +1173,13 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
 
     case 'resumen_diario':
       return componerResumenDiario(lang)
+
+    // Búsqueda inteligente interna (Fase 1). Rebusca en tareas, decisiones y
+    // contactos (datos NO sensibles) y responde citando la fuente y la fecha.
+    case 'buscar': {
+      const res = await buscarGlobal(intent.texto)
+      return formatBusqueda(res, intent.texto, lang)
+    }
 
     // Traducir un texto. NUNCA envía nada: devuelve la traducción para revisar.
     case 'traducir': {
