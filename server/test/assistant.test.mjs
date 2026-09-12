@@ -171,6 +171,13 @@ check('en alemán', 'antworte dem gast 12345: Danke, bis morgen', 'de',
 check('en portugués', 'responde ao hóspede 12345: obrigado', 'pt',
   { action: 'huesped_reply', bookingId: '12345' })
 
+console.log('\nRESÚMENES — diario y semanal no se pisan')
+check('diario es', 'resumen de hoy', 'es', { action: 'resumen_diario' })
+check('diario es 2', 'qué requiere mi atención hoy', 'es', { action: 'resumen_diario' })
+check('diario de', 'Tagesbericht', 'de', { action: 'resumen_diario' })
+check('diario pt', 'resumo de hoje', 'pt', { action: 'resumen_diario' })
+check('semanal sigue siendo semanal', 'resumen semanal', 'es', { action: 'resumen_semanal' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

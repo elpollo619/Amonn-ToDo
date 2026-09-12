@@ -141,6 +141,8 @@ const REGLAS = {
     // "resumen semanal": la foto del negocio. Va con apellido ("semanal")
     // porque "resumen" a secas ya significa listar tareas.
     resumenSemanal: /^(?:resumen (?:semanal|de la semana)|como va la semana)\??$/,
+    // "resumen diario / de hoy": la foto del día (tareas, citas, hotel, impagos).
+    resumenDiario: /^(?:resumen (?:diario|de hoy|del dia)|que (?:requiere|necesita) (?:mi|tu) atencion(?: hoy)?|que tengo hoy|mi dia|agenda de hoy)\??$/,
     // "Rayna de vacaciones del 10 al 15" · "quién está de vacaciones"
     ausenciaList: /^(?:quien esta (?:de vacaciones|de baja|fuera|ausente)|ausencias|vacaciones)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(vacaciones|baja|permiso|libre)\s*(.*)$/,
@@ -237,6 +239,7 @@ const REGLAS = {
     kmList: /^(?:kilometer|km|meine kilometer|meine km|kilometrierung)(?:\s+(\d{4}))?\??$/,
     gastoComercio: /^(?:wie ?viel (?:haben wir|wurde)|ausgaben|spesen)\s+(?:bei|fur|von)\s+(.+?)(?:\s+(dieses jahr|diesen monat|letztes jahr))?\??$/,
     resumenSemanal: /^(?:wochenbericht|wochenubersicht|wochen ubersicht|wie lauft die woche)\??$/,
+    resumenDiario: /^(?:tagesbericht|tagesubersicht|tages ubersicht|was ist heute wichtig|was brauche ich heute|mein tag)\??$/,
     ausenciaList: /^(?:wer (?:ist|hat) (?:im urlaub|in den ferien|ferien|frei)|abwesenheiten|ferien)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:ist\s+|hat\s+)?(im urlaub|in den ferien|ferien|urlaub|krank|abwesend)\s*(.*)$/,
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
@@ -312,6 +315,7 @@ const REGLAS = {
     kmList: /^(?:quilometros|km|os meus km|quantos km|quilometragem)(?:\s+(?:de\s+)?(\d{4}))?\??$/,
     gastoComercio: /^(?:quanto (?:gastamos|foi gasto|gastamos ja))\s+(?:no|na|em|com)\s+(.+?)(?:\s+(este ano|este mes|ano passado))?\??$/,
     resumenSemanal: /^(?:resumo (?:semanal|da semana)|como vai a semana)\??$/,
+    resumenDiario: /^(?:resumo (?:diário|diario|de hoje|do dia)|o que preciso (?:ver )?hoje|meu dia|agenda de hoje)\??$/,
     ausenciaList: /^(?:quem esta de ferias|ausencias|ferias)\b\??$/,
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(ferias|baixa|licenca|folga)\s*(.*)$/,
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
@@ -460,7 +464,8 @@ function parseInLang(text, ctx, lang) {
   // tareas porque "cuartos" y "habitación" no son palabras de tarea.
   if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
 
-  // El resumen semanal va antes que las listas: "resumen" a secas es listar.
+  // Los resúmenes van antes que las listas: "resumen" a secas es listar.
+  if (cfg.resumenDiario && cfg.resumenDiario.test(t)) return { action: 'resumen_diario' }
   if (cfg.resumenSemanal && cfg.resumenSemanal.test(t)) return { action: 'resumen_semanal' }
 
   // Ausencias. La lista va primero: "wer ist im urlaub" encaja también en el

@@ -33,7 +33,7 @@ import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
-import { componerResumenSemanal } from './reminders.js'
+import { componerResumenSemanal, componerResumenDiario } from './reminders.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
 import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
@@ -1168,6 +1168,9 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
 
     case 'resumen_semanal':
       return componerResumenSemanal(lang)
+
+    case 'resumen_diario':
+      return componerResumenDiario(lang)
 
     case 'ausencia_add': {
       const r = resolverPersona(String(intent.quien ?? ''), users, user, lang, aliases)

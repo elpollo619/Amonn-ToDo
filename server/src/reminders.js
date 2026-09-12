@@ -9,6 +9,8 @@ import { sendWhatsApp } from './whatsapp.js'
 import { todayKey } from './dates.js'
 import { saldos, chf } from './gastos.js'
 import { listAppointments } from './agenda.js'
+import { estadoDeCobros } from './impagos.js'
+import { apaleoConfigurado, llegadas, salidas } from './apaleo.js'
 
 // Un ÚNICO aviso diario por persona, en lugar de un mensaje por tarea.
 //
@@ -190,6 +192,71 @@ export async function runResumenSemanal() {
   }
   console.log(`[resumen] semanal enviado a ${enviados} teléfono(s)`)
   return { enviados }
+}
+
+// ============================================================
+// Resumen diario: "¿qué requiere mi atención hoy?".
+//
+// La foto del día para dirección/oficina en un solo mensaje: lo urgente de
+// tareas, las citas de hoy, entradas/salidas del hotel e impagos del mes.
+// Cada bloque es defensivo: si un módulo no está configurado (p.ej. Apaleo)
+// o falla, el resumen sigue saliendo con lo demás.
+// ============================================================
+export async function componerResumenDiario(lang = 'es') {
+  const bloques = []
+
+  // 1) Tareas: atrasadas y las de hoy (lo que vence ya).
+  try {
+    const { rows } = await query(
+      `select t.title, u.full_name, (current_date - t.due_date) as dias
+         from tasks t left join users u on u.id = t.assignee_id
+        where t.status in ('open','in_progress')
+          and t.due_date is not null and t.due_date <= current_date
+        order by t.due_date asc limit 12`,
+    )
+    if (rows.length) {
+      const linea = (x) => x.dias > 0
+        ? tr(lang, 'week_overdue_line', { titulo: x.title, quien: x.full_name ?? '—', dias: x.dias })
+        : `• ${x.title} (${x.full_name ?? '—'})`
+      bloques.push(tr(lang, 'day_tasks', { lista: rows.map(linea).join('\n') }))
+    }
+  } catch (e) { console.error('[resumen-diario] tareas:', e.message) }
+
+  // 2) Citas de hoy.
+  try {
+    const hoy = todayKey()
+    const citas = (await listAppointments(new Date().toISOString(), 12))
+      .filter((c) => String(c.starts_at).slice(0, 10) === hoy)
+    if (citas.length) {
+      const hora = (iso) => new Intl.DateTimeFormat('de-CH', {
+        timeZone: config.timezone, hour: '2-digit', minute: '2-digit',
+      }).format(new Date(iso))
+      bloques.push(tr(lang, 'day_appts', {
+        lista: citas.map((c) => `• ${hora(c.starts_at)} ${c.title}${c.with_whom ? ` — ${c.with_whom}` : ''}`).join('\n'),
+      }))
+    }
+  } catch (e) { console.error('[resumen-diario] citas:', e.message) }
+
+  // 3) Hotel: entradas y salidas de hoy (solo si Apaleo está conectado).
+  if (apaleoConfigurado()) {
+    try {
+      const hoy = todayKey()
+      const [inn, out] = await Promise.all([llegadas(hoy), salidas(hoy)])
+      const nIn = Array.isArray(inn) ? inn.length : (inn?.reservations?.length ?? 0)
+      const nOut = Array.isArray(out) ? out.length : (out?.reservations?.length ?? 0)
+      if (nIn || nOut) bloques.push(tr(lang, 'day_hotel', { entradas: nIn, salidas: nOut }))
+    } catch (e) { console.error('[resumen-diario] hotel:', e.message) }
+  }
+
+  // 4) Impagos del mes (si ya hay abonos vistos en el banco).
+  try {
+    const cobros = await estadoDeCobros()
+    if (cobros.abonos > 0 && cobros.impagados.length > 0) {
+      bloques.push(tr(lang, 'day_unpaid', { n: cobros.impagados.length }))
+    }
+  } catch (e) { console.error('[resumen-diario] impagos:', e.message) }
+
+  return bloques.length ? tr(lang, 'day_head') + bloques.join('') : tr(lang, 'day_quiet')
 }
 
 export function scheduleResumenSemanal() {
