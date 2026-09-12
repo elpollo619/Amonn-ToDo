@@ -45,8 +45,8 @@ resúmenes, borradores):
 - Dirección: decisiones, permisos por rol (admin/dinero/huespedes/hotel/accesos/contratos).
 
 **Pendiente (Fase 2+):**
-- Obra / **Bautagebuch** (diario de obra): NO existe.
-- Mantenimiento/averías como **tickets** propios: NO existe.
+- ✅ Obra / **Bautagebuch** (diario de obra): implementado (sep 2026).
+- ✅ Mantenimiento/**averías** como tickets propios: implementado (sep 2026).
 - Arquitectura/planos (Grundrisse, versiones): NO existe.
 - Übergabeprotokoll (entrada/salida de vivienda), limpieza de hotel como lista.
 - Búsqueda de **documentos** (no solo registros).

@@ -215,6 +215,19 @@ const REGLAS = {
     // "¿cuántos llegan hoy?" · "¿qué cuartos están sucios?" · "el hotel"
     hotel: /\b(hotel|llegan|llegadas|salidas|check[\s-]?in|huespedes|cuartos?|habitacion(?:es)?|sucia?s?|limpia?s?|ocupacion)\b/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
+    // Averías / mantenimiento. add: síntomas que pueden aparecer en cualquier
+    // parte de la frase ("la calefacción no funciona"); en el parser cede ante
+    // los verbos de crear una tarea. list y done tienen gatillos propios.
+    averiaAdd: /(?:^averia\b|hay (?:una |un )?(?:fuga|escape|gotera)|\bgotea\b|se (?:rompio|ha roto)|\besta (?:roto|rota|estropead)|no (?:funciona|va|arranca|enciende))/,
+    averiaList: /^(?:que\s+averias(?:\s+hay)?|averias(?:\s+abiertas|\s+pendientes)?|hay\s+averias)\b(?:\s+(?:de(?:l| la)?)\s+(.+?))?\s*\??$/,
+    averiaDone: /^(?:(?:la\s+)?averia\s+(?:de\s+)?(.+?)\s+(?:resuelta|arreglada|solucionada|reparada|resuelto|arreglado)|(?:ya\s+)?(?:resuelta|arreglada|solucionada|reparada|resuelto|arreglado)\s+(?:la\s+|el\s+)?(?:averia\s+(?:de\s+)?)?(.+?))\s*\??$/,
+    // Diario de obra (Bautagebuch). add: "informe/parte/diario de obra de X: ...",
+    // "bautagebuch X: ...". El texto (proyecto + trabajos) se re-extrae del crudo
+    // con obraAddRaw para conservar mayúsculas y acentos.
+    obraAdd: /^(?:(?:informe|parte|diario)\s+de\s+obra(?:\s+de)?|bautagebuch|baubericht|baustellenbericht)\s+(.+)$/,
+    obraAddRaw: /^(?:(?:informe|parte|diario)\s+de\s+obra(?:\s+de)?|bautagebuch|baubericht|baustellenbericht)\s+([\s\S]+)$/i,
+    // list: "¿qué pasó en X?", "partes de obra de X", "diario de obra de X".
+    obraList: /^(?:que\s+(?:paso|ha\s+pasado|hubo)\s+en|partes\s+de\s+obra(?:\s+de)?|diario\s+de\s+obra(?:\s+de)?)\s+(.+?)\s*\??$/,
   },
 
   de: {
@@ -300,6 +313,19 @@ const REGLAS = {
     gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
     hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
+    // Störungen / Wartung. "erledigt" ist auch das Wort zum Abschliessen einer
+    // Aufgabe: als "erledigt" für eine Störung zählt es nur zusammen mit dem
+    // Wort "störung" (erste Alternative von averiaDone).
+    averiaAdd: /(?:\bstorung\b|\bdefekt\b|\bkaputt\b|\bpanne\b|\bundicht\b|funktioniert nicht|geht nicht(?: mehr)?)/,
+    averiaList: /^(?:welche\s+storungen|storungen(?:\s+offen)?|offene\s+storungen|gibt es\s+storungen)\b(?:\s+(?:von|vom|bei|in)\s+(.+?))?\s*\??$/,
+    averiaDone: /^(?:storung\s+(?:von\s+|bei\s+)?(.+?)\s+(?:erledigt|behoben|repariert|gelost)|(.+?)\s+(?:behoben|repariert))\s*\??$/,
+    // Bautagebuch. add nur mit "bau"/"baustelle" — "Tagesbericht" allein ist der
+    // resumen_diario. Projekt + Arbeiten werden aus dem Rohtext (obraAddRaw)
+    // gelesen, um Gross-/Kleinschreibung und Umlaute zu erhalten.
+    obraAdd: /^(?:bautagebuch|baubericht|baustellenbericht|baustellenrapport)\s+(.+)$/,
+    obraAddRaw: /^(?:bautagebuch|baubericht|baustellenbericht|baustellenrapport)\s+([\s\S]+)$/i,
+    // list: "was ist auf der baustelle X passiert", "bauberichte X".
+    obraList: /^(?:was\s+ist\s+auf\s+der\s+baustelle\s+|bauberichte(?:\s+(?:von|vom|zu))?\s+)(.+?)(?:\s+passiert)?\s*\??$/,
   },
 
   pt: {
@@ -385,6 +411,18 @@ const REGLAS = {
     gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
     hotel: /\b(hotel|chegam|chegadas|saidas|check[\s-]?in|hospedes|quartos?|sujos?|limpos?|ocupacao)\b/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
+    // Avarias / manutenção. add: sintomas em qualquer parte da frase; no parser
+    // cede aos verbos de criar uma tarefa. list e done têm gatilhos próprios.
+    averiaAdd: /(?:\bavaria\b|nao funciona|\bquebrad[oa]\b|vazamento|esta (?:roto|rota|estragad))/,
+    averiaList: /^(?:que\s+avarias|avarias(?:\s+abertas|\s+pendentes)?|ha\s+avarias)\b(?:\s+(?:de|do|da)\s+(.+?))?\s*\??$/,
+    averiaDone: /^(?:avaria\s+(?:de\s+)?(.+?)\s+(?:resolvida|arranjada|reparada|resolvido)|(?:ja\s+)?(?:resolvida|arranjada|reparada|resolvido)\s+(?:a\s+|o\s+)?(?:avaria\s+(?:de\s+)?)?(.+?))\s*\??$/,
+    // Diário de obra (Bautagebuch). add: "relatório/diário de obra de X: ...".
+    // Projeto + trabalhos re-extraídos do cru (obraAddRaw) para conservar
+    // maiúsculas e acentos.
+    obraAdd: /^(?:relatorio\s+de\s+obra(?:\s+de)?|diario\s+de\s+obra(?:\s+de)?)\s+(.+)$/,
+    obraAddRaw: /^(?:relat[oó]rio\s+de\s+obra(?:\s+de)?|di[aá]rio\s+de\s+obra(?:\s+de)?)\s+([\s\S]+)$/i,
+    // list: "relatórios de obra X", "o que aconteceu em X".
+    obraList: /^(?:relatorios\s+de\s+obra(?:\s+de)?|diario\s+de\s+obra(?:\s+de)?|o\s+que\s+(?:aconteceu|se\s+passou|passou)\s+em)\s+(.+?)\s*\??$/,
   },
 }
 
@@ -530,6 +568,53 @@ function parseInLang(text, ctx, lang) {
   // nada que ver con las tareas y así no compite con "crea una tarea".
   // El hotel: llegadas, salidas, habitaciones sucias. Va antes que las
   // tareas porque "cuartos" y "habitación" no son palabras de tarea.
+  // Listar y resolver averías. Van ANTES del hotel: "averías del hotel" lleva
+  // la palabra "hotel" y la regla del hotel se lo quedaría. Sus gatillos son
+  // específicos ("averías/störungen/avarias", "resuelta/behoben/resolvida"),
+  // así que no chocan con gastos, contadores ni contratos de más arriba.
+  if (cfg.averiaList && cfg.averiaList.test(t)) {
+    const m = t.match(cfg.averiaList)
+    return { action: 'averia_list', texto: (m?.[1] ?? '').trim() || null }
+  }
+  const averiaHecha = cfg.averiaDone ? t.match(cfg.averiaDone) : null
+  if (averiaHecha) {
+    const pista = (averiaHecha[1] ?? averiaHecha[2] ?? '')
+      .replace(/^(?:la |el |lo |los |las |un |una |die |der |das |den |a |o |as |os |da |do |dos |das |von |vom )+/, '')
+      .trim()
+    if (pista) return { action: 'averia_done', pista }
+  }
+
+  // Diario de obra (Bautagebuch). Gatillos específicos ("obra/bau/baustelle/
+  // relatório de obra"), así que no pisan a resumen_diario (Tagesbericht),
+  // averías ni tareas. La lista va PRIMERO pero solo cuando NO hay ":", para
+  // que "diario de obra de Seewer: hormigonado" caiga en el alta, y
+  // "diario de obra de Seewer" (sin dos puntos) sea una consulta.
+  if (cfg.obraList && !t.includes(':') && cfg.obraList.test(t)) {
+    const m = t.match(cfg.obraList)
+    const proyecto = (m?.[1] ?? m?.[2] ?? '').trim()
+    return { action: 'obra_list', proyecto: proyecto ? restoreCase(proyecto, raw) : null }
+  }
+  if (cfg.obraAdd && cfg.obraAdd.test(t)) {
+    // proyecto y trabajos se re-extraen del crudo para conservar mayúsculas y
+    // acentos (lo normalizado destrozaría "Seewer" o "Böhlen").
+    const enCrudo = cfg.obraAddRaw ? raw.match(cfg.obraAddRaw) : null
+    const rest = (enCrudo?.[1] ?? t.match(cfg.obraAdd)?.[1] ?? '').trim()
+    let proyecto = ''
+    let trabajos = ''
+    const ci = rest.indexOf(':')
+    if (ci >= 0) {
+      proyecto = rest.slice(0, ci).trim()
+      trabajos = rest.slice(ci + 1).trim()
+    } else {
+      // Sin dos puntos: la primera palabra es la obra y el resto los trabajos;
+      // si es una sola palabra, la obra queda vacía y todo va a trabajos.
+      const sp = rest.search(/\s/)
+      if (sp > 0) { proyecto = rest.slice(0, sp).trim(); trabajos = rest.slice(sp + 1).trim() }
+      else { proyecto = ''; trabajos = rest }
+    }
+    if (proyecto || trabajos) return { action: 'obra_add', proyecto, trabajos }
+  }
+
   if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
 
   // Los resúmenes van antes que las listas: "resumen" a secas es listar.
@@ -798,6 +883,29 @@ function parseInLang(text, ctx, lang) {
   if (porFecha) {
     const cuando = porFecha[1].trim()
     if (cuando) return { action: 'list_due', due: cuando }
+  }
+
+  // Alta de avería. Va ANTES de crear una tarea (para que "la calefacción no
+  // funciona" sea una avería y no una tarea) pero DESPUÉS de gastos, contadores
+  // y contratos, para no pisar "gasto 37.90", "luz 204: 4521" ni "contrato de
+  // X". Cede además ante los verbos explícitos de crear una tarea: "crea una
+  // tarea: X no funciona" es una tarea, no una avería. (Listar y resolver se
+  // resuelven más arriba, con sus gatillos propios.)
+  if (cfg.averiaAdd && cfg.averiaAdd.test(t) && !cfg.create.test(t) && !cfg.createNoun.test(t)) {
+    const urgencia = /\b(?:emergencia|notfall)\b/.test(t) ? 'emergencia'
+      : /\b(?:urgente|urgentemente|dringend)\b/.test(t) ? 'urgente'
+      : 'normal'
+    // Ubicación: número de habitación/unidad si lo hay; si no, se deja vacío y
+    // la frase completa queda en la descripción (aceptable a propósito).
+    const ubm = t.match(/\b(?:habitacion|zimmer|quarto|apartamento|unidad|hab|nr|numero|piso)\s+(\d{1,4}[a-z]?)\b/)
+      ?? t.match(/\b(?:la|el|die|der|das|o|a)\s+(\d{2,4})\b/)
+      ?? t.match(/\b(\d{2,4})\b/)
+    return {
+      action: 'averia_add',
+      descripcion: raw.trim(),
+      ubicacion: ubm ? ubm[1] : '',
+      urgencia,
+    }
   }
 
   if (cfg.create.test(t)) {

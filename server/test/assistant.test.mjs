@@ -217,6 +217,73 @@ check('contrato de Koubaa sigue siendo contrato', 'contrato de Koubaa', 'es',
 check('tareas de Isma siguen siendo lista', 'tareas de Isma', 'es', { action: 'list_tasks', who: 'isma' })
 check('resumen de hoy sigue siendo diario', 'resumen de hoy', 'es', { action: 'resumen_diario' })
 
+console.log('\nAVERÍAS — registrar, listar, resolver en 3 idiomas')
+// Español
+check('registrar fuga con ubicación', 'hay una fuga en la ducha de la 203', 'es',
+  { action: 'averia_add', ubicacion: '203', urgencia: 'normal' })
+check('no funciona → avería urgente', 'la calefacción no funciona urgente', 'es',
+  { action: 'averia_add', urgencia: 'urgente' })
+check('emergencia', 'se rompió una tubería, emergencia', 'es',
+  { action: 'averia_add', urgencia: 'emergencia' })
+check('listar abiertas', 'averías abiertas', 'es', { action: 'averia_list', texto: null })
+check('listar con búsqueda', 'averías del hotel', 'es', { action: 'averia_list', texto: 'hotel' })
+check('resolver por ubicación', 'avería de la 203 resuelta', 'es',
+  { action: 'averia_done', pista: '203' })
+check('resolver por descripción', 'resuelta la fuga de la ducha', 'es',
+  { action: 'averia_done', pista: 'fuga de la ducha' })
+// Alemán
+check('registrar defekt', 'die heizung funktioniert nicht', 'de', { action: 'averia_add' })
+check('störung dringend', 'störung: aufzug kaputt, dringend', 'de',
+  { action: 'averia_add', urgencia: 'urgente' })
+check('listar offene störungen', 'offene störungen', 'de', { action: 'averia_list' })
+check('resolver störung behoben', 'störung heizung behoben', 'de',
+  { action: 'averia_done', pista: 'heizung' })
+// Portugués
+check('registrar avaria', 'não funciona o aquecimento', 'pt', { action: 'averia_add' })
+check('listar avarias', 'avarias abertas', 'pt', { action: 'averia_list' })
+check('resolver avaria', 'avaria da 203 resolvida', 'pt',
+  { action: 'averia_done', pista: '203' })
+
+console.log('\nAVERÍAS — no pisan a otras intenciones')
+check('crear tarea sigue creando', 'crea una tarea a Isma: revisar la caldera', 'es',
+  { action: 'create_task', assignee: 'isma' })
+check('gasto sigue apuntando', 'gasto 37.90 Landi', 'es', { action: 'gasto_add', importe: 37.9 })
+check('contador sigue apuntando', 'luz 204: 4521', 'es',
+  { action: 'contador_add', tipo: 'luz', unidad: '204', valor: 4521 })
+check('completar sigue completando', 'hecha la de la caldera', 'es',
+  { action: 'complete_task', task_hint: 'caldera' })
+check('contrato sigue consultando', 'contrato de Koubaa', 'es',
+  { action: 'vertrag_info', que: 'koubaa' })
+check('buscar sigue buscando', 'busca la caldera', 'es', { action: 'buscar', texto: 'la caldera' })
+check('completar en alemán no es avería', 'Erledigt die Heizung', 'de',
+  { action: 'complete_task' })
+
+console.log('\nDIARIO DE OBRA — registrar y listar en 3 idiomas')
+// Español
+check('informe de obra con proyecto y trabajos', 'informe de obra de Seewer: hormigonado del sótano, estuvo Böhlen', 'es',
+  { action: 'obra_add', proyecto: 'Seewer', trabajos: 'hormigonado del sótano, estuvo Böhlen' })
+check('parte de obra', 'parte de obra Seewer: encofrado terminado', 'es',
+  { action: 'obra_add', proyecto: 'Seewer', trabajos: 'encofrado terminado' })
+check('qué pasó en X', 'qué pasó en Seewer', 'es', { action: 'obra_list', proyecto: 'Seewer' })
+check('partes de obra de X', 'partes de obra de Seewer', 'es', { action: 'obra_list', proyecto: 'Seewer' })
+// Alemán
+check('baubericht', 'Baubericht Seewer: Aushub fertig', 'de',
+  { action: 'obra_add', proyecto: 'Seewer', trabajos: 'Aushub fertig' })
+check('was ist auf der baustelle X passiert', 'was ist auf der Baustelle Seewer passiert', 'de',
+  { action: 'obra_list', proyecto: 'Seewer' })
+// Portugués
+check('relatório de obra', 'relatório de obra de Seewer: betonagem da cave', 'pt',
+  { action: 'obra_add', proyecto: 'Seewer', trabajos: 'betonagem da cave' })
+check('relatórios de obra X', 'relatórios de obra Seewer', 'pt',
+  { action: 'obra_list', proyecto: 'Seewer' })
+
+console.log('\nDIARIO DE OBRA — no pisa a otras intenciones')
+check('Tagesbericht sigue siendo resumen diario', 'Tagesbericht', 'de', { action: 'resumen_diario' })
+check('resumen de hoy sigue siendo diario', 'resumen de hoy', 'es', { action: 'resumen_diario' })
+check('fuga sigue siendo avería', 'hay una fuga en la 203', 'es', { action: 'averia_add' })
+check('crear tarea sigue creando', 'crea una tarea a Isma: pintar', 'es',
+  { action: 'create_task', assignee: 'isma' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })

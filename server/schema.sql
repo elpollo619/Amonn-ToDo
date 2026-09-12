@@ -354,6 +354,40 @@ create table if not exists decisions (
 );
 create index if not exists decisions_project on decisions (lower(coalesce(project,'')));
 
+-- Averías / mantenimiento (sección 7 del documento del asistente).
+-- "Hay agua bajo la ducha de la 203" → ticket con ubicación, urgencia, estado,
+-- responsable e historial. Transversal: hotel, viviendas, oficinas y obra.
+create table if not exists averias (
+  id            uuid primary key default gen_random_uuid(),
+  ubicacion     text not null,                      -- "ducha 203", "baño EG Löwen"
+  descripcion   text not null,
+  urgencia      text not null default 'normal',     -- normal | urgente | emergencia
+  estado        text not null default 'nueva',      -- nueva | asignada | en_curso | resuelta
+  proyecto      text,                               -- inmueble/obra/hotel (opcional)
+  assignee_id   uuid references users(id) on delete set null,
+  reported_by   uuid references users(id) on delete set null,
+  nota          text,
+  created_at    timestamptz not null default now(),
+  resolved_at   timestamptz
+);
+create index if not exists averias_estado on averias (estado, created_at);
+
+-- Bautagebuch / diario de obra (sección 6 del documento del asistente).
+-- Un audio o unas líneas al final del día → el parte de obra queda escrito:
+-- qué se hizo, quién, el tiempo y las incidencias, por obra y por fecha.
+create table if not exists bautagebuch (
+  id          uuid primary key default gen_random_uuid(),
+  proyecto    text not null,                      -- Seewer, 770 Bremgarten...
+  fecha       date not null default current_date,
+  trabajos    text not null,                      -- lo que se hizo (texto/audio)
+  personal    text,                               -- quién estuvo / empresas
+  clima       text,                               -- soleado, lluvia...
+  incidencias text,                               -- problemas, hallazgos
+  created_by  uuid references users(id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists bautagebuch_proj on bautagebuch (lower(proyecto), fecha desc);
+
 -- Spesen: gastos adelantados que hay que devolver a quien los pagó.
 -- Una fila aquí = una fila en el Excel de Spesen.
 create table if not exists expenses (

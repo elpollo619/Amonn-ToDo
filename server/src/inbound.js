@@ -32,6 +32,8 @@ import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
+import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
+import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal, componerResumenDiario } from './reminders.js'
 import { traducir, redactarBorrador } from './redactar.js'
@@ -1550,6 +1552,52 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         total: decisiones.length,
         lista: decisiones.map((x) => formatDecision(x, lang)).join('\n'),
       })
+    }
+
+    case 'averia_add': {
+      // "hay una fuga en la ducha de la 203" · "la calefacción no funciona urgente"
+      const a = await addAveria({
+        descripcion: intent.descripcion,
+        ubicacion: intent.ubicacion,
+        urgencia: intent.urgencia,
+        reportedBy: user.id,
+      })
+      return t(lang, 'averia_ok', { ficha: formatAveria(a, lang) })
+    }
+
+    case 'averia_list': {
+      // "¿qué averías hay?" · "averías del hotel"
+      const list = await listAverias({ busqueda: intent.texto || null })
+      return list.length
+        ? t(lang, 'averia_list_head') + '\n' + list.map((x) => formatAveria(x, lang)).join('\n')
+        : t(lang, 'averia_none')
+    }
+
+    case 'averia_done': {
+      // "avería de la 203 resuelta" · "resuelta la fuga de la ducha"
+      const m = await findAveriaByHint(intent.pista)
+      if (!m.length) return t(lang, 'averia_notfound')
+      if (m.length > 1) return t(lang, 'averia_many', { lista: m.map((x) => formatAveria(x, lang)).join('\n') })
+      const done = await resolverAveria(m[0].id)
+      return t(lang, 'averia_done_ok', { ficha: formatAveria(done, lang) })
+    }
+
+    case 'obra_add': {
+      // "informe de obra de Seewer: hormigonado del sótano, estuvo Böhlen"
+      try {
+        const b = await addReporte({ proyecto: intent.proyecto, trabajos: intent.trabajos, userId: user.id })
+        return t(lang, 'obra_ok', { ficha: formatReporte(b, lang) })
+      } catch {
+        return t(lang, 'obra_faltan')
+      }
+    }
+
+    case 'obra_list': {
+      // "¿qué pasó en Seewer?" · "partes de obra de Seewer"
+      const list = await listReportes({ proyecto: intent.proyecto || null })
+      return list.length
+        ? t(lang, 'obra_list_head') + '\n\n' + list.map((x) => formatReporte(x, lang)).join('\n\n')
+        : t(lang, 'obra_none')
     }
 
     case 'dinero_entrado': {
