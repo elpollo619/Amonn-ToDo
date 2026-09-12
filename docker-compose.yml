@@ -1,0 +1,53 @@
+# ============================================================
+# Amonn — stack para el NAS (versión que compila desde el código).
+#
+#   db      → base de datos Postgres (aquí viven las tareas)
+#   server  → API + app web (lo que abres en el navegador)
+#
+# WhatsApp: Amonn se conecta a un OpenWA Gateway (open-wa.org) que YA tengas
+# corriendo (self-hosted). No incluye su propio WhatsApp. Configura los datos
+# del Gateway en el .env (WA_API_URL, WA_API_KEY, WA_SESSION_ID, WA_WEBHOOK_SECRET).
+#
+# Para desplegar sin compilar (usando la imagen ya publicada), usa
+# docker-compose.nas.yml en su lugar.
+#
+# Arranca con:  docker compose up -d
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: amonn
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: amonn
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U amonn']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://amonn:${DB_PASSWORD}@db:5432/amonn
+      JWT_SECRET: ${JWT_SECRET}
+      WA_API_URL: ${WA_API_URL}
+      WA_API_KEY: ${WA_API_KEY}
+      WA_SESSION_ID: ${WA_SESSION_ID:-auto}
+      WA_REALTIME: ${WA_REALTIME:-true}
+      WA_WEBHOOK_URL: ${WA_WEBHOOK_URL:-}
+      WA_WEBHOOK_SECRET: ${WA_WEBHOOK_SECRET:-}
+      WA_ENABLED: ${WA_ENABLED:-true}
+      REMINDER_CRON: ${REMINDER_CRON:-0 9 * * 1-5}
+      REMINDER_COOLDOWN_HOURS: ${REMINDER_COOLDOWN_HOURS:-20}
+      TZ: ${TZ:-Europe/Madrid}
+    ports:
+      - '${APP_PORT:-8080}:4000'
