@@ -44,3 +44,34 @@ export async function setPending(phone, userId, pending) {
 export async function clearPending(phone) {
   await query('delete from wa_conversations where phone = $1', [phone])
 }
+
+// ─── Memoria conversacional ligera (Fase C) ───────────────────
+// A diferencia del pending de arriba, esto NO es un flujo a medias: es solo
+// "de qué íbamos hablando", para resolver frases elípticas ("créame uno de
+// muestra"). Caduca igual (10 min) para que un "otro" de mañana no se
+// enganche al tema de hoy.
+
+/** Devuelve el contexto reciente de ese teléfono, o null si no hay o caducó. */
+export async function getContext(phone) {
+  const { rows } = await query('select * from wa_context where phone = $1', [phone])
+  const row = rows[0]
+  if (!row) return null
+  if (Date.now() - new Date(row.updated_at).getTime() > CADUCIDAD_MS) {
+    await query('delete from wa_context where phone = $1', [phone])
+    return null
+  }
+  return { tema: row.tema, tipo: row.tipo, ultimoBot: row.ultimo_bot }
+}
+
+/** Guarda (o reemplaza) el contexto reciente. Campos opcionales. */
+export async function setContext(phone, userId, { tema = null, tipo = null, ultimoBot = null } = {}) {
+  await query(
+    `insert into wa_context (phone, user_id, tema, tipo, ultimo_bot, updated_at)
+     values ($1, $2, $3, $4, $5, now())
+     on conflict (phone) do update
+       set tema = excluded.tema, tipo = excluded.tipo,
+           ultimo_bot = excluded.ultimo_bot, user_id = excluded.user_id,
+           updated_at = now()`,
+    [phone, userId, tema, tipo, ultimoBot ? String(ultimoBot).slice(0, 500) : null],
+  )
+}

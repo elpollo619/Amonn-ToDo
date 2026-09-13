@@ -54,6 +54,19 @@ create table if not exists wa_conversations (
   updated_at timestamptz not null default now()
 );
 
+-- Memoria conversacional ligera (Fase C): el "de qué íbamos hablando" por
+-- teléfono, para resolver frases elípticas como "créame uno de muestra". Es
+-- una miga de pan, NO un flujo a medias: por eso vive aparte de
+-- wa_conversations y nunca intercepta el mensaje siguiente.
+create table if not exists wa_context (
+  phone      text primary key,
+  user_id    uuid references users(id) on delete cascade,
+  tema       text,
+  tipo       text,
+  ultimo_bot text,
+  updated_at timestamptz not null default now()
+);
+
 -- ¿El idioma se sigue detectando solo? Pasa a false en cuanto alguien lo
 -- elige a mano ("habla en alemán"), para no volver a pisárselo.
 alter table users add column if not exists language_auto boolean not null default true;

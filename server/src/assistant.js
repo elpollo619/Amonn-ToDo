@@ -1169,7 +1169,8 @@ ${DOSSIER}
 
 Hoy es ${wd} ${ctx.today} (zona Europe/Madrid).
 Quien escribe: ${ctx.sender.full_name} (idioma: ${lang}).
-Personas del equipo: ${names}.
+Personas del equipo: ${names}.${ctx.recent?.tema ? `
+CONTEXTO RECIENTE: acabáis de hablar de ${ctx.recent.tema}${ctx.recent.tipo ? ` (${ctx.recent.tipo})` : ''}${ctx.recent.ultimoBot ? `. Lo último que respondiste: "${String(ctx.recent.ultimoBot).slice(0, 200)}"` : ''}. Si el mensaje es una continuación elíptica (p. ej. "créame uno de muestra", "y otro de vivienda"), resuélvelo con ese tema.` : ''}
 Tareas abiertas de quien escribe:
 ${mine}
 
@@ -1218,6 +1219,50 @@ async function parseWithGemini(text, ctx) {
   }
 }
 
+// ─── Memoria conversacional: temas y elipsis (Fase C) ─────────
+// Sirve para resolver frases elípticas ("créame uno de muestra") con el
+// "de qué íbamos hablando" (ctx.recent, que viene de wa_context).
+const CUES_MUESTRA = /\b(muestra|ejemplo|modelo|plantilla|prueba|borrador|machote|muster|beispiel|vorlage|entwurf|amostra|exemplo|rascunho|minuta)\b/
+const PRONOMBRE_INDEF = /\b(uno|una|otro|otra|otros|otras|um|uma|outro|outra|ein|eine|einen|eines)\b/
+const DOC_NOUN = /\b(contrato|mietvertrag|vertrag|protocolo|protokoll|ubergabeprotokoll|documento|dokument|carta|brief|minuta)\b/
+
+/** Deduce el "tema" del mensaje para recordarlo. Hoy solo 'documento'. */
+export function temaDeTexto(text) {
+  return DOC_NOUN.test(normalize(String(text ?? ''))) ? 'documento' : null
+}
+
+/** Deduce el tipo de documento si el texto lo menciona (Longstay/vivienda…). */
+export function tipoDocDeTexto(text, lang = 'es') {
+  const t = normalize(String(text ?? ''))
+  if (/\b(vivienda|wohnung|apartamento|apartment|piso|casa)\b/.test(t)) {
+    return lang === 'de' ? 'Mietvertrag (Wohnung)' : lang === 'pt' ? 'contrato de habitação' : 'contrato de vivienda'
+  }
+  if (/\b(longstay|habitacion|zimmer|quarto|amueblad|mobliert|mobiliad)\b/.test(t)) {
+    return lang === 'de' ? 'Mietvertrag (Longstay)' : lang === 'pt' ? 'contrato Longstay' : 'contrato Longstay'
+  }
+  if (/\b(protocolo|protokoll|ubergabe)\b/.test(t)) {
+    return lang === 'de' ? 'Übergabeprotokoll' : 'protocolo de entrega'
+  }
+  return null
+}
+
+/**
+ * ¿Es una continuación elíptica de un documento? P. ej. "créame uno de
+ * muestra", "y otro de vivienda": lleva una pista de muestra y un pronombre
+ * indefinido, pero NO nombra el documento (ese va en el tema recordado).
+ */
+export function elipsisDocumento(text, recent, lang = 'es') {
+  if (recent?.tema !== 'documento') return null
+  const t = normalize(String(text ?? ''))
+  if (DOC_NOUN.test(t)) return null
+  // Si nombra otra cosa concreta (tarea, gasto, cita…), no es el documento.
+  if (/\b(tarea|tarefa|aufgabe|task|gasto|spesen|despesa|cita|termin|compra)\b/.test(t)) return null
+  if (!PRONOMBRE_INDEF.test(t) && !CUES_MUESTRA.test(t)) return null
+  const tipo = tipoDocDeTexto(text, lang) || recent.tipo ||
+    (lang === 'de' ? 'Mietvertrag' : lang === 'pt' ? 'contrato de arrendamento' : 'contrato de alquiler')
+  return { action: 'redactar_documento', tipo, sobre: `un ${tipo} de muestra (${String(text).trim()})`, idioma: lang }
+}
+
 /** Interpreta el mensaje: Gemini si está configurado, reglas si no (o si falla). */
 export async function interpret(text, ctx) {
   ctx.today = ctx.today ?? todayKey()
@@ -1226,6 +1271,18 @@ export async function interpret(text, ctx) {
   // los nombres de los clientes, y son las únicas que conocen todo lo que se
   // ha ido añadiendo: gastos, compra, residuos, contactos, citas, hotel...
   const intent = parseWithRules(text, ctx)
+
+  // Continuación elíptica con memoria: "créame uno de muestra" tras hablar de
+  // contratos. En una conversación sobre documentos, esto es más fiable que un
+  // create_task disparado por el verbo suelto ("créame…"), así que tiene
+  // precedencia sobre esos matches débiles (pero NO sobre acciones fuertes y
+  // específicas). Se resuelve sin Gemini: rápido, gratis y sin mandar nada.
+  const elip = elipsisDocumento(text, ctx.recent, ctx.lang ?? 'es')
+  if (elip && ['unknown', 'create_task', 'task_detail'].includes(intent.action)) {
+    console.log(`[asistente] elipsis (${ctx.recent?.tema}) → ${JSON.stringify(elip)}`)
+    return { ...elip, via: 'elipsis' }
+  }
+
   if (intent.action !== 'unknown') {
     console.log(`[asistente] reglas → ${JSON.stringify(intent)}`)
     return { ...intent, via: 'reglas' }
