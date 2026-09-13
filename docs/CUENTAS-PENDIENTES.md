@@ -7,7 +7,7 @@ diagrama de unión con WorkPulse: artifact «Un solo sistema».
 | # | Qué | Estado |
 |---|-----|--------|
 | 1 | **Beds24** — abrir la disponibilidad de Casa Reto | 🔴 lo más urgente |
-| 2 | **Apaleo** — scopes `rates.manage`, `rates.read`, `availability.read` | 🔴 el código YA está listo y esperando |
+| 2 | **Apaleo** — scopes `inventory.read`, `rates.read`, `rates.manage`, `availability.read` | 🔴 el código YA está listo y esperando |
 | 3 | **PriceLabs** — Market Dashboard suelto (~9 CHF/mes) | 🟡 decidido, sin contratar |
 | 4 | ~~WorkPulse — usuario de servicio~~ | ✅ **HECHO** 09.09.2026 |
 | 5 | **Google** — cuenta de servicio (Drive + Docs) | 🟡 desde sept 2026 |
@@ -29,6 +29,21 @@ El token actual solo tiene `accounting.read` y
 escribir precios: apaleo.dev → cuenta del hotel → Apps →
 `UCVF-SP-EINKOMMEN_SYNC` → añadir `rates.manage`, `rates.read`,
 `availability.read`.
+
+**Lectura ampliada del hotel (13.09.2026).** El asistente ya sabe mirar TODO
+en Apaleo, no solo llegadas/salidas: alojados ahora mismo, buscar una reserva
+por nombre, cuartos libres (disponibilidad), habitaciones sucias y **fuera de
+servicio** (avería), y un **diagnóstico** — se escribe «¿qué ves en Apaleo?» y
+responde área por área qué puede ver hoy y qué scope falta marcar. Cada área se
+enciende sola en cuanto se concede su permiso; ninguna rompe a las demás si le
+falta (el 403 se absorbe). Para que el agente lo vea TODO hay que marcar en la
+misma app estos scopes:
+- `inventory.read` → habitaciones, estado de limpieza y averías/mantenimiento.
+- `availability.read` → cuartos libres.
+- `rates.read` (+ `rates.manage` para cambiarlos) → precios/tarifas.
+⚠️ La forma exacta de la respuesta de disponibilidad/tarifas está puesta según
+la documentación (aún sin verificar contra la cuenta real): la primera vez que
+se conceda cada permiso, mirar el campo `crudo` y ajustar si hiciera falta.
 
 **3. PriceLabs.** Decisión de Cris: NO licenciar una habitación para derivar
 las demás (incumpliría su contrato, cobran por habitación). En su lugar,

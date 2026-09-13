@@ -260,3 +260,114 @@ export async function fijarPreciosHotel({ ratePlanId, cambios, ensayo = false })
   }
   return { cambiadas: nuevas.length, sinTarifa, ensayo: false }
 }
+
+// ─── Lectura ampliada: «que el agente pueda mirar TODO en Apaleo» ─────────
+//
+// Todas estas funciones siguen el mismo principio del resto del fichero:
+//   · un 403 (falta de permiso) NO es una avería → se devuelve `sinPermiso:true`
+//     en vez de lanzar, para que lo que sí se puede ver siga respondiendo;
+//   · se devuelve `crudo` para poder mirar la forma real la primera vez y
+//     ajustar sin inventar nombres de campos.
+//
+// ⚠️ Sin probar contra la cuenta real todavía: hoy la app solo tiene
+// `reservations.read` + `accounting.read`. Disponibilidad, tarifas e
+// inventario responden 403 hasta que se marquen sus scopes en apaleo.dev.
+
+/** Envuelve una consulta absorbiendo el 403 como `sinPermiso`. */
+async function lecturaOpcional(fn) {
+  try {
+    return { ...(await fn()), sinPermiso: false }
+  } catch (err) {
+    if (err.status === 403 || err.status === 401) return { sinPermiso: true, crudo: null }
+    throw err
+  }
+}
+
+/**
+ * Quién está alojado AHORA mismo (estado InHouse). Solo reservas.read, que la
+ * app ya tiene. Apaleo marca el estado en `r.status`.
+ */
+export async function enCasa(propertyId = config.apaleo.propertyId) {
+  const hoy = dia(new Date().toISOString())
+  const j = await apaleoGet('/booking/v1/reservations', {
+    propertyId, from: `${hoy}T00:00:00Z`, to: `${hoy}T23:59:59Z`,
+    dateFilter: 'Stay', status: 'InHouse', pageSize: 200,
+  })
+  const reservas = (j.reservations ?? []).filter(
+    (r) => String(r.status ?? '').toLowerCase() === 'inhouse',
+  )
+  return { reservas, crudo: j }
+}
+
+/**
+ * Busca una reserva por apellido del huésped (o del que reservó). Usa la
+ * búsqueda de texto de Apaleo y además filtra en local por si acaso.
+ */
+export async function buscarReserva(texto, propertyId = config.apaleo.propertyId) {
+  const j = await apaleoGet('/booking/v1/reservations', { propertyId, textSearch: texto, pageSize: 50 })
+  const q = String(texto).toLowerCase()
+  const reservas = (j.reservations ?? []).filter((r) => {
+    const campos = [r.primaryGuest?.lastName, r.primaryGuest?.firstName, r.booker?.lastName, r.id]
+    return campos.some((c) => String(c ?? '').toLowerCase().includes(q))
+  })
+  // Si el filtro local se queda vacío pero Apaleo devolvió algo, nos fiamos de Apaleo.
+  return { reservas: reservas.length ? reservas : (j.reservations ?? []), crudo: j }
+}
+
+/** Reservas que se solapan con un rango de fechas (para «próximos días»). */
+export async function reservasEntre(desde, hasta, propertyId = config.apaleo.propertyId) {
+  const j = await apaleoGet('/booking/v1/reservations', {
+    propertyId, from: `${dia(desde)}T00:00:00Z`, to: `${dia(hasta)}T23:59:59Z`,
+    dateFilter: 'Stay', pageSize: 200,
+  })
+  return { reservas: j.reservations ?? [], crudo: j }
+}
+
+/**
+ * Cuartos libres en un rango. Necesita `availability.read`. El endpoint de
+ * disponibilidad de Apaleo agrupa por tipo de unidad (`unitGroups`).
+ */
+export async function disponibilidad(desde, hasta, propertyId = config.apaleo.propertyId) {
+  return lecturaOpcional(async () => {
+    const j = await apaleoGet('/availability/v1/unit-groups', {
+      propertyId, from: `${dia(desde)}T00:00:00Z`, to: `${dia(hasta)}T00:00:00Z`,
+    })
+    return { grupos: j.unitGroups ?? j.availableUnitGroups ?? [], crudo: j }
+  })
+}
+
+/** Saldo/cuenta de una reserva. Necesita el permiso de contabilidad/folios. */
+export async function saldoReserva(reservationId) {
+  return lecturaOpcional(async () => {
+    const j = await apaleoGet('/finance/v1/folios', { reservationId, pageSize: 50 })
+    return { folios: j.folios ?? [], crudo: j }
+  })
+}
+
+/**
+ * Diagnóstico: pregunta a Apaleo, área por área, qué deja ver HOY. Es la
+ * respuesta a «¿qué ves en Apaleo?»: en vez de adivinar, prueba cada endpoint
+ * con una consulta mínima y clasifica 200 (ok) / 401-403 (falta permiso) /
+ * otro (avería). Así Cris ve exactamente qué está activo y qué scope marcar.
+ */
+export async function permisosApaleo(propertyId = config.apaleo.propertyId) {
+  const areas = [
+    { clave: 'reservas',       etiqueta: 'Reservas (llegadas, salidas, quién hay)', scope: 'reservations.read', ruta: '/booking/v1/reservations', params: { propertyId, pageSize: 1 } },
+    { clave: 'inventario',     etiqueta: 'Habitaciones, limpieza y averías',        scope: 'inventory.read',    ruta: '/inventory/v1/units',        params: { propertyId, pageSize: 1 } },
+    { clave: 'disponibilidad', etiqueta: 'Cuartos libres (disponibilidad)',         scope: 'availability.read', ruta: '/availability/v1/unit-groups', params: { propertyId, from: `${dia(new Date().toISOString())}T00:00:00Z`, to: `${dia(new Date().toISOString())}T00:00:00Z` } },
+    { clave: 'tarifas',        etiqueta: 'Precios y tarifas',                        scope: 'rates.read',        ruta: '/rateplan/v1/rate-plans',    params: { propertyId, pageSize: 1 } },
+    { clave: 'contabilidad',   etiqueta: 'Cuentas y cobros',                         scope: 'accounting.read',   ruta: '/finance/v1/folios',         params: { pageSize: 1 } },
+  ]
+  const resultado = []
+  for (const a of areas) {
+    let estado = 'ok', detalle = ''
+    try {
+      await apaleoGet(a.ruta, a.params)
+    } catch (err) {
+      if (err.status === 403 || err.status === 401) estado = 'sin_permiso'
+      else { estado = 'error'; detalle = String(err.message).slice(0, 120) }
+    }
+    resultado.push({ ...a, estado, detalle })
+  }
+  return resultado
+}

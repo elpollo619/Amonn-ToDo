@@ -54,7 +54,7 @@ import { esCamt, parseCamt, conciliarPagos, consultarEntradas, formatEntrada, to
 import { estadoDeCobros, formatImpagos } from './impagos.js'
 import { parseMahnung, crearMahnung } from './mahnung.js'
 import { mietertragCsv } from './vertraege.js'
-import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza } from './apaleo.js'
+import { apaleoConfigurado, llegadas, salidas, habitaciones, contarPersonas, porEstadoDeLimpieza, enMantenimiento, enCasa, buscarReserva, disponibilidad, permisosApaleo } from './apaleo.js'
 import { CODIGOS, categoriasDe, porKey, proponerCategoria, nombreDeArchivo } from './spesen.js'
 import { listComments } from './comments.service.js'
 import { createComment, createAttachment, storageStatus, MIMES } from './comments.service.js'
@@ -1015,7 +1015,66 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       // nunca — el ejemplo del propio README no funcionaba.
       const soloSucias = /suci|schmutzig|suj[oa]|limpiar|reinig|limpar/.test(q)
       const soloLlegadas = /llegan|llegada|anreise|chegam|chegada|check/.test(q) && !soloSucias
+      // Ramas nuevas (van antes que el parte del día). Cada una absorbe el 403
+      // como «falta permiso» para no romper lo que sí se puede ver.
+      const esDiagnostico = /apaleo|diagn|scope|permiso|permiss|berechtigung/.test(q)
+      const esLibres = /libres?|disponib|frei|verf[uü]g|livres?/.test(q)
+      const esEnCasa = /aloja|en casa|dentro|belegt?|belegung|unterkunft|ocupa[cç]|quien(?:es)? (?:hay|esta|está|estan|están)/.test(q)
+      const esReserva = /\breservas?\b|\breservation/.test(q) && !soloLlegadas
       try {
+        if (esDiagnostico) {
+          const areas = await permisosApaleo()
+          const icono = { ok: '✅', sin_permiso: '🔒', error: '⚠️' }
+          const lista = areas.map((a) => {
+            const cola = a.estado === 'sin_permiso' ? ` — falta el permiso \`${a.scope}\``
+              : a.estado === 'error' ? ` — ${a.detalle}` : ''
+            return `${icono[a.estado]} ${a.etiqueta}${cola}`
+          }).join('\n')
+          const faltan = areas.filter((a) => a.estado === 'sin_permiso').length
+          return t(lang, 'hotel_diag', { lista, faltan })
+        }
+        if (esLibres) {
+          const hasta = new Date(Date.now() + 86400_000).toISOString()
+          const { grupos, sinPermiso } = await disponibilidad(today, hasta)
+          if (sinPermiso) return t(lang, 'hotel_libres_noperm')
+          if (!grupos.length) return t(lang, 'hotel_libres_none')
+          const lista = grupos.slice(0, 12).map((g) => {
+            const nombre = g.unitGroup?.name ?? g.name ?? g.unitGroup?.id ?? '—'
+            const libres = g.availableCount ?? g.available ?? g.count ?? '?'
+            return `• ${nombre}: ${libres}`
+          }).join('\n')
+          return t(lang, 'hotel_libres', { lista })
+        }
+        if (esEnCasa) {
+          const { reservas } = await enCasa()
+          if (!reservas.length) return t(lang, 'hotel_inhouse_none')
+          const personas = contarPersonas(reservas)
+          const detalle = '\n' + reservas.slice(0, 12).map((r) => {
+            const h = r.unit?.name ? ` — ${r.unit.name}` : ''
+            const quien = r.primaryGuest?.lastName ?? r.booker?.lastName ?? ''
+            return `• ${quien}${h}`
+          }).join('\n')
+          return t(lang, 'hotel_inhouse', { personas, reservas: reservas.length, detalle })
+        }
+        if (esReserva) {
+          // Nombre de búsqueda: se quita «reserva(s) de/del/de la», «busca…».
+          const term = q
+            .replace(/.*?\breservas?\b|.*?\breservation(?:en)?\b/, '')
+            .replace(/^\s*(?:de|del|de la|da|do|von|of|para)\s+/, '')
+            .replace(/[?¿!¡.]+$/, '')
+            .trim()
+          if (!term) return t(lang, 'hotel_reserva_pide')
+          const { reservas } = await buscarReserva(term)
+          if (!reservas.length) return t(lang, 'hotel_reserva_none', { term })
+          const lista = reservas.slice(0, 8).map((r) => {
+            const quien = [r.primaryGuest?.firstName, r.primaryGuest?.lastName].filter(Boolean).join(' ') || r.booker?.lastName || '—'
+            const h = r.unit?.name ? ` · ${r.unit.name}` : ''
+            const fechas = [r.arrival, r.departure].filter(Boolean).map((d) => String(d).slice(0, 10)).join('→')
+            const est = r.status ? ` [${r.status}]` : ''
+            return `• ${quien}${h}${fechas ? ` · ${fechas}` : ''}${est}`
+          }).join('\n')
+          return t(lang, 'hotel_reserva', { term, total: reservas.length, lista })
+        }
         if (soloSucias) {
           const { unidades, sinPermiso } = await habitaciones()
           if (sinPermiso) return t(lang, 'hotel_hk_noperm')
@@ -1050,11 +1109,16 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         const base = { personas, llegadas: reservas.length, detalle, salidas: salen.length }
         if (hk.sinPermiso) return t(lang, 'hotel_today_sin_limpieza', base)
         const { sucias, limpias } = porEstadoDeLimpieza(hk.unidades)
+        const averiadas = enMantenimiento(hk.unidades)
         return t(lang, 'hotel_today', {
           ...base,
           sucias: sucias.length,
           listaSucias: sucias.map((u) => u.name ?? u.id).join(', ') || '—',
           limpias: limpias.length,
+          // Solo se añade la línea de mantenimiento si hay alguna: si no, cadena vacía.
+          mantenimiento: averiadas.length
+            ? `\n🔧 Fuera de servicio (${averiadas.length}): ${averiadas.map((u) => u.name ?? u.id).join(', ')}`
+            : '',
         })
       } catch (err) {
         return t(lang, 'hotel_error', { motivo: err.message.slice(0, 140) })

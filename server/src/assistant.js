@@ -213,7 +213,7 @@ const REGLAS = {
     // gastos/spesen: "cierra" a secas es completar una tarea (verbo de done).
     gastoCierre: /^(?:cierra|cerrar|exporta(?:r)?)\s+(?:el mes de (?:los\s+)?)?(?:los\s+|las\s+)?(?:gastos|spesen)(?:\s+de(?:l mes de)?\s+(\w+))?$/,
     // "¿cuántos llegan hoy?" · "¿qué cuartos están sucios?" · "el hotel"
-    hotel: /\b(hotel|llegan|llegadas|salidas|check[\s-]?in|huespedes|cuartos?|habitacion(?:es)?|sucia?s?|limpia?s?|ocupacion)\b/,
+    hotel: /\b(hotel|apaleo|llegan|llegadas|salidas|check[\s-]?in|huespedes?|cuartos?|habitacion(?:es)?|sucia?s?|limpia?s?|ocupacion|reservas?|libres?|disponib\w*|aloja\w*|permisos?|diagn\w*)\b/,
     compraDone: /^(?:ya (?:esta|lo) compr\w+|compr(?:e|ado|ada)|todo comprado|ya compre)\s*(.*)$/,
     // Averías / mantenimiento. add: síntomas que pueden aparecer en cualquier
     // parte de la frase ("la calefacción no funciona"); en el parser cede ante
@@ -311,7 +311,7 @@ const REGLAS = {
     huespedReply: /^antworte (?:dem |an |der )?(?:gast|buchung)\s+(\S+)\s*[:,-]\s*(.+)$/,
     // "spesen august abschliessen" · "schliesse die spesen von august ab"
     gastoCierre: /^(?:(?:spesen|auslagen)(?:\s+(?:von\s+|vom\s+)?(\w+))?\s+(?:abschliessen|exportieren)|schliess(?:e)?\s+die\s+(?:spesen|auslagen)(?:\s+(?:von|vom)\s+(\w+))?\s*(?:ab)?|monat(?:\s+(\w+))?\s+abschliessen)$/,
-    hotel: /\b(hotel|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung)\b/,
+    hotel: /\b(hotel|apaleo|anreise|anreisen|abreise|check[\s-]?in|gaste|zimmer|schmutzig|sauber|belegung|reservation(?:en)?|frei(?:e[srn]?)?|verf[uü]g\w*|unterkunft|berechtigung\w*|diagnose)\b/,
     compraDone: /^(?:gekauft|schon gekauft|alles gekauft|erledigt einkauf)\s*(.*)$/,
     // Störungen / Wartung. "erledigt" ist auch das Wort zum Abschliessen einer
     // Aufgabe: als "erledigt" für eine Störung zählt es nur zusammen mit dem
@@ -409,7 +409,7 @@ const REGLAS = {
     // "fecha as despesas de agosto" · "exporta as despesas". Exige a palavra
     // despesas: "fecha" sozinho é concluir uma tarefa (verbo de done).
     gastoCierre: /^(?:fecha(?:r)?|exporta(?:r)?)\s+(?:o mes d(?:e|as)\s+)?(?:as\s+)?despesas(?:\s+de\s+(\w+))?$/,
-    hotel: /\b(hotel|chegam|chegadas|saidas|check[\s-]?in|hospedes|quartos?|sujos?|limpos?|ocupacao)\b/,
+    hotel: /\b(hotel|apaleo|chegam|chegadas|saidas|check[\s-]?in|hospedes?|quartos?|sujos?|limpos?|ocupacao|reservas?|livres?|disponib\w*|aloja\w*|permiss\w*|diagn\w*)\b/,
     compraDone: /^(?:ja compr\w+|comprado|tudo comprado)\s*(.*)$/,
     // Avarias / manutenção. add: sintomas em qualquer parte da frase; no parser
     // cede aos verbos de criar uma tarefa. list e done têm gatilhos próprios.
