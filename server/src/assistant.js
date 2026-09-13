@@ -178,6 +178,10 @@ const REGLAS = {
     // "luz 204: 4521" · "lecturas de la 204"
     contadorAdd: /^(luz|electricidad|agua|gas|calefaccion|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:lecturas|contadores)(?:\s+(?:de\s+)?(?:la\s+|el\s+)?(\S+))?\??$/,
+    // Redactar un documento DE MUESTRA (contrato/protocolo/carta modelo). Se
+    // reconoce por llevar a la vez un tipo de documento y una pista de "modelo"
+    // (muestra, ejemplo, plantilla…). NO crea ni consulta un alquiler real.
+    docDraft: /(?:contrato|mietvertrag|vertrag|protocolo|documento|carta)[\s\S]*\b(?:muestra|ejemplo|modelo|plantilla|prueba|borrador|machote)\b|\b(?:muestra|ejemplo|modelo|plantilla|prueba|borrador|machote)\b[\s\S]*(?:contrato|mietvertrag|vertrag|protocolo|documento|carta)/,
     // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "contrato de la 204" · "contrato de Koubaa" (consultar, no crear)
@@ -295,6 +299,7 @@ const REGLAS = {
     ausenciaAdd: /^(\w+)\s+(?:ist\s+|hat\s+)?(im urlaub|in den ferien|ferien|urlaub|krank|abwesend)\s*(.*)$/,
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
+    docDraft: /(?:vertrag|mietvertrag|protokoll|ubergabeprotokoll|dokument|brief|vorlage)[\s\S]*\b(?:muster|beispiel|vorlage|entwurf)\b|\b(?:muster|beispiel|vorlage|entwurf)\b[\s\S]*(?:vertrag|mietvertrag|protokoll|dokument|brief)/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     // Consultar es "vertrag von 204"; crear es "vertrag für ..." (contratoAdd).
     vertragInfo: /^(?:mietvertrag|vertrag)\s+(?:von|vom)\s*(?:zimmer\s+)?([\w.\-]+)\??$/,
@@ -393,6 +398,7 @@ const REGLAS = {
     ausenciaAdd: /^(\w+)\s+(?:esta\s+)?de\s+(ferias|baixa|licenca|folga)\s*(.*)$/,
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
+    docDraft: /(?:contrato|protocolo|documento|carta|minuta)[\s\S]*\b(?:amostra|exemplo|modelo|rascunho|minuta)\b|\b(?:amostra|exemplo|modelo|rascunho|minuta)\b[\s\S]*(?:contrato|protocolo|documento|carta)/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     vertragInfo: /^(?:contrato)\s+(?:de|do|da)\s*(?:o\s+|a\s+)?(?:quarto\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:rendas)(?:\s+(?:de|do|da)\s+(\S+))?\??$/,
@@ -515,6 +521,26 @@ function parseInLang(text, ctx, lang) {
       bookingId: huesped[1],
       texto: (enCrudo?.[2] ?? huesped[2]).trim(),
     }
+  }
+
+  // Redactar un DOCUMENTO de muestra (contrato/protocolo/carta modelo). Va
+  // ANTES de vertrag_info y contrato_add: «contrato de muestra» no es ni
+  // consultar ni dar de alta un alquiler real, sino pedir un texto de ejemplo
+  // listo para revisar. No guarda nada ni lo envía.
+  // Guarda contra falsos positivos: un ALTA real trae datos (habitación y/o
+  // importe → dígitos). Además el apellido alemán "Muster" = "muestra" chocaría
+  // con la pista de idioma; por eso, si esto es un alta con datos, no es muestra.
+  const altaConDatos = cfg.contratoAdd && cfg.contratoAdd.test(t) && /\d/.test(t)
+  if (!altaConDatos && cfg.docDraft && cfg.docDraft.test(t)) {
+    let tipo = lang === 'de' ? 'Dokument' : lang === 'pt' ? 'documento' : 'documento'
+    if (/contrato|vertrag/.test(t)) {
+      tipo = lang === 'de' ? 'Mietvertrag' : lang === 'pt' ? 'contrato de arrendamento' : 'contrato de alquiler'
+    } else if (/protocolo|protokoll/.test(t)) {
+      tipo = lang === 'de' ? 'Übergabeprotokoll' : lang === 'pt' ? 'protocolo de entrega' : 'protocolo de entrega'
+    } else if (/carta|brief/.test(t)) {
+      tipo = lang === 'de' ? 'Brief' : 'carta'
+    }
+    return { action: 'redactar_documento', tipo, sobre: raw.trim(), idioma: lang }
   }
 
   // Consultar un contrato existente va ANTES que crear uno: «contrato de la
@@ -1147,13 +1173,19 @@ Personas del equipo: ${names}.
 Tareas abiertas de quien escribe:
 ${mine}
 
-Acciones posibles (campo "action"):
+Acciones posibles (campo "action"). Elige LA que mejor encaje:
 - "create_task": crear una tarea. Campos: "title" (breve, imperativo, sin el nombre de la persona ni la fecha), "assignee" (nombre de la persona tal como aparece en el equipo, o "yo" si es para quien escribe, o null si no dice), "due" (fecha YYYY-MM-DD o null; interpreta "el viernes" como el próximo viernes, "mañana", "en 3 días", "5/9"...), "priority" ("high" si dice urgente/importante, "low" si dice sin prisa, si no null), "description" (detalles extra o null).
 - "list_tasks": quiere ver tareas abiertas. Campo "who": null (las suyas), "equipo" (todas) o el nombre de una persona.
 - "complete_task": dice que una tarea concreta está hecha. Campo "task_hint": palabras clave de la tarea.
 - "reply_done" / "reply_not_done": responde solo sí/no/hecho a una pregunta de si terminó una tarea.
+- "redactar_documento": pide un DOCUMENTO DE MUESTRA/borrador para revisar: un contrato de ejemplo, un modelo de contrato, un protocolo de entrega, una plantilla, "muéstrame cómo se ve un contrato", etc. Campos: "tipo" (p. ej. "contrato de alquiler", "protocolo de entrega", "carta") y "sobre" (qué debe contener, con lo que se deduzca del mensaje). OJO: esto es solo una MUESTRA; NO es dar de alta un contrato real (eso lleva inquilino, habitación e importe y lo hacen las reglas).
+- "borrador": redactar un mensaje o correo para que la persona lo revise (no lo envía). Campos: "para" (destinatario o null) y "tema".
+- "traducir": traducir un texto. Campos: "texto" y "idioma" (destino).
+- "buscar": buscar algo en tareas, decisiones o contactos. Campo "texto" (lo que busca).
+- "resumen_diario": pregunta qué requiere su atención hoy / qué tiene pendiente hoy. Sin campos.
+- "resumen_semanal": pide un resumen de la semana. Sin campos.
 - "help": saluda o pregunta qué puedes hacer.
-- "answer": es una PREGUNTA o conversación que puedes responder con lo que sabes de la empresa. Campo "text": la respuesta, en el idioma de quien escribe (${lang}), corta y práctica como un WhatsApp (máximo ~6 líneas). Si algo no está conectado o no lo sabes, dilo claramente en vez de inventar.
+- "answer": es una PREGUNTA o conversación que puedes responder con lo que sabes de la empresa, O una intención especializada (gasto, contrato real, cita, avería, lectura de contador, factura, permiso…) en la que faltan datos o no estás seguro del formato: en ese caso guía en una frase pidiendo lo que falta. Campo "text": la respuesta, en el idioma de quien escribe (${lang}), corta y práctica como un WhatsApp (máximo ~6 líneas). Si algo no está conectado o no lo sabes, dilo claramente en vez de inventar.
 - "unknown": no encaja en nada y tampoco sabes responder.
 
 Mensaje: """${text}"""`

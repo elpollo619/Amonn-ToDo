@@ -284,6 +284,23 @@ check('fuga sigue siendo avería', 'hay una fuga en la 203', 'es', { action: 'av
 check('crear tarea sigue creando', 'crea una tarea a Isma: pintar', 'es',
   { action: 'create_task', assignee: 'isma' })
 
+console.log('\nDOCUMENTOS DE MUESTRA (Fase B) — redactar, no crear ni consultar')
+check('contrato de muestra', 'créame un contrato de muestra', 'es',
+  { action: 'redactar_documento', tipo: 'contrato de alquiler' })
+check('modelo de contrato', 'muéstrame un modelo de contrato', 'es',
+  { action: 'redactar_documento' })
+check('protocolo de ejemplo', 'hazme un protocolo de entrega de ejemplo', 'es',
+  { action: 'redactar_documento', tipo: 'protocolo de entrega' })
+check('Mietvertrag als Muster (de)', 'zeig mir einen Mietvertrag als Muster', 'de',
+  { action: 'redactar_documento', tipo: 'Mietvertrag' })
+check('contrato de amostra (pt)', 'faz-me um contrato de amostra', 'pt',
+  { action: 'redactar_documento', tipo: 'contrato de arrendamento' })
+// La muestra NO pisa el alta real ni la consulta:
+check('alta real sigue siendo contrato_add', 'contrato para Max Muster, habitación 204, 850', 'es',
+  { action: 'contrato_add' })
+check('consulta sigue siendo vertrag_info', 'contrato de la 204', 'es',
+  { action: 'vertrag_info', que: '204' })
+
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
 check('sin sentido → unknown', 'asdfghjkl qwerty', 'es', { action: 'unknown' })
