@@ -1294,6 +1294,20 @@ export function elipsisDocumento(text, recent, lang = 'es') {
   return { action: 'redactar_documento', tipo, sobre: `un ${tipo} de muestra (${String(text).trim()})`, idioma: lang }
 }
 
+/**
+ * ¿El mensaje parece los DATOS de un documento (para rellenar una muestra) y
+ * no un comando nuevo? Los datos de un contrato traen números (habitación,
+ * importe, fecha), comas o un "para <nombre>". Evita parseWithRules a
+ * propósito: "habitación 204" dispararía el hotel y "lista…" otras cosas.
+ */
+export function pareceDatosDocumento(text) {
+  const s = String(text ?? '').trim()
+  if (!s) return false
+  if (/\d/.test(s) || /,/.test(s)) return true
+  if (/^(para|fur|para\s+o|para\s+a)\b/.test(normalize(s))) return true
+  return false
+}
+
 /** Interpreta el mensaje: Gemini si está configurado, reglas si no (o si falla). */
 export async function interpret(text, ctx) {
   ctx.today = ctx.today ?? todayKey()

@@ -14,7 +14,7 @@
 import { query } from './db.js'
 import { config } from './config.js'
 import { sendWhatsApp, chatIdToPhone, interpretReply } from './whatsapp.js'
-import { interpret, matchUser, pickTaskByHint, parseWithRules, temaDeTexto, tipoDocDeTexto } from './assistant.js'
+import { interpret, matchUser, pickTaskByHint, parseWithRules, temaDeTexto, tipoDocDeTexto, pareceDatosDocumento } from './assistant.js'
 import {
   createTask, completeTask, setTaskState, openTasksFor, openTasksAll, listUsers,
   setDue, reassignTask, getTask, openTasksByState, openTasksDueBy,
@@ -333,6 +333,21 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
   if (/^(cancela|cancelar|olvidalo|dejalo|abbrechen|vergiss es|cancel|esquece)\b/.test(t0)) {
     await clearPending(phone)
     return t(lang, 'cancelled')
+  }
+
+  // Rellenar un documento de muestra con los datos que mande la persona.
+  // Si en vez de datos escribe un comando nuevo (las reglas lo reconocen),
+  // se cede el paso para procesarlo con normalidad.
+  if (pending.esperando === 'documento_datos') {
+    await clearPending(phone)
+    // Si no parecen datos (es un comando nuevo, una pregunta…), se cede el paso.
+    if (!pareceDatosDocumento(texto)) return null
+    const tipo = pending.tipo || (lang === 'de' ? 'Dokument' : 'documento')
+    const out = await redactarDocumento({
+      tipo, sobre: `${tipo} con estos datos: ${String(texto).trim()}`, idioma: lang,
+    })
+    if (!out) return t(lang, 'ia_off')
+    return t(lang, 'documento_head', { tipo }) + out + t(lang, 'documento_pie')
   }
 
   // Alta guiada de contacto: empresa → email → tel. oficina → tel. privado →
@@ -1289,7 +1304,10 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
     case 'redactar_documento': {
       const out = await redactarDocumento({ tipo: intent.tipo, sobre: intent.sobre, idioma: lang })
       if (!out) return t(lang, 'ia_off')
-      return t(lang, 'documento_head', { tipo: intent.tipo || 'documento' }) + out + t(lang, 'documento_pie')
+      // Queda esperando los datos: el siguiente mensaje rellena el documento.
+      await setPending(phone, user.id, { esperando: 'documento_datos', tipo: intent.tipo || 'documento' })
+      return t(lang, 'documento_head', { tipo: intent.tipo || 'documento' }) + out +
+        t(lang, 'documento_pie') + t(lang, 'documento_datos_invite')
     }
 
     case 'ausencia_add': {

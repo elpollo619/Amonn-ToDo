@@ -1,6 +1,6 @@
 // Pruebas de comprensión del asistente en español, alemán y portugués.
 // No tocan la base de datos: solo parseWithRules con un equipo de mentira.
-import { parseWithRules, matchUser, interpret, temaDeTexto, elipsisDocumento } from '../src/assistant.js'
+import { parseWithRules, matchUser, interpret, temaDeTexto, elipsisDocumento, pareceDatosDocumento } from '../src/assistant.js'
 import { esSecreto } from '../src/conocimiento.js'
 
 const USERS = [
@@ -320,6 +320,16 @@ check('guarda que decidimos sigue siendo decisión', 'guarda que decidimos la va
   has('esSecreto: contraseña', esSecreto('la contraseña del wifi es Amonn2024xy') === true)
   has('esSecreto: IBAN', esSecreto('el IBAN es CH93 0076 2011 6238 5295 7') === true)
   has('esSecreto: hecho normal → false', esSecreto('la caldera de A14 es Viessmann') === false)
+}
+
+console.log('\nRELLENAR DOCUMENTO — datos vs comando')
+{
+  const has = (nombre, cond) => { if (cond) console.log(`  ✔ ${nombre}`); else { fallos++; console.log(`  ✘ ${nombre}`) } }
+  has('datos con nº y coma → datos', pareceDatosDocumento('Max Muster, habitación 204, 850 CHF desde el 1.10') === true)
+  has('datos "para <nombre>" → datos', pareceDatosDocumento('para Max Muster') === true)
+  has('pregunta suelta → NO datos', pareceDatosDocumento('qué tengo hoy') === false)
+  has('comando suelto → NO datos', pareceDatosDocumento('lista mis tareas') === false)
+  has('saludo → NO datos', pareceDatosDocumento('hola') === false)
 }
 
 console.log('\nMEMORIA CONVERSACIONAL (Fase C) — elipsis con contexto')

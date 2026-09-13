@@ -33,6 +33,7 @@ console.log('\nCONOCIMIENTO (Fase D2) — extremo a extremo')
 check('enseñar un hecho', await processMessage(PHONE, 'recuerda que la caldera de A14 es Viessmann'),
   ['Aprendido', 'Viessmann'])
 check('listar lo aprendido', await processMessage(PHONE, 'qué has aprendido'), ['Viessmann'])
+check('la búsqueda A-Z encuentra el hecho', await processMessage(PHONE, 'busca Viessmann'), ['Viessmann'])
 check('rechaza un secreto (contraseña)',
   await processMessage(PHONE, 'recuerda que la contraseña del wifi es Amonn2024xy'), ['secreto'])
 check('rechaza un secreto (IBAN)',
