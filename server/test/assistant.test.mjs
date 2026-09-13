@@ -322,6 +322,14 @@ check('guarda que decidimos sigue siendo decisión', 'guarda que decidimos la va
   has('esSecreto: hecho normal → false', esSecreto('la caldera de A14 es Viessmann') === false)
 }
 
+console.log('\nPROTOCOLO GUIADO — enrutado')
+check('protocolo de entrada → guiado', 'haz el protocolo de entrada de la 204', 'es',
+  { action: 'protocolo_guiado' })
+check('übergabeprotokoll (de) → guiado', 'Übergabeprotokoll', 'de', { action: 'protocolo_guiado' })
+check('protocolo de saída (pt) → guiado', 'protocolo de saída', 'pt', { action: 'protocolo_guiado' })
+check('protocolo de ejemplo sigue siendo muestra', 'protocolo de entrega de ejemplo', 'es',
+  { action: 'redactar_documento' })
+
 console.log('\nRELLENAR DOCUMENTO — datos vs comando')
 {
   const has = (nombre, cond) => { if (cond) console.log(`  ✔ ${nombre}`); else { fallos++; console.log(`  ✘ ${nombre}`) } }

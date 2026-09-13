@@ -386,6 +386,47 @@ async function continuarPendiente(phone, user, lang, pending, texto, users, toda
     }
   }
 
+  // Protocolo de entrega guiado: objeto/inquilino → momento/fecha →
+  // contadores/llaves → estado → redactar. Cada paso admite "-"/"saltar".
+  if (pending.esperando === 'protocolo') {
+    const datos = pending.datos ?? {}
+    const salta = /^[-.]+$/.test(t0) || /^(saltar|skip|nada|ningun[ao]|kein|nenhum|nao|no)\b/.test(t0)
+    const valor = salta ? null : String(texto ?? '').trim()
+    const preguntar = async (paso, clave) => {
+      await setPending(phone, user.id, { esperando: 'protocolo', paso, datos })
+      return t(lang, clave)
+    }
+    switch (pending.paso) {
+      case 'obj':
+        datos.objeto = valor
+        return preguntar('cuando', 'proto_ask_cuando')
+      case 'cuando':
+        datos.cuando = valor
+        return preguntar('medidas', 'proto_ask_medidas')
+      case 'medidas':
+        datos.medidas = valor
+        return preguntar('estado', 'proto_ask_estado')
+      case 'estado': {
+        datos.estado = valor
+        await clearPending(phone)
+        const tipoDoc = lang === 'de' ? 'Übergabeprotokoll' : 'protocolo de entrega'
+        const sobre = [
+          `Protocolo de entrega de vivienda${datos.tipo ? ` (${datos.tipo})` : ''}.`,
+          `Objeto e inquilino: ${datos.objeto ?? '—'}.`,
+          `Momento y fecha: ${datos.cuando ?? '—'}.`,
+          `Contadores y llaves: ${datos.medidas ?? '—'}.`,
+          `Estado y observaciones: ${datos.estado ?? '—'}.`,
+        ].join(' ')
+        const out = await redactarDocumento({ tipo: tipoDoc, sobre, idioma: lang })
+        if (!out) return t(lang, 'ia_off')
+        return t(lang, 'documento_head', { tipo: tipoDoc }) + out + t(lang, 'documento_pie')
+      }
+      default:
+        await clearPending(phone)
+        return null
+    }
+  }
+
   // "¿Cuál de estas?" tras no saber a qué tarea se refería. No es un
   // borrador de tarea, así que se resuelve aparte.
   if (pending.esperando === 'gasto_datos') {
@@ -1308,6 +1349,12 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       await setPending(phone, user.id, { esperando: 'documento_datos', tipo: intent.tipo || 'documento' })
       return t(lang, 'documento_head', { tipo: intent.tipo || 'documento' }) + out +
         t(lang, 'documento_pie') + t(lang, 'documento_datos_invite')
+    }
+
+    // Protocolo de entrega GUIADO: pregunta paso a paso y al final redacta.
+    case 'protocolo_guiado': {
+      await setPending(phone, user.id, { esperando: 'protocolo', paso: 'obj', datos: { tipo: intent.tipo || null } })
+      return t(lang, 'proto_ask_obj')
     }
 
     case 'ausencia_add': {

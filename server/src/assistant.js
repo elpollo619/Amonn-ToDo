@@ -188,6 +188,9 @@ const REGLAS = {
     // reconoce por llevar a la vez un tipo de documento y una pista de "modelo"
     // (muestra, ejemplo, plantilla…). NO crea ni consulta un alquiler real.
     docDraft: /(?:contrato|mietvertrag|vertrag|protocolo|documento|carta)[\s\S]*\b(?:muestra|ejemplo|modelo|plantilla|prueba|borrador|machote)\b|\b(?:muestra|ejemplo|modelo|plantilla|prueba|borrador|machote)\b[\s\S]*(?:contrato|mietvertrag|vertrag|protocolo|documento|carta)/,
+    // Protocolo de entrega guiado (paso a paso). Sin pista de 'muestra' (esa va
+    // a docDraft). "protocolo de entrada/salida/entrega".
+    protocoloGuiado: /^(?:(?:haz(?:me)?|prepara(?:me)?|nuevo|iniciar?|empezar?)\s+)?(?:el\s+|un\s+)?protocolo\s+(?:de\s+)?(entrada|salida|entrega)\b/,
     // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "contrato de la 204" · "contrato de Koubaa" (consultar, no crear)
@@ -310,6 +313,7 @@ const REGLAS = {
     contadorAdd: /^(strom|wasser|gas|heizung|zahler|zaehler)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     docDraft: /(?:vertrag|mietvertrag|protokoll|ubergabeprotokoll|dokument|brief|vorlage)[\s\S]*\b(?:muster|beispiel|vorlage|entwurf)\b|\b(?:muster|beispiel|vorlage|entwurf)\b[\s\S]*(?:vertrag|mietvertrag|protokoll|dokument|brief)/,
+    protocoloGuiado: /^(?:(?:mach(?:e)?|erstelle?|neues)\s+)?(?:ein\s+)?(?:ubergabeprotokoll|abnahmeprotokoll|uebergabeprotokoll|protokoll)\b/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     // Consultar es "vertrag von 204"; crear es "vertrag für ..." (contratoAdd).
     vertragInfo: /^(?:mietvertrag|vertrag)\s+(?:von|vom)\s*(?:zimmer\s+)?([\w.\-]+)\??$/,
@@ -413,6 +417,7 @@ const REGLAS = {
     contadorAdd: /^(luz|eletricidade|agua|gas|aquecimento|contador)\s+([^\s:,-]+)\s*[:,-]?\s*(\d+(?:[.,]\d+)?)$/,
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     docDraft: /(?:contrato|protocolo|documento|carta|minuta)[\s\S]*\b(?:amostra|exemplo|modelo|rascunho|minuta)\b|\b(?:amostra|exemplo|modelo|rascunho|minuta)\b[\s\S]*(?:contrato|protocolo|documento|carta)/,
+    protocoloGuiado: /^(?:(?:faz(?:-me)?|prepara|novo)\s+)?(?:o\s+|um\s+)?protocolo\s+(?:de\s+)?(entrada|saida|entrega)\b/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     vertragInfo: /^(?:contrato)\s+(?:de|do|da)\s*(?:o\s+|a\s+)?(?:quarto\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:rendas)(?:\s+(?:de|do|da)\s+(\S+))?\??$/,
@@ -556,6 +561,12 @@ function parseInLang(text, ctx, lang) {
     }
     return { action: 'redactar_documento', tipo, sobre: raw.trim(), idioma: lang }
   }
+
+  // Protocolo de entrega GUIADO (paso a paso). Va después de docDraft: si lleva
+  // pista de "muestra/ejemplo" es un modelo (docDraft); si no, es el flujo
+  // guiado que pregunta objeto, momento, contadores/llaves y estado.
+  const protoG = cfg.protocoloGuiado ? t.match(cfg.protocoloGuiado) : null
+  if (protoG) return { action: 'protocolo_guiado', tipo: protoG[1] || null }
 
   // Consultar un contrato existente va ANTES que crear uno: «contrato de la
   // 204» es una pregunta; «contrato para Max, habitación 204, 850» (con
