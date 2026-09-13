@@ -14,7 +14,7 @@
 import { query } from './db.js'
 import { config } from './config.js'
 import { sendWhatsApp, chatIdToPhone, interpretReply } from './whatsapp.js'
-import { interpret, matchUser, pickTaskByHint, parseWithRules } from './assistant.js'
+import { interpret, matchUser, pickTaskByHint, parseWithRules, temaDeTexto, tipoDocDeTexto } from './assistant.js'
 import {
   createTask, completeTask, setTaskState, openTasksFor, openTasksAll, listUsers,
   setDue, reassignTask, getTask, openTasksByState, openTasksDueBy,
@@ -22,7 +22,7 @@ import {
 import { firstName, taskSummary } from './notify.js'
 import { describeRange, monthKeyFromText, parseDateAnyLang, parseRange, saysNoDate, todayKey, normalize } from './dates.js'
 import { t, safeLang, detectLanguage, parseLanguageCommand } from './i18n.js'
-import { getPending, setPending, clearPending } from './conversations.js'
+import { getPending, setPending, clearPending, getContext, setContext } from './conversations.js'
 import { loadAliases, learn, touch, normalizePhrase } from './aliases.js'
 import { listStates, matchStateByName } from './states.service.js'
 import { createSubtask, listSubtasks } from './subtasks.service.js'
@@ -847,12 +847,30 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
   const openTasks = await openTasksFor(user.id)
   const estados = await listStates()
   const todasAbiertas = await openTasksAll()
+  // Fase C: "de qué íbamos hablando", para resolver frases elípticas.
+  const recent = await getContext(phone).catch(() => null)
   const intent = await interpret(text, {
     sender: user, users, openTasks, lang, today, aliases, states: estados,
     // Para reconocer "pon la caldera en X" hace falta poder mirar las tareas
     // de todo el equipo, no solo las de quien escribe.
     allOpenTasks: todasAbiertas,
+    recent,
   })
+
+  // Fase C: recordar el tema para la siguiente frase elíptica. Solo se escribe
+  // cuando hay tema (así un mensaje ajeno no borra la miga); caduca a 10 min.
+  // En try/catch: la memoria nunca debe romper la respuesta.
+  try {
+    const temaAhora = temaDeTexto(text) ||
+      (['redactar_documento', 'vertrag_info', 'contrato_add'].includes(intent.action) ? 'documento' : null)
+    if (temaAhora) {
+      const tipoAhora = (intent.action === 'redactar_documento' ? intent.tipo : null) ||
+        tipoDocDeTexto(text, lang) || (recent?.tema === temaAhora ? recent.tipo : null) || null
+      await setContext(phone, user.id, { tema: temaAhora, tipo: tipoAhora })
+    }
+  } catch (err) {
+    console.error('[asistente] no se pudo guardar el contexto:', err.message)
+  }
 
   switch (intent.action) {
     case 'help':

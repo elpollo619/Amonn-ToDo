@@ -1,6 +1,6 @@
 // Pruebas de comprensión del asistente en español, alemán y portugués.
 // No tocan la base de datos: solo parseWithRules con un equipo de mentira.
-import { parseWithRules, matchUser } from '../src/assistant.js'
+import { parseWithRules, matchUser, interpret, temaDeTexto, elipsisDocumento } from '../src/assistant.js'
 
 const USERS = [
   { id: '1', full_name: 'Cristian Amaya' },
@@ -300,6 +300,29 @@ check('alta real sigue siendo contrato_add', 'contrato para Max Muster, habitaci
   { action: 'contrato_add' })
 check('consulta sigue siendo vertrag_info', 'contrato de la 204', 'es',
   { action: 'vertrag_info', que: '204' })
+
+console.log('\nMEMORIA CONVERSACIONAL (Fase C) — elipsis con contexto')
+{
+  const has = (nombre, cond) => {
+    if (cond) { console.log(`  ✔ ${nombre}`) }
+    else { fallos++; console.log(`  ✘ ${nombre}`) }
+  }
+  has('temaDeTexto detecta contrato', temaDeTexto('muéstrame un contrato como se ve') === 'documento')
+  has('temaDeTexto ignora lo demás', temaDeTexto('¿qué tengo hoy?') === null)
+  const DOC = { tema: 'documento', tipo: 'contrato Longstay' }
+  // Función pura de elipsis (determinista, sin red):
+  const e1 = elipsisDocumento('créame uno de muestra', DOC, 'es')
+  has('elipsis: "uno de muestra" → documento', e1?.action === 'redactar_documento')
+  const e2 = elipsisDocumento('y otro de vivienda', DOC, 'es')
+  has('elipsis: "otro de vivienda" → vivienda', e2?.action === 'redactar_documento' && /vivienda/i.test(e2.tipo || ''))
+  has('elipsis: "una tarea de muestra" → null (es tarea)', elipsisDocumento('créame una tarea de muestra', DOC, 'es') === null)
+  has('elipsis: sin contexto → null', elipsisDocumento('créame uno de muestra', null, 'es') === null)
+  // Precedencia en interpret: la elipsis gana a un create_task débil, y se
+  // resuelve ANTES de Gemini (determinista, no toca la red):
+  const r1 = await interpret('créame uno de muestra',
+    { users: USERS, sender: SENDER, today: HOY, lang: 'es', openTasks: [], recent: DOC })
+  has('interpret: elipsis gana al create_task', r1.action === 'redactar_documento' && r1.via === 'elipsis')
+}
 
 console.log('\nPERSONAS')
 const amb = matchUser('ana', USERS, SENDER)
