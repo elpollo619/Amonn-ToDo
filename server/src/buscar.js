@@ -6,8 +6,10 @@
 // la fuente y la fecha de cada resultado.
 //
 // PRIVACIDAD: la búsqueda global SOLO cubre datos NO sensibles —tareas,
-// decisiones y contactos—. Los datos financieros (gastos, contratos, impagos)
-// tienen sus propias intenciones con control de permisos y NO se filtran aquí.
+// decisiones, contactos, averías y lo que el equipo le ha enseñado—. Los datos
+// financieros (gastos, contratos, impagos) tienen sus propias intenciones con
+// control de permisos y NO se filtran aquí. Los "hechos" nunca contienen
+// secretos (se filtran al guardarse), así que es seguro mostrarlos.
 // ============================================================
 import { query } from './db.js'
 import { t } from './i18n.js'
@@ -20,9 +22,9 @@ import { t } from './i18n.js'
  */
 export async function buscarGlobal(q, limitePorTipo = 4) {
   const termino = String(q ?? '').trim()
-  if (!termino) return { tareas: [], decisiones: [], contactos: [] }
+  if (!termino) return { tareas: [], decisiones: [], contactos: [], averias: [], hechos: [] }
   const like = `%${termino}%`
-  const [tareas, decisiones, contactos] = await Promise.all([
+  const [tareas, decisiones, contactos, averias, hechos] = await Promise.all([
     query(
       `select id, title, status, due_date, created_at
          from tasks
@@ -48,8 +50,24 @@ export async function buscarGlobal(q, limitePorTipo = 4) {
         limit $2`,
       [like, limitePorTipo],
     ).then((r) => r.rows),
+    query(
+      `select id, ubicacion, descripcion, urgencia, estado, proyecto, created_at
+         from averias
+        where ubicacion ilike $1 or descripcion ilike $1 or coalesce(proyecto,'') ilike $1
+        order by created_at desc
+        limit $2`,
+      [like, limitePorTipo],
+    ).then((r) => r.rows),
+    query(
+      `select id, text, created_at
+         from company_facts
+        where active and text ilike $1
+        order by created_at desc
+        limit $2`,
+      [like, limitePorTipo],
+    ).then((r) => r.rows),
   ])
-  return { tareas, decisiones, contactos }
+  return { tareas, decisiones, contactos, averias, hechos }
 }
 
 const LOCALE = { de: 'de-CH', pt: 'pt-PT', es: 'es-ES' }
@@ -77,8 +95,8 @@ function fmtFecha(v, lang) {
  * aviso `search_none`.
  */
 export function formatBusqueda(res, termino, lang = 'es') {
-  const { tareas = [], decisiones = [], contactos = [] } = res ?? {}
-  const total = tareas.length + decisiones.length + contactos.length
+  const { tareas = [], decisiones = [], contactos = [], averias = [], hechos = [] } = res ?? {}
+  const total = tareas.length + decisiones.length + contactos.length + averias.length + hechos.length
   if (total === 0) return t(lang, 'search_none', { q: termino })
 
   const estados = ESTADO[lang] ?? ESTADO.es
@@ -94,6 +112,13 @@ export function formatBusqueda(res, termino, lang = 'es') {
   for (const x of contactos) {
     const detalle = [x.company, x.role, x.project].filter(Boolean).join(' · ')
     partes.push(`${t(lang, 'search_contact_label')}: ${x.name}${detalle ? ` — ${detalle}` : ''}`)
+  }
+  for (const x of averias) {
+    const meta = [x.estado, x.urgencia, x.proyecto, fmtFecha(x.created_at, lang)].filter(Boolean).join(', ')
+    partes.push(`${t(lang, 'search_averia_label')}: ${x.ubicacion} — ${x.descripcion}${meta ? ` (${meta})` : ''}`)
+  }
+  for (const x of hechos) {
+    partes.push(`${t(lang, 'search_fact_label')}: ${x.text} (${fmtFecha(x.created_at, lang)})`)
   }
 
   const mostradas = partes.slice(0, MAX_MOSTRADOS)
