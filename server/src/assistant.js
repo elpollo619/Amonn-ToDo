@@ -141,6 +141,12 @@ const REGLAS = {
     // Registro de decisiones. add: sobre el crudo (conserva mayúsculas).
     decisionAdd: /^(?:(?:guarda(?:r)?|apunta(?:r)?|anota(?:r)?|registra(?:r)?)\s+que\s+)?(?:(?:hemos|ya)\s+)?(?:decidido|decidimos|acordamos|acordado|quedamos\s+en)\s+(?:que\s+)?(.+)$|^decisi[oó]n(?:es)?\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:qu[eé]\s+decisiones(?:\s+hay)?|decisiones|[uú]ltimas\s+decisiones|qu[eé]\s+se\s+decidi[oó])\b(?:\s+(?:de|del|de\s+la|sobre|para)\s+(.+?))?\s*\??$/,
+    // Base de conocimiento (Fase D2). Exige "…que <hecho>" para no pisar los
+    // recordatorios personales ("recuérdame comprar" sigue siendo tarea).
+    conocimientoAdd: /^(?:recuerda|ten\s+en\s+cuenta|que\s+sepas|para\s+que\s+sepas|toma\s+nota\s+de|anota|apunta)\s+que\s+(.+)$/,
+    conocimientoAddRaw: /(?:recuerda|ten en cuenta|que sepas|para que sepas|toma nota de|anota|apunta)\s+que\s+([\s\S]+)$/i,
+    conocimientoList: /^(?:qu[eé]\s+has\s+aprendido|qu[eé]\s+recuerdas|(?:lista\s+de\s+)?conocimiento|qu[eé]\s+sabes\s+de\s+memoria)\b\??$/,
+    conocimientoForget: /^(?:olvida(?:te)?)\s+(?:que\s+|lo\s+de\s+|de\s+)?(.+)$/,
     // Dinero entrado (abonos ya importados de un camt).
     dineroBusca: /^(?:pag[oó]|ha\s+pagado|entr[oó]\s+algo\s+de|pagos?\s+de)\s+(.+?)\s*\??$/,
     dineroLista: /^(?:qu[eé]\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|(?:dinero|pagos|abonos|cobros|ingresos)\s+entrad[oa]s?|cu[aá]nto\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|entradas?\s+de\s+dinero|abonos)\b\s*(.*)$/,
@@ -277,6 +283,10 @@ const REGLAS = {
     contactoEmpresa: /kontakte\s+(?:von\s+|vom\s+|der firma\s+|von der firma\s+)(.+?)\??$/i,
     decisionAdd: /^(?:(?:halte\s+fest,?\s+)?(?:dass\s+)?)?(?:wir\s+)?(?:haben\s+)?(?:entschieden|beschlossen)\s+(?:,?\s*dass\s+)?(.+)$|^entscheidung(?:en)?\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:welche\s+entscheidungen|entscheidungen|letzte\s+entscheidungen)\b(?:\s+(?:von|vom|zu|[üu]ber|f[üu]r)\s+(.+?))?\s*\??$/,
+    conocimientoAdd: /^(?:merk(?:e)?\s+dir|notiere?|zur\s+info|damit\s+du\s+es\s+weisst)\s*[:,]?\s*(?:dass\s+)?(.+)$/,
+    conocimientoAddRaw: /(?:merk(?:e)? dir|notiere?|zur info|damit du es weisst)\s*[:,]?\s*(?:dass\s+)?([\s\S]+)$/i,
+    conocimientoList: /^(?:was\s+hast\s+du\s+gelernt|was\s+weisst\s+du\s+auswendig|wissen)\b\??$/,
+    conocimientoForget: /^(?:vergiss)\s+(?:dass\s+)?(.+)$/,
     dineroBusca: /^(?:hat\s+(.+?)\s+bezahlt|zahlung(?:en)?\s+von\s+(.+?))\s*\??$/,
     dineroLista: /^(?:was\s+ist\s+eingegangen|welche\s+zahlungen|geldeingang|wie\s+viel\s+ist\s+eingegangen|eing[äa]nge)\b\s*(.*)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
@@ -376,6 +386,10 @@ const REGLAS = {
     contactoEmpresa: /contactos\s+d[aeo]\s+(?:empresa\s+|obra\s+)?(.+?)\??$/i,
     decisionAdd: /^(?:(?:guarda(?:r)?\s+que\s+)?)?(?:decidimos|decidido|ficou\s+decidido|ficamos\s+em)\s+(?:que\s+)?(.+)$|^decis[aã]o\s*[:\-]\s*(.+)$/i,
     decisionList: /^(?:que\s+decis[oõ]es|decis[oõ]es|[uú]ltimas\s+decis[oõ]es)\b(?:\s+(?:de|do|da|sobre|para)\s+(.+?))?\s*\??$/,
+    conocimientoAdd: /^(?:lembra(?:-te)?|para\s+que\s+saibas|anota|toma\s+nota)\s+(?:de\s+)?que\s+(.+)$/,
+    conocimientoAddRaw: /(?:lembra(?:-te)?|para que saibas|anota|toma nota)\s+(?:de\s+)?que\s+([\s\S]+)$/i,
+    conocimientoList: /^(?:o\s+que\s+aprendeste|o\s+que\s+sabes\s+de\s+cor|conhecimento)\b\??$/,
+    conocimientoForget: /^(?:esquece)\s+(?:que\s+)?(.+)$/,
     dineroBusca: /^(?:(.+?)\s+pagou|pagamento\s+de\s+(.+?)|entrou\s+algo\s+de\s+(.+?))\s*\??$/,
     dineroLista: /^(?:que\s+entrou|quanto\s+entrou|pagamentos\s+entrados|entradas\s+de\s+dinheiro)\b\s*(.*)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
@@ -737,6 +751,23 @@ function parseInLang(text, ctx, lang) {
   if (decisionNueva) {
     const texto = (decisionNueva[1] ?? decisionNueva[2] ?? '').trim()
     if (texto) return { action: 'decision_add', texto }
+  }
+
+  // Base de conocimiento viva (Fase D2). Va DESPUÉS de decisiones: "guarda que
+  // decidimos…" es una decisión; "recuerda que la caldera es Viessmann" es un
+  // hecho para la memoria del agente. El hecho se lee del crudo (conserva
+  // nombres, marcas y mayúsculas).
+  if (cfg.conocimientoList && cfg.conocimientoList.test(t)) return { action: 'conocimiento_list' }
+  const olvidar = cfg.conocimientoForget ? t.match(cfg.conocimientoForget) : null
+  if (olvidar) {
+    const texto = (olvidar[1] ?? '').trim()
+    if (texto) return { action: 'conocimiento_forget', texto }
+  }
+  const recordar = cfg.conocimientoAdd ? t.match(cfg.conocimientoAdd) : null
+  if (recordar) {
+    const enCrudo = cfg.conocimientoAddRaw ? raw.match(cfg.conocimientoAddRaw) : null
+    const texto = (enCrudo?.[1] ?? recordar[1] ?? '').trim()
+    if (texto) return { action: 'conocimiento_add', texto }
   }
 
   // Dinero entrado (abonos importados de un camt). Buscar por pagador va antes
@@ -1165,7 +1196,7 @@ function buildPrompt(text, ctx) {
   return `Eres la secretaria de Hans Amonn AG. Un miembro del equipo te escribe por WhatsApp. Convierte su mensaje en UNA acción en JSON. Responde SOLO con el JSON, sin texto alrededor.
 
 LO QUE SABES DE LA EMPRESA:
-${DOSSIER}
+${DOSSIER}${ctx.knowledge ? `\n\n${ctx.knowledge}` : ''}
 
 Hoy es ${wd} ${ctx.today} (zona Europe/Madrid).
 Quien escribe: ${ctx.sender.full_name} (idioma: ${lang}).

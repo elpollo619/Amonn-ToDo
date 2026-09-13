@@ -367,6 +367,19 @@ create table if not exists decisions (
 );
 create index if not exists decisions_project on decisions (lower(coalesce(project,'')));
 
+-- Base de conocimiento viva (Fase D2): hechos que el equipo enseña al agente
+-- por WhatsApp ("recuerda que la caldera de A14 es Viessmann"). Se inyectan en
+-- el dossier que ve Gemini. NUNCA se guardan secretos (contraseñas, claves,
+-- IBAN): el conocimiento viaja a la API, así que se filtran al entrar.
+create table if not exists company_facts (
+  id         uuid primary key default gen_random_uuid(),
+  text       text not null,
+  created_by uuid references users(id) on delete set null,
+  active     boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists company_facts_active on company_facts (active, created_at desc);
+
 -- Averías / mantenimiento (sección 7 del documento del asistente).
 -- "Hay agua bajo la ducha de la 203" → ticket con ubicación, urgencia, estado,
 -- responsable e historial. Transversal: hotel, viviendas, oficinas y obra.

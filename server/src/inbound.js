@@ -32,6 +32,7 @@ import { addCompra, listCompras, markComprado } from './compras.js'
 import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
+import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
@@ -849,12 +850,14 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
   const todasAbiertas = await openTasksAll()
   // Fase C: "de qué íbamos hablando", para resolver frases elípticas.
   const recent = await getContext(phone).catch(() => null)
+  // Fase D2: los hechos que el equipo le ha enseñado, para el prompt de Gemini.
+  const knowledge = await factsParaDossier().catch(() => '')
   const intent = await interpret(text, {
     sender: user, users, openTasks, lang, today, aliases, states: estados,
     // Para reconocer "pon la caldera en X" hace falta poder mirar las tareas
     // de todo el equipo, no solo las de quien escribe.
     allOpenTasks: todasAbiertas,
-    recent,
+    recent, knowledge,
   })
 
   // Fase C: recordar el tema para la siguiente frase elíptica. Solo se escribe
@@ -1643,6 +1646,33 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         total: decisiones.length,
         lista: decisiones.map((x) => formatDecision(x, lang)).join('\n'),
       })
+    }
+
+    // Base de conocimiento viva (Fase D2). Enseñar puede cualquiera del equipo;
+    // olvidar es solo de admin. Los secretos se rechazan al entrar (esSecreto).
+    case 'conocimiento_add': {
+      try {
+        const f = await addFact({ text: intent.texto, userId: user.id })
+        return t(lang, 'fact_saved', { ficha: formatFact(f, lang) })
+      } catch (err) {
+        if (err.code === 'secreto') return t(lang, 'fact_secret')
+        throw err
+      }
+    }
+
+    case 'conocimiento_list': {
+      const hechos = await listFacts(30)
+      if (hechos.length === 0) return t(lang, 'fact_none')
+      return t(lang, 'fact_list', {
+        total: hechos.length,
+        lista: hechos.map((x) => formatFact(x, lang)).join('\n'),
+      })
+    }
+
+    case 'conocimiento_forget': {
+      if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'fact_only_admin')
+      const n = await forgetFact(intent.texto)
+      return n > 0 ? t(lang, 'fact_forgotten', { n }) : t(lang, 'fact_forget_none', { que: intent.texto })
     }
 
     case 'averia_add': {

@@ -1,6 +1,7 @@
 // Pruebas de comprensión del asistente en español, alemán y portugués.
 // No tocan la base de datos: solo parseWithRules con un equipo de mentira.
 import { parseWithRules, matchUser, interpret, temaDeTexto, elipsisDocumento } from '../src/assistant.js'
+import { esSecreto } from '../src/conocimiento.js'
 
 const USERS = [
   { id: '1', full_name: 'Cristian Amaya' },
@@ -300,6 +301,26 @@ check('alta real sigue siendo contrato_add', 'contrato para Max Muster, habitaci
   { action: 'contrato_add' })
 check('consulta sigue siendo vertrag_info', 'contrato de la 204', 'es',
   { action: 'vertrag_info', que: '204' })
+
+console.log('\nBASE DE CONOCIMIENTO (Fase D2) — enseñar, listar, olvidar')
+check('recuerda que → conocimiento_add', 'recuerda que la caldera de A14 es Viessmann', 'es',
+  { action: 'conocimiento_add', texto: 'la caldera de A14 es Viessmann' })
+check('merk dir (de)', 'merk dir, die Heizung von A14 ist Viessmann', 'de', { action: 'conocimiento_add' })
+check('lembra que (pt)', 'lembra que a caldeira do A14 é Viessmann', 'pt', { action: 'conocimiento_add' })
+check('qué has aprendido → list', 'qué has aprendido', 'es', { action: 'conocimiento_list' })
+check('olvida que → forget', 'olvida que la caldera es Viessmann', 'es', { action: 'conocimiento_forget' })
+// "recuérdame comprar" NO lo captura la regla de conocimiento (falta "que"):
+// queda unknown y en producción lo resuelve Gemini como recordatorio/tarea.
+check('recuérdame comprar NO es conocimiento', 'recuérdame comprar tornillos', 'es',
+  { action: 'unknown' })
+check('guarda que decidimos sigue siendo decisión', 'guarda que decidimos la variante B en Seewer', 'es',
+  { action: 'decision_add' })
+{
+  const has = (nombre, cond) => { if (cond) console.log(`  ✔ ${nombre}`); else { fallos++; console.log(`  ✘ ${nombre}`) } }
+  has('esSecreto: contraseña', esSecreto('la contraseña del wifi es Amonn2024xy') === true)
+  has('esSecreto: IBAN', esSecreto('el IBAN es CH93 0076 2011 6238 5295 7') === true)
+  has('esSecreto: hecho normal → false', esSecreto('la caldera de A14 es Viessmann') === false)
+}
 
 console.log('\nMEMORIA CONVERSACIONAL (Fase C) — elipsis con contexto')
 {
