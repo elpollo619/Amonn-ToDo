@@ -36,7 +36,7 @@ import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria 
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
 import { componerResumenSemanal, componerResumenDiario } from './reminders.js'
-import { traducir, redactarBorrador } from './redactar.js'
+import { traducir, redactarBorrador, redactarDocumento } from './redactar.js'
 import { buscarGlobal, formatBusqueda } from './buscar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
@@ -1260,6 +1260,15 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       const out = await redactarBorrador({ para: intent.para, tema: intent.tema, idioma: lang })
       if (!out) return t(lang, 'ia_off')
       return t(lang, 'borrador_head') + out + t(lang, 'borrador_pie')
+    }
+
+    // Redactar un DOCUMENTO de muestra (contrato, protocolo, carta modelo).
+    // Como el borrador: NO guarda nada en la base ni lo envía; devuelve el
+    // texto con marcadores para revisar. Distinto de contrato_add (alta real).
+    case 'redactar_documento': {
+      const out = await redactarDocumento({ tipo: intent.tipo, sobre: intent.sobre, idioma: lang })
+      if (!out) return t(lang, 'ia_off')
+      return t(lang, 'documento_head', { tipo: intent.tipo || 'documento' }) + out + t(lang, 'documento_pie')
     }
 
     case 'ausencia_add': {

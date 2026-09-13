@@ -9,6 +9,7 @@
 // aviso "la IA no está configurada".
 // ============================================================
 import { config } from './config.js'
+import { DOSSIER } from './empresa.js'
 
 /**
  * Le pide a Gemini un texto plano (no JSON). Mismo fetch que parseWithGemini,
@@ -60,5 +61,30 @@ export async function redactarBorrador({ tipo = 'mensaje', para = null, tema, id
   if (!config.gemini.apiKey) return null
   const destinatario = para ? ` dirigido a ${para}` : ''
   const prompt = `Redacta un ${tipo} en ${idioma}${destinatario} sobre: ${tema}. Tono profesional y cordial, listo para revisar. Devuelve solo el texto del ${tipo}, sin comillas ni explicaciones.`
+  return geminiTexto(prompt)
+}
+
+/**
+ * Redacta un DOCUMENTO de muestra (contrato, protocolo de entrega, carta…)
+ * listo para revisar. A diferencia de contrato_add, NO da de alta nada en la
+ * base de datos ni envía nada: devuelve el texto con marcadores [entre
+ * corchetes] para los datos que falten. Conoce los tipos de contrato de la
+ * empresa a través del dossier. Sin clave de Gemini devuelve null.
+ */
+export async function redactarDocumento({ tipo = 'documento', sobre, idioma = 'de' }) {
+  if (!config.gemini.apiKey) return null
+  const prompt = `Eres la secretaria de Hans Amonn AG. Redacta un ${tipo} en ${idioma}, listo para que una persona lo revise.
+
+LO QUE SABES DE LA EMPRESA (úsalo solo si es relevante para el documento):
+${DOSSIER}
+
+PETICIÓN DEL EQUIPO:
+${sobre}
+
+REGLAS:
+- Es una MUESTRA/borrador para revisar, no un documento definitivo. No inventes datos personales, direcciones ni importes reales: pon marcadores [entre corchetes] (p. ej. [Nombre del inquilino], [importe CHF], [fecha de inicio]).
+- Si es un contrato de alquiler, elige el tipo correcto según el dossier: Longstay (habitación amueblada, mensual, prórroga al pagar antes del 28, fianza 300–500 CHF) o vivienda (modelo HEV, preaviso 3 meses, fianza ~3 meses). Incluye los apartados habituales: partes, objeto (edificio/habitación), importe y forma de pago (CHF), inicio y duración, fianza, obligaciones y firmas.
+- Estructura clara con apartados. Idioma: ${idioma}.
+- Devuelve SOLO el texto del ${tipo}, sin comillas ni explicaciones alrededor.`
   return geminiTexto(prompt)
 }
