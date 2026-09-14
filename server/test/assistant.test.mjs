@@ -322,6 +322,18 @@ check('guarda que decidimos sigue siendo decisión', 'guarda que decidimos la va
   has('esSecreto: hecho normal → false', esSecreto('la caldera de A14 es Viessmann') === false)
 }
 
+console.log('\nLISTAR vs COMPLETAR — "lista" es verbo y adjetivo en español')
+check('lista mis tareas → listar', 'lista mis tareas', 'es', { action: 'list_tasks' })
+check('lista de tareas → listar', 'lista de tareas', 'es', { action: 'list_tasks' })
+check('listar tareas → listar', 'listar tareas', 'es', { action: 'list_tasks' })
+check('lista las tareas del equipo → equipo', 'lista las tareas del equipo', 'es',
+  { action: 'list_tasks', who: 'equipo' })
+check('lista la compra → compra', 'lista la compra', 'es', { action: 'compra_list' })
+check('hecha la de la caldera sigue completando', 'hecha la de la caldera', 'es',
+  { action: 'complete_task', task_hint: 'caldera' })
+check('liste meine aufgaben (de) → listar', 'liste meine aufgaben', 'de', { action: 'list_tasks' })
+check('listar tarefas (pt) → listar', 'listar tarefas', 'pt', { action: 'list_tasks' })
+
 console.log('\nPROTOCOLO GUIADO — enrutado')
 check('protocolo de entrada → guiado', 'haz el protocolo de entrada de la 204', 'es',
   { action: 'protocolo_guiado' })

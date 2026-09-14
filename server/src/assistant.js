@@ -86,6 +86,12 @@ const REGLAS = {
       /^(?:oye |hola |por favor |porfa )?(?:(?:crea(?:r|me)?|anade|anadir|agrega|agregar|anota|anotar|apunta|apuntar|pon(?:me)?|poner|manda|mandar|asigna(?:le)?|asignar|dile|di)\b[\s:,-]*(?:una |un |la |el )?(?:tarea|trabajo|pendiente|recordatorio)?|(?:nueva|nuevo) (?:tarea|trabajo|pendiente|recordatorio))[\s:,-]*/,
     list:
       /\b(que (?:tengo|hay|tenemos|tiene \w+)|mis tareas|tareas (?:abiertas|pendientes|de \w+|del equipo|de todos)|lista(?:me)?|pendientes|abiertas|resumen)\b/,
+    // "lista mis tareas", "listar tareas", "lista de tareas": aquí "lista" es
+    // el VERBO listar, no "está lista". Se resuelve ANTES que 'done' para que
+    // no la robe. Exige un objeto de lista detrás, así "la caldera ya está
+    // lista" (sin objeto) sigue siendo completar.
+    listImperative:
+      /^(?:lista(?:me)?|listar|muestra(?:me)?|ense[nñ]ame|ver|dame)\s+(?:(?:la|las|los|el|mis|todas|todos|de)\s+)*(?:lista\s+de\s+)?(?:tareas|pendientes|trabajos|abiertas)\b/,
     done:
       /^(?:ya )?(?:hecha|hecho|terminada|terminado|termine|acabe|completada|completado|lista|listo|cierra|cerrar|marca(?:r)? como hecha|marca(?:r)? como completada|completa(?:r)?)\b\s*(?:la |el |lo )?(?:de |la de |tarea |tarea de )?(.+)?$/,
     help: /^(ayuda|help|hola|buenas|buenos dias|buenas tardes|que puedes hacer|comandos)\b/,
@@ -121,7 +127,7 @@ const REGLAS = {
     basura: /\b(cuando|que dia|proxima)\b.{0,20}\b(basura|kehricht|papel|carton|vidrio|metal|plastico|verdes?|gruengut|escombros|reciclaje|entsorgung|contenedor)\b/,
     // "falta café" · "hay que comprar folios" · "apunta en la compra: leche"
     compraAdd: /^(?:falta(?:n)?|se acabo|se ha acabado|hay que comprar|necesitamos|compra(?:r)?|apunta en la (?:compra|lista)|anade a la (?:compra|lista))\s*[:,-]?\s*(.+)$/,
-    compraList: /^(?:que (?:falta|hay que comprar|necesitamos)|lista de (?:la )?compra|la compra|compras)\b\??$/,
+    compraList: /^(?:que (?:falta|hay que comprar|necesitamos)|list(?:a(?:me)?|ar)\s+(?:la\s+|de\s+(?:la\s+)?)?compra|la compra|compras)\b\??$/,
     // "cita con Baumgartner el martes a las 14:00 en la obra G60"
     citaAdd: /^(?:cita|reunion|visita|termin|agenda(?:r)?)\s*(?:con\s+)?(.*)$/,
     citaList: /^(?:que citas|mis citas|proximas citas|agenda|citas)\b\??$/,
@@ -248,6 +254,8 @@ const REGLAS = {
       /^(?:hey |hallo |bitte )?(?:(?:erstelle?|erstellen|mach(?:e)?|machen|leg(?:e)? an|anlegen|notier(?:e)?|notieren|trag(?:e)? ein|eintragen|schick(?:e)?|schicken|weis(?:e)? zu|zuweisen|sag)\b[\s:,-]*(?:eine |einen |ein |die |der |das )?(?:aufgabe|todo|to-do|pendenz|erinnerung)?|(?:neue|neuer|neues) (?:aufgabe|todo|to-do|pendenz|erinnerung))[\s:,-]*/,
     list:
       /\b(was (?:ist|habe ich|haben wir|hat \w+)|meine aufgaben|aufgaben (?:von \w+|vom team|des teams|offen)|offene aufgaben|offen|pendenzen|liste|ubersicht|uberblick)\b/,
+    listImperative:
+      /^(?:liste(?:\s+mir)?|zeig(?:e)?(?:\s+mir)?)\s+(?:(?:die|meine|alle)\s+)*(?:aufgaben|pendenzen)\b/,
     done:
       /^(?:schon )?(?:erledigt|fertig|gemacht|abgeschlossen|beendet|erledige|erledigt ist|als erledigt markieren|schliesse|schliessen)\b\s*(?:die |der |das )?(?:von |die von |aufgabe |aufgabe von )?(.+)?$/,
     help: /^(hilfe|help|hallo|hi|guten morgen|guten tag|was kannst du|befehle)\b/,
@@ -352,6 +360,8 @@ const REGLAS = {
       /^(?:ei |ola |por favor |se faz favor )?(?:(?:cria(?:r)?|adiciona(?:r)?|acrescenta(?:r)?|anota(?:r)?|apontar?|poe|por|manda(?:r)?|atribui(?:r)?|diz)\b[\s:,-]*(?:uma |um |a |o )?(?:tarefa|trabalho|pendente|lembrete)?|(?:nova|novo) (?:tarefa|trabalho|pendente|lembrete))[\s:,-]*/,
     list:
       /\b(o que (?:tenho|ha|temos|tem \w+)|minhas tarefas|as minhas tarefas|tarefas (?:abertas|pendentes|de \w+|do \w+|da equipa|da equipe|de todos)|lista(?:me)?|pendentes|em aberto|resumo)\b/,
+    listImperative:
+      /^(?:lista(?:r)?|mostra(?:-me)?|ver|da-me)\s+(?:(?:as|os|minhas|meus|de|todas|todos)\s+)*(?:lista\s+de\s+)?(?:tarefas|pendentes|trabalhos)\b/,
     done:
       /^(?:ja )?(?:feito|feita|concluida|concluido|terminada|terminado|acabei|pronto|pronta|fecha(?:r)?|marca(?:r)? como feita|completa(?:r)?)\b\s*(?:a |o )?(?:de |a de |tarefa |tarefa de )?(.+)?$/,
     help: /^(ajuda|help|ola|oi|bom dia|boa tarde|o que podes fazer|comandos)\b/,
@@ -1029,6 +1039,14 @@ function parseInLang(text, ctx, lang) {
       priority,
       description: null,
     }
+  }
+
+  // "lista/listar mis tareas": el verbo listar, no "está lista". Va ANTES de
+  // 'done' para que no lo robe (en es "lista" es a la vez listar y completada).
+  if (cfg.listImperative && cfg.listImperative.test(t)) {
+    if (cfg.team.test(t)) return { action: 'list_tasks', who: 'equipo' }
+    const who = t.match(cfg.listWho)
+    return { action: 'list_tasks', who: who ? who[1] : null }
   }
 
   const done = t.match(cfg.done)
