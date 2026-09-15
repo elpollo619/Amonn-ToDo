@@ -34,7 +34,7 @@ import {
   getSessionStatus,
   startSessionWatch,
 } from './whatsapp.js'
-import { connectRealtime, realtimeConnected } from './realtime.js'
+import { connectRealtime, realtimeConnected, realtimeState } from './realtime.js'
 import { mailEnabled } from './mailer.js'
 import { errorHandler } from './util.js'
 
@@ -53,7 +53,10 @@ app.use(
 )
 
 // ─── API ──────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => res.json({ ok: true }))
+app.get('/api/health', (_req, res) => {
+  const rt = realtimeState()
+  res.json({ ok: true, whatsapp: { realtime: rt.connected, subscribed: rt.subscribed } })
+})
 // Qué versión está corriendo (SHA del commit inyectado al construir la imagen).
 app.get('/api/version', (_req, res) => {
   const sha = process.env.APP_VERSION ?? 'dev'
@@ -105,9 +108,11 @@ app.post('/api/reminders/run', requireAuth, async (_req, res) => {
 
 // Estado de WhatsApp (¿sigue vinculado el número?) para mostrarlo en la app.
 app.get('/api/whatsapp/status', requireAuth, async (_req, res) => {
+  const rt = realtimeState()
   const base = {
     enabled: config.whatsapp.enabled,
     realtime: realtimeConnected(),
+    realtimeDetail: rt,
     assistant: config.gemini.apiKey ? 'gemini' : 'reglas',
     email: mailEnabled(),
   }
