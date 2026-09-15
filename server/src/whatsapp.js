@@ -30,23 +30,82 @@ export function chatIdToPhone(chatId) {
   return `+${digits}`
 }
 
-/** Envía un mensaje de texto por WhatsApp a través del OpenWA Gateway. */
+// Tamaño máximo de un mensaje. El 15.09.2026 el Gateway respondió «400 Bad
+// Request» al intentar enviar un contrato de muestra entero: los avisos
+// cortos de cada mañana salían bien y el primer texto largo, no. El límite
+// exacto del Gateway no está documentado, así que se parte con margen y,
+// si un trozo sigue siendo rechazado, se vuelve a partir en dos.
+const MAX_CHARS = Number(process.env.WA_MAX_CHARS) || 3000
+const MIN_CHARS = 300 // por debajo de esto un 400 ya no es por tamaño
+
+/**
+ * Parte un texto en trozos de como mucho `max` caracteres, cortando por
+ * párrafos; si un párrafo no cabe, por líneas; y si una línea no cabe, a
+ * lo bruto. Pura, para poder probarla.
+ */
+export function splitText(text, max = MAX_CHARS) {
+  const t = String(text ?? '')
+  if (t.length <= max) return [t]
+  const trozos = []
+  let actual = ''
+  const empujar = (pieza) => {
+    if ((actual + pieza).length <= max) { actual += pieza; return }
+    if (actual) { trozos.push(actual); actual = '' }
+    if (pieza.length <= max) { actual = pieza; return }
+    for (let i = 0; i < pieza.length; i += max) trozos.push(pieza.slice(i, i + max))
+  }
+  for (const parrafo of t.split(/(?<=\n\n)/)) {
+    if (parrafo.length <= max) empujar(parrafo)
+    else for (const linea of parrafo.split(/(?<=\n)/)) empujar(linea)
+  }
+  if (actual) trozos.push(actual)
+  return trozos.map((x) => x.trimEnd()).filter(Boolean)
+}
+
+async function postText(phone, text) {
+  const { apiUrl } = config.whatsapp
+  return fetch(
+    `${apiUrl}/api/sessions/${encodeURIComponent(waState.sessionId)}/messages/send-text`,
+    {
+      method: 'POST',
+      headers: waHeaders(),
+      body: JSON.stringify({ chatId: phoneToChatId(phone), text }),
+    },
+  )
+}
+
+/** Envía un trozo; si el Gateway lo rechaza con 400 y aún es largo, lo parte en dos. */
+async function sendChunk(phone, text) {
+  const res = await postText(phone, text)
+  if (res.ok) return
+  const detalle = await res.text().catch(() => '')
+  if (res.status === 400 && text.length > MIN_CHARS) {
+    const mitad = Math.floor(text.length / 2)
+    // Se corta por la línea más cercana a la mitad para no partir palabras.
+    const corte = text.lastIndexOf('\n', mitad)
+    const en = corte > MIN_CHARS ? corte + 1 : mitad
+    console.warn(`[wa] el Gateway rechazó un texto de ${text.length} caracteres (400); lo parto en dos`)
+    await sendChunk(phone, text.slice(0, en))
+    await sendChunk(phone, text.slice(en))
+    return
+  }
+  throw new Error(`OpenWA Gateway respondió ${res.status} (texto de ${text.length} caracteres): ${detalle.slice(0, 200)}`)
+}
+
+/**
+ * Envía un mensaje de texto por WhatsApp a través del OpenWA Gateway. Los
+ * textos largos (un contrato, una lista de 222 alquileres) salen en varios
+ * mensajes seguidos, numerados, en orden.
+ */
 export async function sendWhatsApp(phone, content) {
   if (!config.whatsapp.enabled) {
     console.log(`[wa] (desactivado) mensaje a ${phone}: ${content}`)
     return
   }
-  const { apiUrl } = config.whatsapp
-  const res = await fetch(
-    `${apiUrl}/api/sessions/${encodeURIComponent(waState.sessionId)}/messages/send-text`,
-    {
-      method: 'POST',
-      headers: waHeaders(),
-      body: JSON.stringify({ chatId: phoneToChatId(phone), text: content }),
-    },
-  )
-  if (!res.ok) {
-    throw new Error(`OpenWA Gateway respondió ${res.status}: ${await res.text()}`)
+  const trozos = splitText(content, MAX_CHARS)
+  for (let i = 0; i < trozos.length; i++) {
+    const texto = trozos.length > 1 ? `${trozos[i]}\n(${i + 1}/${trozos.length})` : trozos[i]
+    await sendChunk(phone, texto)
   }
 }
 
