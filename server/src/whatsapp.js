@@ -8,7 +8,7 @@ import { config } from './config.js'
 
 // Estado en memoria de la sesión de WhatsApp que usamos (se resuelve al
 // arrancar; puede venir fija por config o detectarse automáticamente).
-export const waState = { sessionId: config.whatsapp.sessionId }
+export const waState = { sessionId: config.whatsapp.sessionId, sessionStatus: null }
 
 function waHeaders(extra = {}) {
   return {
@@ -76,18 +76,48 @@ export async function resolveSession() {
   }
   const list = asList(await res.json())
   if (list.length === 0) throw new Error('El Gateway no tiene ninguna sesión')
-  const connected = list.find((s) => isConnectedStatus(s.status ?? s.state))
-  // Si NINGUNA sesión está conectada seguimos con la primera para poder
-  // arrancar, pero hay que decirlo bien alto: una sesión 'failed' o 'qr_ready'
-  // no recibe ni envía nada, y antes se registraba igual que una sana (así
-  // estuvo WhatsApp caído semanas sin que el Protokoll lo delatara).
-  const chosen = connected ?? list[0]
-  waState.sessionId = chosen.id ?? chosen.sessionId ?? chosen.name ?? chosen.session
+  // Se registra SIEMPRE la lista completa: cuando el asistente se queda sordo
+  // la pregunta es «¿a qué sesión te suscribiste y cuáles había?», y hasta el
+  // 15.09.2026 el Protokoll solo enseñaba la elegida.
+  console.log(`[wa] sesiones en el Gateway: ${describirSesiones(list)}`)
+  const { chosen, connected, ambigua } = pickSession(list, waState.sessionId)
+  waState.sessionId = sessionIdOf(chosen)
   const status = String(chosen.status ?? chosen.state ?? 'desconocido')
+  waState.sessionStatus = status
   console.log(`[wa] sesión seleccionada: ${waState.sessionId} (estado: ${status})`)
+  if (ambigua) {
+    console.warn(
+      `[wa] ⚠️ hay VARIAS sesiones conectadas y ninguna fijada: elegí ${waState.sessionId}. ` +
+        'Si el asistente no recibe mensajes, fija WA_SESSION_ID en el compose con la sesión correcta.',
+    )
+  }
   lastKnownConnected = Boolean(connected)
   if (!connected) warnSessionNotConnected(status)
   return waState.sessionId
+}
+
+const sessionIdOf = (s) => s?.id ?? s?.sessionId ?? s?.name ?? s?.session
+const describirSesiones = (list) =>
+  list.map((s) => `${sessionIdOf(s)}=${s.status ?? s.state ?? '?'}`).join(', ') || '(ninguna)'
+
+/**
+ * Elige la sesión a usar entre las que devuelve el Gateway. Pura, sin red,
+ * para poder probarla. Criterio, en orden:
+ *  1. Si la sesión que ya usábamos (`preferida`) sigue conectada, se mantiene
+ *     (evita cambiar de sesión —y de número— por un empate).
+ *  2. Si hay UNA conectada, esa.
+ *  3. Si hay varias conectadas, la primera, marcando `ambigua` para avisar.
+ *  4. Si no hay ninguna conectada, la preferida si existe, o la primera, con
+ *     `connected: false` para que se avise bien alto (una sesión 'failed' o
+ *     'qr_ready' no recibe ni envía nada).
+ */
+export function pickSession(list, preferida = null) {
+  const conectadas = list.filter((s) => isConnectedStatus(s.status ?? s.state))
+  const pref = preferida ? list.find((s) => sessionIdOf(s) === preferida) : null
+  if (pref && conectadas.includes(pref)) return { chosen: pref, connected: true, ambigua: false }
+  if (conectadas.length === 1) return { chosen: conectadas[0], connected: true, ambigua: false }
+  if (conectadas.length > 1) return { chosen: conectadas[0], connected: true, ambigua: true }
+  return { chosen: pref ?? list[0], connected: false, ambigua: false }
 }
 
 // Último estado conocido (conectada / no conectada). Lo comparte el aviso de
@@ -111,11 +141,46 @@ let sessionWatchTimer = null
  * Vigila el estado de la sesión y avisa SOLO cuando cambia (conectada ↔ caída).
  * Sin esto, que WhatsApp se desvincule es un fallo totalmente silencioso.
  */
-export function startSessionWatch(intervalMs = 5 * 60_000) {
+// Quien quiera enterarse de que la sesión ha cambiado (el tiempo real, para
+// resuscribirse) se registra aquí. Evita importar realtime.js desde aquí.
+const onSessionChange = []
+export function whenSessionChanges(fn) { onSessionChange.push(fn) }
+
+export function startSessionWatch(intervalMs = 60_000) {
   if (sessionWatchTimer || !config.whatsapp.enabled) return
+  const fijada = config.whatsapp.sessionId && config.whatsapp.sessionId !== 'auto'
   const check = async () => {
     try {
+      // Antes el vigilante solo miraba el ESTADO de la sesión elegida. Si en
+      // el arranque se había elegido la sesión equivocada (por ejemplo porque
+      // la buena aún no aparecía conectada), nadie volvía a elegir y el
+      // asistente quedaba suscrito a una sesión que no recibe nada. Ahora se
+      // vuelve a elegir con el mismo criterio y, si cambia, se avisa a quien
+      // esté registrado (el tiempo real resuscribe).
+      if (!fijada) {
+        const res = await fetch(`${config.whatsapp.apiUrl}/api/sessions`, { headers: waHeaders() })
+        if (res.ok) {
+          const list = asList(await res.json())
+          if (list.length) {
+            const { chosen, connected } = pickSession(list, waState.sessionId)
+            const nuevo = sessionIdOf(chosen)
+            waState.sessionStatus = String(chosen.status ?? chosen.state ?? 'desconocido')
+            if (nuevo && nuevo !== waState.sessionId) {
+              console.warn(`[wa] la sesión a usar ha cambiado: ${waState.sessionId} → ${nuevo} (${describirSesiones(list)})`)
+              waState.sessionId = nuevo
+              for (const fn of onSessionChange) { try { fn(nuevo) } catch (e) { console.error('[wa] al cambiar de sesión:', e.message) } }
+            }
+            if (connected !== lastKnownConnected) {
+              lastKnownConnected = connected
+              if (connected) console.log(`[wa] la sesión de WhatsApp está conectada (estado: ${waState.sessionStatus})`)
+              else warnSessionNotConnected(waState.sessionStatus)
+            }
+            return
+          }
+        }
+      }
       const { status, connected } = await getSessionStatus()
+      waState.sessionStatus = status
       if (connected === lastKnownConnected) return
       lastKnownConnected = connected
       if (connected) console.log(`[wa] la sesión de WhatsApp está conectada (estado: ${status})`)
@@ -124,7 +189,8 @@ export function startSessionWatch(intervalMs = 5 * 60_000) {
       console.error(`[wa] no pude comprobar el estado de la sesión: ${err.message}`)
     }
   }
-  void check()
+  // La primera comprobación, pronto: si el arranque eligió mal, no esperamos.
+  setTimeout(() => void check(), 20_000).unref?.()
   sessionWatchTimer = setInterval(check, intervalMs)
   sessionWatchTimer.unref?.()
 }

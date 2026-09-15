@@ -28,13 +28,8 @@ import { sembrarPermisos } from './permisos.js'
 import { scheduleBackup } from './backup.js'
 import cron from 'node-cron'
 import { revisarCorreo, correoConfigurado } from './correo.js'
-import {
-  resolveSession,
-  ensureWebhookRegistered,
-  getSessionStatus,
-  startSessionWatch,
-} from './whatsapp.js'
-import { connectRealtime, realtimeConnected, realtimeState } from './realtime.js'
+import { resolveSession, ensureWebhookRegistered, getSessionStatus, startSessionWatch, whenSessionChanges, waState } from './whatsapp.js'
+import { connectRealtime, realtimeConnected, realtimeState, resubscribe } from './realtime.js'
 import { mailEnabled } from './mailer.js'
 import { errorHandler } from './util.js'
 
@@ -55,7 +50,17 @@ app.use(
 // ─── API ──────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   const rt = realtimeState()
-  res.json({ ok: true, whatsapp: { realtime: rt.connected, subscribed: rt.subscribed } })
+  res.json({
+    ok: true,
+    whatsapp: {
+      realtime: rt.connected,
+      subscribed: rt.subscribed,
+      // La sesión y su estado no son secretos y son justo lo que hace falta
+      // para saber desde fuera si el asistente escucha el número correcto.
+      session: waState.sessionId ?? null,
+      sessionStatus: waState.sessionStatus ?? null,
+    },
+  })
 })
 // Qué versión está corriendo (SHA del commit inyectado al construir la imagen).
 app.get('/api/version', (_req, res) => {
@@ -185,6 +190,8 @@ async function setupWhatsApp(attempt = 1) {
   }
   // Tiempo real (recomendado): recibe los mensajes por Socket.IO.
   connectRealtime()
+  // Si el vigilante descubre que la sesión a usar es otra, resuscribimos.
+  whenSessionChanges(() => resubscribe())
   // Vigila que el teléfono siga vinculado y avisa en cuanto deje de estarlo.
   startSessionWatch()
   // Webhook (opcional y alternativo): solo si se configura una URL de destino.
