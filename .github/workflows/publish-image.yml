@@ -25,9 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar QEMU (para construir también para ARM)
-        uses: docker/setup-qemu-action@v3
-
+      # Sin QEMU: solo se construye para amd64. El NAS (UGREEN DXP6800 Pro,
+      # Intel) es amd64 y la emulación ARM se quedó colgada dos veces seguidas
+      # el 15.09.2026 (más de 30 minutos en «npm ci» bajo QEMU, con un arreglo
+      # urgente esperando). Si algún día hace falta ARM, se añade de nuevo
+      # docker/setup-qemu-action y linux/arm64 en platforms.
       - name: Configurar Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -47,11 +49,11 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      - name: Construir y publicar (amd64 + arm64)
+      - name: Construir y publicar (amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
