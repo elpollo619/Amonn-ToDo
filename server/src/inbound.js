@@ -1343,7 +1343,16 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
     // Como el borrador: NO guarda nada en la base ni lo envía; devuelve el
     // texto con marcadores para revisar. Distinto de contrato_add (alta real).
     case 'redactar_documento': {
-      const out = await redactarDocumento({ tipo: intent.tipo, sobre: intent.sobre, idioma: lang })
+      // Si Gemini falla (tarda demasiado, cuota, clave), se dice el motivo en
+      // vez de dejar que el error suba y se convierta en el «algo ha fallado»
+      // genérico, que no le dice a nadie qué pasó.
+      let out
+      try {
+        out = await redactarDocumento({ tipo: intent.tipo, sobre: intent.sobre, idioma: lang })
+      } catch (err) {
+        console.error('[documento] Gemini falló:', err.message)
+        return t(lang, 'documento_error', { motivo: String(err.message).slice(0, 140) })
+      }
       if (!out) return t(lang, 'ia_off')
       // Queda esperando los datos: el siguiente mensaje rellena el documento.
       await setPending(phone, user.id, { esperando: 'documento_datos', tipo: intent.tipo || 'documento' })

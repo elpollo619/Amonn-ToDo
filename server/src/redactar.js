@@ -16,11 +16,15 @@ import { DOSSIER } from './empresa.js'
  * pero con temperatura 0.3 (algo de gracia para redactar) y SIN
  * responseMimeType: aquí queremos prosa, no un objeto.
  */
-async function geminiTexto(prompt) {
+// `limiteMs`: redactar un documento entero (un contrato con todos sus
+// apartados) tarda bastante más que interpretar una intención. Con los 15 s
+// de antes, «dame una muestra de un contrato» se abortaba a medias y el
+// usuario solo veía «algo ha fallado» (visto en producción el 14.09.2026).
+async function geminiTexto(prompt, limiteMs = 15_000) {
   const { apiKey, model } = config.gemini
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15_000)
+  const timer = setTimeout(() => controller.abort(), limiteMs)
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -35,10 +39,16 @@ async function geminiTexto(prompt) {
     const data = await res.json()
     const out = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') ?? ''
     return out.trim()
+  } catch (err) {
+    if (err?.name === 'AbortError') throw new Error(`Gemini tardó más de ${Math.round(limiteMs / 1000)} s`)
+    throw err
   } finally {
     clearTimeout(timer)
   }
 }
+
+/** Tiempo para redactar prosa larga (borradores y documentos de muestra). */
+const LIMITE_REDACCION_MS = 60_000
 
 /**
  * Traduce un texto a otro idioma conservando el tono. Devuelve SOLO la
@@ -61,7 +71,7 @@ export async function redactarBorrador({ tipo = 'mensaje', para = null, tema, id
   if (!config.gemini.apiKey) return null
   const destinatario = para ? ` dirigido a ${para}` : ''
   const prompt = `Redacta un ${tipo} en ${idioma}${destinatario} sobre: ${tema}. Tono profesional y cordial, listo para revisar. Devuelve solo el texto del ${tipo}, sin comillas ni explicaciones.`
-  return geminiTexto(prompt)
+  return geminiTexto(prompt, LIMITE_REDACCION_MS)
 }
 
 /**
@@ -86,5 +96,5 @@ REGLAS:
 - Si es un contrato de alquiler, elige el tipo correcto según el dossier: Longstay (habitación amueblada, mensual, prórroga al pagar antes del 28, fianza 300–500 CHF) o vivienda (modelo HEV, preaviso 3 meses, fianza ~3 meses). Incluye los apartados habituales: partes, objeto (edificio/habitación), importe y forma de pago (CHF), inicio y duración, fianza, obligaciones y firmas.
 - Estructura clara con apartados. Idioma: ${idioma}.
 - Devuelve SOLO el texto del ${tipo}, sin comillas ni explicaciones alrededor.`
-  return geminiTexto(prompt)
+  return geminiTexto(prompt, LIMITE_REDACCION_MS)
 }
