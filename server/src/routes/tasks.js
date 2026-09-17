@@ -1,0 +1,101 @@
+import { asyncRouter } from '../util.js'
+import { query } from '../db.js'
+import { requireAuth } from '../auth.js'
+import { broadcast } from '../events.js'
+import { createTask, getUser, STATUSES, PRIORITIES } from '../tasks.service.js'
+import { resolveState } from '../states.service.js'
+import { SUBTASK_COUNTS_SQL } from '../subtasks.service.js'
+import { notifyTaskAssigned } from '../notify.js'
+
+export const tasksRouter = asyncRouter()
+tasksRouter.use(requireAuth)
+
+// Listar todas las tareas del equipo.
+tasksRouter.get('/', async (_req, res) => {
+  // Se devuelve también el estado (nombre y color) para que la app pueda
+  // pintarlo sin una segunda consulta por tarea.
+  const { rows } = await query(
+    `select t.*, s.name as state_name, s.color as state_color,
+            s.kind as state_kind, s.is_default as state_is_default,
+            coalesce(sc.subtasks_total, 0) as subtasks_total,
+            coalesce(sc.subtasks_done, 0) as subtasks_done
+       from tasks t
+       left join task_states s on s.id = t.state_id
+       ${SUBTASK_COUNTS_SQL}
+      order by t.created_at desc`,
+  )
+  res.json(rows)
+})
+
+// Crear una tarea (avisa al responsable por WhatsApp/email si no es quien la crea).
+tasksRouter.post('/', async (req, res) => {
+  const b = req.body ?? {}
+  if (!b.title || !String(b.title).trim()) {
+    return res.status(400).json({ error: 'El título es obligatorio' })
+  }
+  const task = await createTask(b, req.userId)
+  res.json(task)
+})
+
+// Editar una tarea (campos parciales).
+tasksRouter.patch('/:id', async (req, res) => {
+  const b = req.body ?? {}
+  const before = (await query('select assignee_id from tasks where id = $1', [req.params.id])).rows[0]
+  const fields = []
+  const values = []
+  let i = 1
+
+  const set = (col, val) => {
+    fields.push(`${col} = $${i++}`)
+    values.push(val)
+  }
+
+  if (b.title !== undefined) set('title', b.title)
+  if (b.description !== undefined) set('description', b.description)
+  if (b.priority !== undefined && PRIORITIES.includes(b.priority)) set('priority', b.priority)
+  if (b.assignee_id !== undefined) set('assignee_id', b.assignee_id || null)
+  if (b.due_date !== undefined) set('due_date', b.due_date || null)
+  if (b.start_date !== undefined) set('start_date', b.start_date || null)
+  if (b.work_days !== undefined) set('work_days', b.work_days === null ? null : Number(b.work_days))
+  // Estado y status van SIEMPRE juntos: si llega uno, se calcula el otro. Es
+  // lo que impide que una tarea quede "Hecha" en el tablero pero abierta para
+  // el asistente, o al revés.
+  if (b.state_id !== undefined || (b.status !== undefined && STATUSES.includes(b.status))) {
+    const resuelto = await resolveState({ state_id: b.state_id, status: b.status })
+    set('state_id', resuelto.state_id)
+    set('status', resuelto.status)
+    set('completed_at', resuelto.status === 'done' ? new Date().toISOString() : null)
+  }
+  if (b.last_reminder_at !== undefined) set('last_reminder_at', b.last_reminder_at)
+
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'Nada que actualizar' })
+  }
+  set('updated_at', new Date().toISOString())
+  values.push(req.params.id)
+
+  const { rows } = await query(
+    `update tasks set ${fields.join(', ')} where id = $${i} returning *`,
+    values,
+  )
+  if (!rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' })
+  broadcast()
+  // Si se ha asignado a otra persona, avisarla.
+  const task = rows[0]
+  if (
+    b.assignee_id !== undefined && task.assignee_id &&
+    task.assignee_id !== before?.assignee_id && task.assignee_id !== req.userId &&
+    task.status !== 'done'
+  ) {
+    const [assignee, creator] = await Promise.all([getUser(task.assignee_id), getUser(req.userId)])
+    notifyTaskAssigned(task, assignee, creator).catch(() => {})
+  }
+  res.json(task)
+})
+
+// Eliminar una tarea.
+tasksRouter.delete('/:id', async (req, res) => {
+  await query('delete from tasks where id = $1', [req.params.id])
+  broadcast()
+  res.json({ ok: true })
+})
