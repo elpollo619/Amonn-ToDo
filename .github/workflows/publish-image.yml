@@ -54,6 +54,13 @@ jobs:
         with:
           context: .
           platforms: linux/amd64
+          # Manifiesto CLÁSICO (sin índice OCI ni attestations). Al pasar a
+          # amd64 solo, buildx publicaba un índice de una plataforma + firma de
+          # procedencia, y Watchtower 1.7.1 en el NAS lo daba por «sin cambios»
+          # (Scanned=1 Updated=0 durante 36 h, 15–17.09.2026) aunque el digest
+          # era otro. Con un manifiesto simple vuelve a detectar la novedad.
+          provenance: false
+          sbom: false
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
