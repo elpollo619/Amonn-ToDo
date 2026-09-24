@@ -28,6 +28,7 @@
 import crypto from 'node:crypto'
 import { config } from './config.js'
 import { parseDateAnyLang, todayKey } from './dates.js'
+import { PLANTILLAS } from './plantillas.js'
 
 export function contratosConfigurados() {
   const g = config.google ?? {}
@@ -161,11 +162,22 @@ async function llamar(url, opciones = {}) {
  */
 export function parseContrato(texto, today = todayKey(), lang = 'es') {
   const trozos = String(texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
-  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null }
+  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null, pauschal: null }
   const sueltos = []
   for (const tr of trozos) {
-    const hab = tr.match(/(?:habitacion|habitación|hab\.?|zimmer|quarto)\s*(?:nr\.?|n[º°]?\.?)?\s*(\S+)/i)
-    if (hab && !datos.habitacion) { datos.habitacion = hab[1].toUpperCase(); continue }
+    // La unidad alquilada: habitación, o plaza de aparcamiento. Siempre con su
+    // palabra delante, para no confundirla con el importe: en «204, 850» los
+    // dos números son igual de válidos y adivinar sería jugársela.
+    // Se toma TODO lo que sigue a la palabra, no solo la palabra siguiente:
+    // las plazas se llaman «AEP 15» o «Nr. 3 EG», y quedarse con el primer
+    // trozo daba una plaza «AEP» sin número. El texto ya viene partido por
+    // comas, así que no se traga nada de más.
+    const hab = tr.match(/(?:habitacion|habitación|hab\.?|zimmer|quarto|plaza|platz|parkplatz|stellplatz|abstellplatz)\s*(?:nr\.?|n[º°]?\.?)?\s*(.+)$/i)
+    if (hab && !datos.habitacion) { datos.habitacion = hab[1].trim().toUpperCase().replace(/[.,;]+$/, ''); continue }
+    // Gastos fijos del parking («pauschal 20», «gastos 20»): van con su
+    // palabra, porque si no serían indistinguibles del alquiler.
+    const pau = tr.match(/(?:pauschal|nebenkosten|gastos|forfait)\s*(?:de\s+)?(?:chf\s*)?(\d{1,5})(?:[.,](\d{2}))?/i)
+    if (pau && !datos.pauschal) { datos.pauschal = `${pau[1]}${pau[2] ? '.' + pau[2] : ''}`; continue }
     const fecha = parseDateAnyLang(tr, today, lang)
     if (fecha && !datos.desde) { datos.desde = fecha.key; continue }
     // La fianza va con su palabra: «kaution 500», «fianza 500», «depósito 500».
@@ -387,6 +399,84 @@ export function formatDiagnosticoContratos(pasos, lang = 'es') {
     ? (de ? '\nAlles bereit: ich kann Verträge erstellen.' : '\nTodo listo: ya puedo generar contratos.')
     : (de ? `\nEs fehlen noch ${fallos} Punkt(e).` : `\nQuedan ${fallos} cosa(s) por arreglar.`)
   return [cabecera, '', ...lineas, cierre].join('\n')
+}
+
+/**
+ * El id del Google Doc de una plantilla del catálogo.
+ *
+ * Se busca POR NOMBRE dentro de la carpeta de contratos, para que añadir un
+ * tipo de documento sea dejar el fichero en esa carpeta y no tocar el compose
+ * del NAS. La plantilla Longstay es la excepción: su id vive en una variable
+ * desde antes de que existiera el catálogo y se respeta, porque cambiarlo
+ * ahora rompería lo único que ya funciona en producción.
+ *
+ * Se cachea: la carpeta no cambia entre dos contratos seguidos, y cada
+ * búsqueda es una llamada a Drive.
+ */
+const cachePlantillas = new Map()
+export async function idDePlantilla(clave) {
+  const p = PLANTILLAS[clave]
+  if (!p) throw new Error(`No conozco la plantilla «${clave}»`)
+  if (p.idPorEnv && config.google[p.idPorEnv]) return config.google[p.idPorEnv]
+  if (cachePlantillas.has(clave)) return cachePlantillas.get(clave)
+
+  const carpeta = config.google.contractsFolderId
+  if (!carpeta) throw new Error('No hay carpeta de contratos (GOOGLE_CONTRACTS_FOLDER_ID)')
+  const q = `'${carpeta}' in parents and name = '${p.docEnDrive.replace(/'/g, "\\'")}' and trashed = false`
+  const j = await llamar(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,mimeType)&supportsAllDrives=true`,
+  )
+  const doc = (j.files ?? []).find((f) => f.mimeType === 'application/vnd.google-apps.document')
+  if (!doc) {
+    throw new Error(
+      `No encuentro la plantilla «${p.docEnDrive}» en la carpeta de contratos. ` +
+      `Tiene que ser un Documento de Google (no un Word subido) y llamarse exactamente así.`,
+    )
+  }
+  cachePlantillas.set(clave, doc.id)
+  return doc.id
+}
+
+/** Olvida las plantillas encontradas (para las pruebas y tras mover ficheros). */
+export function olvidarPlantillas() {
+  cachePlantillas.clear()
+}
+
+/**
+ * Genera cualquier documento del catálogo: copia su plantilla, rellena los
+ * huecos y devuelve los enlaces. `generarContrato` es el caso particular del
+ * Longstay, que se conserva para no tocar lo que ya funciona.
+ */
+export async function generarDocumento(clave, datos, today = todayKey()) {
+  const p = PLANTILLAS[clave]
+  if (!p) throw new Error(`No conozco la plantilla «${clave}»`)
+  const g = config.google
+  const plantillaId = await idDePlantilla(clave)
+  const nombreDoc = p.nombreDoc(datos)
+
+  const copia = await llamar(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(plantillaId)}/copy?supportsAllDrives=true`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ name: nombreDoc, ...(g.contractsFolderId ? { parents: [g.contractsFolderId] } : {}) }),
+    },
+  )
+  const huecos = p.huecos(datos, today)
+  await llamar(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(copia.id)}:batchUpdate`, {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: Object.entries(huecos).map(([hueco, valor]) => ({
+        replaceAllText: { containsText: { text: hueco, matchCase: true }, replaceText: String(valor ?? '') },
+      })),
+    }),
+  })
+  return {
+    id: copia.id,
+    nombre: nombreDoc,
+    tipo: clave,
+    docUrl: `https://docs.google.com/document/d/${copia.id}/edit`,
+    pdfUrl: `https://docs.google.com/document/d/${copia.id}/export?format=pdf`,
+  }
 }
 
 export async function generarContrato(datos, today = todayKey()) {

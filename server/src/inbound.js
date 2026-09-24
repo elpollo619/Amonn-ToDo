@@ -43,7 +43,8 @@ import { traducir, redactarBorrador, redactarDocumento } from './redactar.js'
 import { buscarGlobal, formatBusqueda } from './buscar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
-import { contratosConfigurados, parseContrato, generarContrato, diagnosticoContratos, formatDiagnosticoContratos } from './contratos.js'
+import { contratosConfigurados, parseContrato, generarContrato, generarDocumento, diagnosticoContratos, formatDiagnosticoContratos } from './contratos.js'
+import { tipoDeDocumento, PLANTILLAS } from './plantillas.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
 import { huespedesConfigurado, listarMensajes, responderHuesped } from './huespedes.js'
 import { tienePermiso, darPermiso, quitarPermiso, listarPermisos, NOMBRES_PERMISO, PERMISOS } from './permisos.js'
@@ -1644,8 +1645,13 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
             `Dímelo y lo pongo en el contrato. Por ejemplo:\n«contrato para ${datos.nombre}, B22, habitación ${datos.habitacion}, ${datos.alquiler}, desde el ...»`
       }
 
+      // Qué documento se pide: contrato de habitación (lo de siempre) o de
+      // plaza de aparcamiento. El tipo se saca de la frase; por defecto,
+      // Longstay, que es lo que la gente escribe a diario.
+      const tipoDoc = tipoDeDocumento(intent.texto)
+
       try {
-        const c = await generarContrato({ ...datos, direccion: ed?.direccion ?? '' }, today)
+        const c = await generarDocumento(tipoDoc, { ...datos, direccion: ed?.direccion ?? '' }, today)
         const base = t(lang, 'contract_done', {
           nombre: datos.nombre, habitacion: datos.habitacion,
           alquiler: datos.alquiler,
