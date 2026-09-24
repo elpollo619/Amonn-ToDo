@@ -294,8 +294,24 @@ chat; no están en el repo).
    **Catálogo de documentos (24.09.2026).** `server/src/plantillas.js`. Una
    plantilla se identifica por su NOMBRE dentro de la carpeta «Contratos
    generados», no por otra variable en el compose: añadir un tipo es dejar el
-   Google Doc ahí y registrar sus huecos. Hoy hay dos: **longstay** y
-   **garaje** (aparcamiento), este último probado en producción.
+   Google Doc ahí y registrar sus huecos. Hoy hay **cuatro, los cuatro
+   probados en producción**:
+
+   | Orden | Tipo | Qué tiene de propio |
+   |---|---|---|
+   | `longstay` | habitación amueblada | el de siempre; es el tipo por defecto |
+   | `garaje` | plaza de aparcamiento | suma «pauschal» al total; fianza 100 |
+   | `trastero` | Keller/Bastelraum/Lager | preaviso de **6 meses**; fianza = 1 mes |
+   | `vivienda` | Wohnung (modelo HEV) | preaviso 3 meses; fianza = 3 meses; **el propietario cambia** |
+
+   ⚠️ En **vivienda el arrendador NO es siempre Hans Amonn AG**: es el
+   propietario del edificio (I16 es de otro), con H. Amonn AG de
+   representante. Por eso sus datos son huecos y salen «A RELLENAR».
+   ⚠️ Los importes se escriben con apóstrofo suizo (`1’500.00`), función
+   `suizo()`.
+   ⚠️ Viviendas y trasteros se nombran de una pieza en la frase
+   («3½-Zimmerwohnung EG», «Lagerraum Lager 1»): el parser los toma enteros.
+   Antes cortaba por el medio y el contrato salía con el objeto «WOHNUNG EG».
 
    🔴 **LAS PLANTILLAS .docx DE LA EMPRESA NO ESTÁN VACÍAS.** Son el último
    contrato combinado: traen dentro nombre, dirección, plaza e importes de una
