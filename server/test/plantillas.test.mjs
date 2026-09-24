@@ -8,6 +8,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
 import { parseContrato, parseBaja } from '../src/contratos.js'
+import { fechaSuiza } from '../src/edificios.js'
 import { parseWithRules } from '../src/assistant.js'
 import { SISTEMAS, formatDocumentos } from '../src/sistemas.js'
 
@@ -312,4 +313,68 @@ test('«que documentos sabes hacer?» no pisa a «que sistemas usamos?»', () =>
 test('la lista avisa de que no se inventa nada', () => {
   assert.match(formatDocumentos('es'), /no me lo invento/)
   assert.match(formatDocumentos('de'), /erfinde ich nicht/)
+})
+
+// ── Fallos encontrados en la auditoria del 24.09.2026 ──────────────────────
+//
+// Siete defectos reales que llegaron a produccion en los documentos de hoy.
+// Cada prueba fija uno para que no vuelva.
+
+test('la hora de entrega no se inventa desde «Lagerraum»', () => {
+  // «um» sin limite de palabra casaba dentro de Lagerra(um), Dat(um),
+  // Zentr(um)… y la carta salia con una hora inventada (01:00) Y sin el
+  // aviso de que faltaba, porque el campo parecia relleno.
+  const d = parseBaja('Max Muster, A14, Lagerraum 1, sale el 31 de octubre', HOY, 'es')
+  assert.equal(d.abnahmeZeit, null)
+  // Y cuando SI se dice, se lee.
+  assert.equal(parseBaja('Max Muster, B22, hab 3, sale el 31 de octubre, entrega el 30 de octubre a las 10:00', HOY, 'es').abnahmeZeit, '10:00')
+})
+
+test('la fecha de salida no se hereda de la de entrega', () => {
+  // Antes «entrega el 30 de octubre» se escribia en la carta como fecha de
+  // SALIDA, una fecha que nadie habia dicho, con plazos legales de por medio.
+  const d = parseBaja('Max Muster, B22, habitacion 3, entrega el 30 de octubre a las 10:00', HOY, 'es')
+  assert.equal(d.desde, null)
+  assert.ok(d.faltan.includes('fecha de salida'), 'tiene que pedirla')
+  // Dicha con su palabra, se lee.
+  assert.equal(parseBaja('Max Muster, B22, hab 3, sale el 31 de octubre', HOY, 'es').desde, '2026-10-31')
+})
+
+test('una vivienda que menciona Keller sigue siendo vivienda', () => {
+  // Casi toda vivienda suiza nombra «Keller» en sus anexos; con el orden
+  // invertido salia un contrato de TRASTERO (preaviso 6 meses, otra fianza).
+  assert.equal(tipoDeDocumento('contrato de vivienda para Max, I16, 4-Zimmerwohnung EG mit Kellerraum, 1500'), 'vivienda')
+  // Y un trastero de verdad sigue siendo trastero.
+  assert.equal(tipoDeDocumento('Bruno, A14, Lagerraum Lager 1, 550'), 'trastero')
+})
+
+test('los centimos no se pierden al partir por comas', () => {
+  const d = parseContrato('Max Muster, habitacion 3, 850,50, desde el 1 de octubre', HOY, 'es')
+  assert.equal(d.alquiler, '850.50', 'el contrato saldria por 850.00 y nadie lo veria')
+})
+
+test('el garaje entiende el apostrofo suizo y no escribe NaN', () => {
+  const h = PLANTILLAS.garaje.huecos({ nombre: 'X Y', habitacion: '1', alquiler: '1\u2019500', pauschal: '20', desde: '2026-03-01' }, HOY)
+  assert.equal(h['{{Netto}}'], '1\u2019500.00')
+  assert.equal(h['{{Total}}'], '1\u2019520.00')
+  for (const v of Object.values(h)) assert.ok(!String(v).includes('NaN'), `hay un NaN: ${v}`)
+})
+
+test('TODAS las plantillas definen los huecos que usan', () => {
+  // La vivienda era la unica sin {{Datum}}: el contrato salia con el texto
+  // «{{Datum}}» impreso donde va la fecha.
+  for (const [clave, pl] of Object.entries(PLANTILLAS)) {
+    const h = pl.huecos({ nombre: 'X Y', habitacion: '1', alquiler: '100', desde: '2026-01-01' }, HOY)
+    assert.ok(h['{{Datum}}'], `${clave}: falta {{Datum}}`)
+    for (const [k, v] of Object.entries(h)) {
+      assert.ok(!String(v).includes('{{'), `${clave}: ${k} contiene un hueco sin sustituir`)
+      assert.ok(!String(v).includes('NaN'), `${clave}: ${k} contiene NaN`)
+    }
+  }
+})
+
+test('fechaSuiza no desplaza un dia las marcas de tiempo', () => {
+  // toISOString() pasaba a UTC: las 00:00 en hora suiza caian al dia anterior.
+  assert.equal(fechaSuiza(new Date('2026-01-01T00:00:00+01:00')), '01.01.2026')
+  assert.equal(fechaSuiza('2026-12-01'), '01.12.2026')
 })

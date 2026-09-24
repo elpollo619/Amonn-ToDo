@@ -69,9 +69,12 @@ export const PLANTILLAS = {
       // El importe total: si hay gastos fijos («pauschal»), se suman. Se
       // calcula aquí y no se pide, porque sumar dos números a mano en un
       // contrato es justo donde aparecen los errores.
-      const netto = Number(String(d.alquiler ?? '0').replace(',', '.'))
-      const pauschal = Number(String(d.pauschal ?? '0').replace(',', '.'))
-      const total = (netto + pauschal).toFixed(2)
+      // Misma limpieza que el resto: sin el apóstrofo suizo, «1’500» daba NaN
+      // y el documento salía con «NaN» impreso donde va el importe.
+      const num = (x) => Number(String(x ?? '0').replace(/[\u2019']/g, '').replace(',', '.')) || 0
+      const netto = num(d.alquiler)
+      const pauschal = num(d.pauschal)
+      const total = netto + pauschal
       return {
         '{{Anrede}}': d.anrede ?? '',
         '{{M1VName}}': pila,
@@ -85,9 +88,9 @@ export const PLANTILLAS = {
         // un año menos un día desde el inicio, y así lo calculamos; si no hay
         // inicio, se deja a mano.
         '{{Kuendbar}}': d.kuendbar ? fecha(d.kuendbar) : (d.desde ? fecha(unAnoMenosUnDia(d.desde)) : aMano('primera fecha de rescisión')),
-        '{{Netto}}': netto.toFixed(2),
-        '{{Pauschal}}': pauschal.toFixed(2),
-        '{{Total}}': total,
+        '{{Netto}}': suizo(netto),
+        '{{Pauschal}}': suizo(pauschal),
+        '{{Total}}': suizo(total),
         '{{Depot}}': d.deposito ?? '100',
         '{{Bemerkungen}}': d.bemerkungen ?? '',
         '{{Datum}}': fecha(hoy),
@@ -230,6 +233,8 @@ export const PLANTILLAS = {
         // se puede fijar a mano («kaution 4500»).
         '{{Depot}}': d.deposito ? suizo(Number(String(d.deposito).replace(/[’']/g, ''))) : suizo((netto + nk) * 3),
         '{{Besondere}}': d.besondere ?? '',
+        // Sin esto el contrato salía con «{{Datum}}» impreso tal cual.
+        '{{Datum}}': fecha(hoy),
       }
     },
   },
@@ -269,8 +274,12 @@ export function tipoDeDocumento(texto) {
   // como una habitación y salía el contrato equivocado.
   // La vivienda va PRIMERO: «contrato de vivienda … con plaza de garaje» es
   // un contrato de vivienda que menciona una plaza, no al revés.
-  if (/\b(trastero|keller|kellerraum|bastelraum|lagerraum|lager|almacen|almacén|bodega)\b/.test(t)) return 'trastero'
+  // ⚠️ La vivienda va PRIMERO de verdad, no solo en el comentario. Casi toda
+  // vivienda suiza menciona «Keller» en sus anexos, y con el orden invertido
+  // «4½-Zimmerwohnung EG mit Kellerraum» generaba un contrato de TRASTERO
+  // (preaviso 6 meses, fianza de un mes) en lugar del de vivienda.
   if (/\b(vivienda|wohnung|whg|piso|apartamento|zimmerwohnung|\d\s*½?\s*-?\s*zimmer)\b/.test(t)) return 'vivienda'
+  if (/\b(trastero|keller|kellerraum|bastelraum|lagerraum|lager|almacen|almacén|bodega)\b/.test(t)) return 'trastero'
   if (/\b(parking|park(?:platz)?|garaje|garage|plaza|platz|stellplatz|einstellhall\w*|abstellplatz|aparcamiento|aep|aap|ehp)\b/.test(t)) return 'garaje'
   return 'longstay'
 }

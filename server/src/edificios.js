@@ -240,8 +240,12 @@ export async function contratoRepetido(nombre, habitacion) {
  */
 export function fechaSuiza(d) {
   if (!d) return ''
-  const iso = d instanceof Date ? d.toISOString() : String(d)
-  const soloFecha = iso.slice(0, 10)
+  // ⚠️ Fecha LOCAL, no UTC: con toISOString() una marca de las 00:00 en hora
+  // suiza (+01:00) se convertía en el día anterior, y un contrato hecho el
+  // 1 de enero aparecía como del 31 de diciembre.
+  const soloFecha = d instanceof Date
+    ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    : String(d).slice(0, 10)
   return /^\d{4}-\d{2}-\d{2}$/.test(soloFecha) ? soloFecha.split('-').reverse().join('.') : ''
 }
 

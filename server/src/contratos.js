@@ -161,7 +161,11 @@ async function llamar(url, opciones = {}) {
  * válidos. Devuelve { nombre, habitacion, alquiler, desde, faltan: [...] }.
  */
 export function parseContrato(texto, today = todayKey(), lang = 'es') {
-  const trozos = String(texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+  // ⚠️ Los decimales con coma se protegen ANTES de partir por comas: si no,
+  // «850,50» se partía en «850» y «50», el contrato salía por 850.00 y los
+  // céntimos desaparecían en silencio.
+  const protegido = String(texto ?? '').replace(/(\d),(\d{2})(?!\d)/g, '$1.$2')
+  const trozos = protegido.split(',').map((x) => x.trim()).filter(Boolean)
   const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null, pauschal: null, objeto: null }
   const sueltos = []
   for (const tr of trozos) {
@@ -197,7 +201,8 @@ export function parseContrato(texto, today = todayKey(), lang = 'es') {
     if (kaution && !datos.deposito) { datos.deposito = kaution[1]; continue }
     // El alquiler tiene que ser un trozo que sea SOLO un importe («850»,
     // «CHF 850», «850.50 chf»): si lleva más palabras, no se adivina.
-    const importe = tr.match(/^(?:chf\s*)?(\d{2,5})(?:[.,](\d{2}))?\s*(?:chf|fr\.?)?$/i)
+    // Admite el apóstrofo suizo de los miles: «1’500», «1'500.00».
+    const importe = tr.replace(/[\u2019']/g, '').match(/^(?:chf\s*)?(\d{2,7})(?:[.,](\d{2}))?\s*(?:chf|fr\.?)?$/i)
     if (importe && !datos.alquiler) {
       datos.alquiler = `${importe[1]}${importe[2] ? '.' + importe[2] : ''}`
       continue
@@ -427,7 +432,11 @@ export function parseBaja(texto, today = todayKey(), lang = 'es') {
   const datos = { ...base, abnahmeDatum: null, abnahmeZeit: null, kuendigungDatum: null }
 
   // La hora de la entrega: «a las 10:00», «um 10.30», «10h».
-  const hora = String(texto).match(/(?:a\s+las|um|[àa]s)\s*(\d{1,2})[:.h]?(\d{2})?/i)
+  // ⚠️ «um» CON límite de palabra. Sin él casaba dentro de «Lagerra(um) 1»,
+  // «Dat(um)», «Zentr(um)»… y la carta salía con una hora de entrega
+  // INVENTADA (01:00) — y encima sin el aviso de «falta la hora», porque el
+  // campo parecía relleno. En un documento que se firma, eso es grave.
+  const hora = String(texto).match(/(?:a\s+las|\bum\b|\b[àa]s)\s*(\d{1,2})[:.h](\d{2})\b/i)
   if (hora) datos.abnahmeZeit = `${hora[1].padStart(2, '0')}:${hora[2] ?? '00'}`
 
   // Las fechas que se nombran con su palabra. `desde` ya lo sacó
@@ -441,6 +450,17 @@ export function parseBaja(texto, today = todayKey(), lang = 'es') {
     const f = parseDateAnyLang(m[1], today, lang)
     if (f) datos[clave] = f.key
   }
+  // ⚠️ La SALIDA solo cuenta si se dice con su palabra. Antes se heredaba la
+  // primera fecha suelta de parseContrato, así que «entrega el 30 de octubre»
+  // acababa escrito en la carta como fecha de salida — una fecha que nadie
+  // había dicho, en un documento con plazos de preaviso legales.
+  const salida = String(texto).match(/(?:sale\s+el|sale|salida|se\s+va\s+el|auszug(?:\s+per)?|per|sai\s+em)\s+([^,;]+)/i)
+  datos.desde = null
+  if (salida) {
+    const f = parseDateAnyLang(salida[1], today, lang)
+    if (f) datos.desde = f.key
+  }
+
   const faltan = []
   if (!datos.nombre) faltan.push('nombre')
   if (!datos.desde) faltan.push('fecha de salida')
