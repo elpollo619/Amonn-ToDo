@@ -231,9 +231,23 @@ export async function contratoRepetido(nombre, habitacion) {
   return rows[0] ?? null
 }
 
+/**
+ * Fecha en suizo (24.09.2026) venga como venga de Postgres.
+ *
+ * ⚠️ Cuidado aquí: una columna `date` llega como texto «2026-01-01», pero una
+ * `timestamptz` llega como objeto Date, y `String(fecha).slice(0,10)` sobre un
+ * Date da «Thu Sep 2» — que es justo lo que salió publicado el 24.09.2026.
+ */
+export function fechaSuiza(d) {
+  if (!d) return ''
+  const iso = d instanceof Date ? d.toISOString() : String(d)
+  const soloFecha = iso.slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(soloFecha) ? soloFecha.split('-').reverse().join('.') : ''
+}
+
 /** Como se lee en el móvil. */
 export function formatContratoGenerado(c) {
-  const f = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('.') : '')
+  const f = fechaSuiza
   const cuando = f(c.created_at ?? c.createdAt)
   const partes = [`• *${c.nombre}* · hab. ${c.habitacion}`]
   if (c.edificio) partes.push(` (${c.edificio})`)

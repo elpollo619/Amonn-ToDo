@@ -11,7 +11,7 @@ import { initDb, query, pool } from '../src/db.js'
 import {
   direccionDeEdificio, listarEdificios, edificioEnTexto, edificioDeHabitacion,
   formatDireccion, habitacionOcupada, resolverEdificio,
-  registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado,
+  registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado, fechaSuiza,
 } from '../src/edificios.js'
 import { camposDePlantilla } from '../src/contratos.js'
 
@@ -101,6 +101,17 @@ check('el texto lleva nombre, habitación y enlace', (() => {
   const txt = formatContratoGenerado(lista.find((c) => c.nombre === 'ZZTest Persona'))
   return txt.includes('ZZTest Persona') && txt.includes('hab. 3') && txt.includes('docs.google.com')
 })())
+
+// Esta prueba nace de un fallo que llegó a producción el 24.09.2026: la
+// fecha salía como «Thu Sep 24» porque created_at es timestamptz y llega como
+// objeto Date, donde String(d).slice(0,10) corta el toString() inglés.
+check('la fecha sale en suizo, no «Thu Sep 24»', (() => {
+  const txt = formatContratoGenerado(lista.find((c) => c.nombre === 'ZZTest Persona'))
+  return /\d{2}\.\d{2}\.\d{4}/.test(txt) && !/Thu|Mon|Tue|Wed|Fri|Sat|Sun/.test(txt)
+})(), formatContratoGenerado(lista.find((c) => c.nombre === 'ZZTest Persona')))
+check('fechaSuiza entiende un Date', fechaSuiza(new Date('2026-09-24T12:00:00Z')) === '24.09.2026')
+check('fechaSuiza entiende un texto de columna date', fechaSuiza('2026-12-01') === '01.12.2026')
+check('fechaSuiza con basura no revienta', fechaSuiza(null) === '' && fechaSuiza('lo que sea') === '')
 
 console.log('\n9. AVISA SI SE REPITE UN CONTRATO')
 const rep = await contratoRepetido('ZZTest Persona', '3')

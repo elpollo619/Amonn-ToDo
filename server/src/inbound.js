@@ -34,7 +34,7 @@ import { addContact, buscarContactos, formatContacto, listByCompany } from './co
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
 import { SISTEMAS, formatSistema, formatListaSistemas } from './sistemas.js'
-import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion, registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado } from './edificios.js'
+import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion, registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado, fechaSuiza } from './edificios.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
@@ -1666,7 +1666,7 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         if (repe) {
           extra.push(
             `📋 Ya hice un contrato para ${repe.nombre} (hab. ${repe.habitacion}) el ` +
-            `${String(repe.created_at).slice(0, 10).split('-').reverse().join('.')}. ` +
+            `${fechaSuiza(repe.created_at)}. ` +
             `Si era para corregirlo, quédate con el nuevo y borra el viejo:\n   ${repe.doc_url}`,
           )
         }
