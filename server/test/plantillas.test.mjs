@@ -6,7 +6,7 @@
 // es la forma más rápida de romper algo sin enterarse.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre } from '../src/plantillas.js'
+import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
 import { parseContrato } from '../src/contratos.js'
 import { parseWithRules } from '../src/assistant.js'
 
@@ -110,4 +110,51 @@ test('cada plantilla del catálogo está completa', () => {
 test('el documento se nombra como manda la empresa', () => {
   assert.equal(PLANTILLAS.longstay.nombreDoc({ nombre: 'Max Muster' }), 'MV Max Muster')
   assert.equal(PLANTILLAS.garaje.nombreDoc({ nombre: 'Max Muster' }), 'MV Parkplatz Max Muster')
+})
+
+// ── Contrato de vivienda ───────────────────────────────────────────────────
+
+test('reconoce un contrato de vivienda', () => {
+  for (const f of ['Anna Test, I16, 3½-Zimmerwohnung EG, 1500', 'Eva, vivienda EG, 1200', 'Hans, Wohnung 2, 1400', 'Lena, piso 1, 1300']) {
+    assert.equal(tipoDeDocumento(f), 'vivienda', `no detecto vivienda en: ${f}`)
+  }
+})
+
+test('la vivienda gana al parking cuando se nombran los dos', () => {
+  // «contrato de vivienda con plaza de garaje» es un contrato de vivienda.
+  assert.equal(tipoDeDocumento('Anna, vivienda EG con plaza de garaje, 1500'), 'vivienda')
+})
+
+test('los importes salen en formato suizo, con apostrofo', () => {
+  assert.equal(suizo(1500), '1\u2019500.00')
+  assert.equal(suizo(1730), '1\u2019730.00')
+  assert.equal(suizo(90), '90.00')
+  assert.equal(suizo(5190), '5\u2019190.00')
+  assert.equal(suizo('no es un numero'), '')
+})
+
+test('en vivienda se suman los gastos y la fianza son tres meses', () => {
+  const h = PLANTILLAS.vivienda.huecos(
+    { nombre: 'Anna Test', objeto: '3-Zimmerwohnung EG', alquiler: '1500', pauschal: '230', desde: '2025-10-01' },
+    HOY,
+  )
+  assert.equal(h['{{Netto}}'], '1\u2019500.00')
+  assert.equal(h['{{Nebenkosten}}'], '230.00')
+  assert.equal(h['{{Total}}'], '1\u2019730.00', 'el total se suma solo')
+  assert.equal(h['{{Depot}}'], '5\u2019190.00', 'la fianza por defecto son 3 meses del total')
+})
+
+test('la fianza dicha manda sobre la calculada', () => {
+  const h = PLANTILLAS.vivienda.huecos(
+    { nombre: 'Anna Test', alquiler: '1500', pauschal: '230', deposito: '4500', desde: '2025-10-01' },
+    HOY,
+  )
+  assert.equal(h['{{Depot}}'], '4\u2019500.00')
+})
+
+test('el propietario NO se supone: se marca para rellenar', () => {
+  // El arrendador no siempre es Hans Amonn AG; en I16 es otro propietario.
+  const h = PLANTILLAS.vivienda.huecos({ nombre: 'Anna Test', alquiler: '1500', desde: '2025-10-01' }, HOY)
+  assert.match(h['{{VermieterName}}'], /A RELLENAR/)
+  assert.match(h['{{Nebenraeume}}'], /A RELLENAR/)
 })

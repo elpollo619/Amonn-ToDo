@@ -94,6 +94,56 @@ export const PLANTILLAS = {
       }
     },
   },
+  // Vivienda (modelo HEV). El contrato largo de la casa.
+  //
+  // ⚠️ Aquí el ARRENDADOR también cambia: no siempre es Hans Amonn AG, sino
+  // el propietario del edificio (I16 es de Ulrich Brechtbühl, por ejemplo),
+  // con H. Amonn AG como representante. Por eso sus datos son huecos y no
+  // texto fijo — y por eso se marcan «a rellenar» en vez de suponer.
+  vivienda: {
+    clave: 'vivienda',
+    etiqueta: 'Contrato de vivienda (Wohnung)',
+    docEnDrive: '01 Maske MV Whg (Vorlage Assistent)',
+    nombreDoc: (d) => `MV ${d.nombre}`,
+    huecos: (d, hoy) => {
+      const { pila, apellido } = partirNombre(d.nombre)
+      const netto = Number(String(d.alquiler ?? '0').replace(/[’']/g, '').replace(',', '.'))
+      const nk = Number(String(d.pauschal ?? '0').replace(/[’']/g, '').replace(',', '.'))
+      return {
+        '{{VAnrede}}': d.vAnrede ?? '',
+        '{{MAnrede}}': d.anrede ?? '',
+        '{{VermieterName}}': d.vermieter || aMano('propietario'),
+        '{{VermieterAdresse}}': d.vermieterAdresse || aMano('dirección del propietario'),
+        '{{VermieterOrt}}': d.vermieterOrt || aMano('CP y localidad'),
+        '{{M1VName}}': pila,
+        '{{M1Name}}': apellido,
+        '{{MieterAdresse}}': d.mieterAdresse || aMano('dirección del inquilino'),
+        '{{MieterOrt}}': d.mieterOrt || aMano('CP y localidad'),
+        '{{Liegenschaft}}': d.direccion || aMano('dirección de la finca'),
+        '{{Objekt}}': d.objeto ?? String(d.habitacion ?? ''),
+        '{{Nebenraeume}}': d.nebenraeume || aMano('trastero, lavadero, plaza…'),
+        '{{Mbeginn}}': fecha(d.desde),
+        // En vivienda el preaviso es de 3 meses y la primera rescisión suele
+        // ser al año: se calcula igual que en el garaje, pero se puede dar.
+        '{{Kuendbar}}': d.kuendbar ? fecha(d.kuendbar) : (d.desde ? fecha(unAnoMenosUnDia(d.desde)) : aMano('primera fecha de rescisión')),
+        '{{Netto}}': suizo(netto),
+        '{{Nebenkosten}}': suizo(nk),
+        '{{Total}}': suizo(netto + nk),
+        // La fianza de vivienda son ~3 meses; se calcula si no se dice, pero
+        // se puede fijar a mano («kaution 4500»).
+        '{{Depot}}': d.deposito ? suizo(Number(String(d.deposito).replace(/[’']/g, ''))) : suizo((netto + nk) * 3),
+        '{{Besondere}}': d.besondere ?? '',
+      }
+    },
+  },
+}
+
+/** Importe como lo escribe la empresa: 1’500.00, con el apóstrofo suizo. */
+export function suizo(n) {
+  const x = Number(n)
+  if (!Number.isFinite(x)) return ''
+  const [ent, dec] = x.toFixed(2).split('.')
+  return `${ent.replace(/\B(?=(\d{3})+(?!\d))/g, '’')}.${dec}`
 }
 
 /**
@@ -120,6 +170,9 @@ export function tipoDeDocumento(texto) {
   // «platz» suelto entra a propósito: en una frase de contrato solo puede ser
   // una plaza de aparcamiento, y sin él «Anna, A4, Platz 12, 90» se trataba
   // como una habitación y salía el contrato equivocado.
+  // La vivienda va PRIMERO: «contrato de vivienda … con plaza de garaje» es
+  // un contrato de vivienda que menciona una plaza, no al revés.
+  if (/\b(vivienda|wohnung|whg|piso|apartamento|zimmerwohnung|\d\s*½?\s*-?\s*zimmer)\b/.test(t)) return 'vivienda'
   if (/\b(parking|park(?:platz)?|garaje|garage|plaza|platz|stellplatz|einstellhall\w*|abstellplatz|aparcamiento|aep|aap|ehp)\b/.test(t)) return 'garaje'
   return 'longstay'
 }
