@@ -1,0 +1,107 @@
+/* Línea de tiempo: una fila por persona, columnas de días laborables y las
+   tareas como barras desde su inicio hasta su fin. */
+.linea { display: flex; flex-direction: column; gap: 14px; padding-bottom: 30px; }
+
+.linea-cab { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.linea-cab h1 { font-size: 26px; margin: 0; }
+.linea-cab .hint { margin: 3px 0 0; }
+.linea-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.linea-rango { flex-shrink: 0; }
+
+.linea-mes {
+  font-family: var(--font-titulo); font-size: 14px; font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* En el móvil se desplaza a lo ancho: dos semanas no caben en 390px y
+   comprimirlas dejaría las barras ilegibles. */
+.linea-scroll { overflow-x: auto; padding-bottom: 4px; }
+.linea-tabla { display: flex; flex-direction: column; }
+
+.linea-fila { display: flex; border-top: 1px solid var(--border); }
+.linea-fila:last-child { border-bottom: 1px solid var(--border); }
+.linea-dias { border-top: 0; }
+
+.linea-persona {
+  width: 168px; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+  padding: 12px 12px 12px 0;
+}
+.linea-nombre { font-weight: 600; font-size: 14px; }
+.linea-huerfana { color: var(--text-muted); font-weight: 500; }
+.linea-dias-txt { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+
+/* Las guías verticales son el FONDO, no elementos de la rejilla: como
+   elementos alteraban la altura de las filas y aplastaban las barras. */
+.linea-cuerpo {
+  flex-grow: 1; display: grid; position: relative; padding: 10px 0;
+  background-image: linear-gradient(to right, var(--border) 0 1px, transparent 1px 100%);
+  background-repeat: repeat-x;
+}
+.linea-hoy {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--primary); pointer-events: none;
+}
+
+.linea-dia { text-align: center; padding: 8px 0; border-left: 1px solid var(--border); }
+.linea-dia.semana { border-left: 1px solid var(--border-strong); }
+.linea-dow {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+.linea-num { font-family: var(--font-titulo); font-size: 15px; font-weight: 500; margin-top: 1px; }
+.linea-dia.es-hoy { border-left: 2px solid var(--primary); }
+.linea-dia.es-hoy .linea-num { color: var(--primary-ink); font-weight: 700; }
+.linea-dia.es-hoy .linea-dow { color: var(--primary-ink); }
+
+.barra {
+  display: flex; align-items: center; gap: 7px; overflow: hidden;
+  height: 100%; min-height: 30px;
+  margin-right: 4px; padding: 0 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; text-align: left;
+  border: 1px solid var(--border-strong); background: var(--surface);
+  color: var(--text); cursor: pointer; min-width: 0;
+}
+.barra:hover { border-color: var(--text-muted); }
+.barra-txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra-pasos { font-family: var(--font-mono); font-size: 11px; opacity: 0.75; flex-shrink: 0; }
+.b-vencida {
+  background: var(--danger-soft);
+  border-color: color-mix(in oklab, var(--danger-strong) 45%, transparent);
+  color: var(--danger);
+}
+.b-marcha {
+  background: var(--warning-soft);
+  border-color: color-mix(in oklab, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+/* Las barras cortadas pierden la esquina del lado por el que se salen: así se
+   ve que la tarea sigue fuera de la ventana. */
+.barra.corte-izq { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-style: dashed; }
+.barra.corte-der { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-style: dashed; }
+
+.linea-pie { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.leyenda { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-soft); }
+.leyenda i {
+  width: 13px; height: 13px; border-radius: 4px; display: block;
+  border: 1px solid var(--border-strong); background: var(--surface);
+}
+.leyenda i.b-vencida { background: var(--danger-soft); border-color: var(--danger-strong); }
+.leyenda i.b-marcha { background: var(--warning-soft); border-color: var(--warning); }
+.linea-hoy-nota { margin: 0; margin-left: auto; }
+
+.linea-sinfecha {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; font-size: 13px;
+  color: var(--text-soft);
+}
+.enlace {
+  background: none; border: 0; padding: 0 6px 0 0; color: var(--primary-ink);
+  font: inherit; text-decoration: underline; cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .linea-cab h1 { font-size: 22px; }
+  .linea-nav { margin-left: 0; }
+  .linea-persona { width: 118px; }
+  .linea-hoy-nota { margin-left: 0; }
+}

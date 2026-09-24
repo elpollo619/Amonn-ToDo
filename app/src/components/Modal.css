@@ -1,0 +1,45 @@
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(10, 12, 20, 0.5); backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+  z-index: 100; animation: fade 0.15s ease;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  width: 100%; max-width: 540px; max-height: calc(100vh - 48px); display: flex; flex-direction: column;
+  animation: pop 0.18s ease; overflow: hidden;
+}
+.modal form { display: flex; flex-direction: column; min-height: 0; max-height: inherit; }
+@keyframes pop { from { transform: translateY(10px) scale(0.98); opacity: 0; } }
+.modal-grip { display: none; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { margin: 0; font-size: 18px; }
+.modal-body { padding: 20px; overflow-y: auto; }
+.modal-footer {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 20px;
+  border-top: 1px solid var(--border); background: var(--surface);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+@media (max-width: 640px) {
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    max-width: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 94vh;
+    animation: sheet 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  @keyframes sheet { from { transform: translateY(40px); opacity: 0.6; } }
+  .modal-grip {
+    display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--border-strong);
+    margin: 10px auto 0;
+  }
+  .modal-header { padding: 8px 16px 12px; border-bottom: none; }
+  .modal-body { padding: 4px 16px 16px; }
+  .modal-footer { padding: 12px 16px; flex-wrap: wrap; }
+  .modal-footer .row { flex: 1; }
+  .modal-footer .row .btn { flex: 1; }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+}
