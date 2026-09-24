@@ -1,7 +1,8 @@
 // Pruebas del generador de contratos: el parseo y la plantilla, que son
 // puras. La llamada real a Google no se prueba aquí (no hay credenciales);
 // por eso generarContrato avisa de mirar la respuesta cruda la primera vez.
-import { parseContrato, camposDePlantilla, contratosConfigurados } from '../src/contratos.js'
+import { parseContrato, camposDePlantilla, contratosConfigurados, diagnosticoContratos, formatDiagnosticoContratos } from '../src/contratos.js'
+import { parseWithRules } from '../src/assistant.js'
 
 const HOY = '2026-09-03'
 let fallos = 0
@@ -52,6 +53,25 @@ eq('kaution 300', g.deposito, '300')
 
 console.log('\n5. SIN CREDENCIALES, DESACTIVADO')
 eq('no configurado por defecto', contratosConfigurados(), false)
+
+console.log('\n6. EL DIAGNÓSTICO DICE QUÉ FALTA, NO «algo ha fallado»')
+// Sin credencial, el primer eslabón ya falla y tiene que decir CUÁL es la
+// variable que falta: es lo que ahorra abrir una sesión técnica para saberlo.
+const pasos = await diagnosticoContratos()
+eq('para en el primer eslabón', pasos.length, 1)
+eq('y señala la credencial', pasos[0].clave, 'credencial')
+eq('con estado de fallo', pasos[0].estado, 'falla')
+const texto = formatDiagnosticoContratos(pasos, 'es')
+eq('nombra la variable exacta', texto.includes('GOOGLE_SA_KEY'), true)
+eq('y dice cuántas cosas quedan', texto.includes('Quedan 1'), true)
+eq('el diagnóstico en alemán va en alemán', formatDiagnosticoContratos(pasos, 'de').includes('Prüfung'), true)
+
+console.log('\n7. PREGUNTAR NO ES CREAR')
+const ctx = (lang) => ({ users: [], sender: '+41765683445', today: HOY, lang, openTasks: [] })
+eq('«¿puedes hacer contratos?» pregunta', parseWithRules('¿puedes hacer contratos?', ctx('es')).action, 'contrato_diag')
+eq('«comprueba los contratos» pregunta', parseWithRules('comprueba los contratos', ctx('es')).action, 'contrato_diag')
+// Y lo importante: crear sigue creando.
+eq('crear sigue creando', parseWithRules('contrato para Max Muster, habitación 204, 850, desde el 1 de octubre', ctx('es')).action, 'contrato_add')
 
 console.log(fallos === 0 ? '\n✅ todas las pruebas de contratos pasan' : `\n❌ ${fallos} fallos`)
 process.exit(fallos === 0 ? 0 : 1)

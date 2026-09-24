@@ -42,7 +42,7 @@ import { traducir, redactarBorrador, redactarDocumento } from './redactar.js'
 import { buscarGlobal, formatBusqueda } from './buscar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
-import { contratosConfigurados, parseContrato, generarContrato } from './contratos.js'
+import { contratosConfigurados, parseContrato, generarContrato, diagnosticoContratos, formatDiagnosticoContratos } from './contratos.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
 import { huespedesConfigurado, listarMensajes, responderHuesped } from './huespedes.js'
 import { tienePermiso, darPermiso, quitarPermiso, listarPermisos, NOMBRES_PERMISO, PERMISOS } from './permisos.js'
@@ -1605,8 +1605,21 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       }
     }
 
+    // Comprobación de la cadena de contratos, eslabón a eslabón. Va antes de
+    // contrato_add para que "¿puedes hacer contratos?" no intente crear uno.
+    case 'contrato_diag': {
+      const pasos = await diagnosticoContratos()
+      return formatDiagnosticoContratos(pasos, lang)
+    }
+
     case 'contrato_add': {
-      if (!contratosConfigurados()) return t(lang, 'contract_not_configured')
+      // Si falta configuración, el diagnóstico dice QUÉ falta. Un "no está
+      // configurado" a secas obliga a abrir una sesión técnica para averiguar
+      // lo mismo que el propio asistente puede comprobar en dos segundos.
+      if (!contratosConfigurados()) {
+        const pasos = await diagnosticoContratos().catch(() => null)
+        return pasos ? formatDiagnosticoContratos(pasos, lang) : t(lang, 'contract_not_configured')
+      }
       const datos = parseContrato(intent.texto, today, lang)
       if (datos.faltan.length) return t(lang, 'contract_need', { faltan: datos.faltan.join(', ') })
       try {

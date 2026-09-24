@@ -154,6 +154,116 @@ export function camposDePlantilla({ nombre, habitacion, alquiler, desde, deposit
 }
 
 /** Copia la plantilla, rellena los huecos y devuelve los enlaces. */
+/**
+ * Diagnóstico: prueba la cadena de contratos ESLABÓN A ESLABÓN y dice en qué
+ * punto exacto se rompe.
+ *
+ * Por qué existe: todo esto está escrito contra la documentación pública de
+ * Google y nunca se ha ejecutado contra la cuenta real. Cuando Cris ponga la
+ * credencial, algo fallará —siempre falla algo: la API sin habilitar, la
+ * plantilla sin compartir, la carpeta de otro— y un «Google 403» a secas no
+ * le dice qué hacer. Esto sí.
+ *
+ * Es de solo lectura: no copia nada ni crea ningún documento.
+ * Devuelve una lista de pasos con estado 'ok' | 'falla' | 'saltado'.
+ */
+export async function diagnosticoContratos() {
+  const g = config.google ?? {}
+  const pasos = []
+  const anota = (clave, etiqueta, estado, queHacer = '') =>
+    pasos.push({ clave, etiqueta, estado, queHacer })
+
+  // 1. ¿Hay credencial y se puede leer?
+  let clave = null
+  if (!g.serviceAccountKey) {
+    anota('credencial', 'La clave de la cuenta de servicio', 'falla',
+      'Falta la variable GOOGLE_SA_KEY en el compose del NAS: el JSON entero de la cuenta de servicio, o ese JSON en base64.')
+    return pasos // sin credencial no hay nada más que probar
+  }
+  try {
+    clave = leerClave()
+    if (!clave.client_email || !clave.private_key) throw new Error('le faltan client_email o private_key')
+    anota('credencial', `La clave de la cuenta de servicio (${clave.client_email})`, 'ok')
+  } catch (e) {
+    anota('credencial', 'La clave de la cuenta de servicio', 'falla',
+      `El JSON no se puede leer (${String(e.message).slice(0, 90)}). Cópialo entero, tal cual lo descargaste, o pásalo a base64.`)
+    return pasos
+  }
+
+  // 2. ¿Google acepta la credencial? Aquí sale si las APIs están apagadas.
+  try {
+    await conseguirToken()
+    anota('token', 'Google acepta la credencial', 'ok')
+  } catch (e) {
+    anota('token', 'Google acepta la credencial', 'falla',
+      `Google rechaza la clave (${String(e.message).slice(0, 110)}). Comprueba en console.cloud.google.com que están HABILITADAS la API de Google Drive y la de Google Docs, y que la clave no esté revocada.`)
+    return pasos
+  }
+
+  // 3. ¿La cuenta de servicio VE la plantilla? El fallo más típico: existe,
+  //    pero nadie se la compartió — y la cuenta de servicio es un usuario más.
+  if (!g.contractTemplateId) {
+    anota('plantilla', 'La plantilla del contrato', 'falla',
+      'Falta GOOGLE_CONTRACT_TEMPLATE_ID: el id del Google Doc de la plantilla (está en su URL, entre /d/ y /edit).')
+  } else {
+    try {
+      const f = await llamar(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(g.contractTemplateId)}?supportsAllDrives=true&fields=id,name,mimeType`,
+      )
+      if (f.mimeType !== 'application/vnd.google-apps.document') {
+        anota('plantilla', `La plantilla «${f.name}»`, 'falla',
+          `Ese fichero no es un Google Doc (es ${f.mimeType}). Si subiste un Word, ábrelo y guárdalo como Documento de Google: la plantilla tiene que ser nativa.`)
+      } else {
+        anota('plantilla', `La plantilla «${f.name}»`, 'ok')
+      }
+    } catch (e) {
+      anota('plantilla', 'La plantilla del contrato', 'falla',
+        `No la puedo abrir (${String(e.message).slice(0, 110)}). Compártela con ${clave.client_email} como si fuera una persona más, con permiso de Lector.`)
+    }
+  }
+
+  // 4. La carpeta es opcional, pero si se indica tiene que poder ESCRIBIR:
+  //    ver la carpeta no basta, y descubrirlo al crear el primer contrato de
+  //    verdad sería descubrirlo tarde.
+  if (!g.contractsFolderId) {
+    anota('carpeta', 'La carpeta donde guardar los contratos', 'saltado',
+      'No hay GOOGLE_CONTRACTS_FOLDER_ID. No es obligatorio: sin ella los contratos nacen en el Drive de la cuenta de servicio, donde nadie los ve. Es mejor poner una.')
+  } else {
+    try {
+      const f = await llamar(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(g.contractsFolderId)}?supportsAllDrives=true&fields=id,name,capabilities(canAddChildren)`,
+      )
+      if (f.capabilities?.canAddChildren === false) {
+        anota('carpeta', `La carpeta «${f.name}»`, 'falla',
+          `La veo pero no puedo escribir en ella. Compártela con ${clave.client_email} como Editor, no como Lector.`)
+      } else {
+        anota('carpeta', `La carpeta «${f.name}»`, 'ok')
+      }
+    } catch (e) {
+      anota('carpeta', 'La carpeta de contratos', 'falla',
+        `No la puedo abrir (${String(e.message).slice(0, 110)}). Compártela con ${clave.client_email} como Editor.`)
+    }
+  }
+
+  return pasos
+}
+
+/** El diagnóstico, escrito para leerlo en el móvil. */
+export function formatDiagnosticoContratos(pasos, lang = 'es') {
+  const de = lang === 'de'
+  const icono = { ok: '✅', falla: '❌', saltado: '➖' }
+  const cabecera = de ? '*Mietverträge — Prüfung*' : '*Contratos — comprobación*'
+  const lineas = pasos.map((p) => {
+    const base = `${icono[p.estado] ?? '•'} ${p.etiqueta}`
+    return p.queHacer ? `${base}\n   ↳ ${p.queHacer}` : base
+  })
+  const fallos = pasos.filter((p) => p.estado === 'falla').length
+  const cierre = fallos === 0
+    ? (de ? '\nAlles bereit: ich kann Verträge erstellen.' : '\nTodo listo: ya puedo generar contratos.')
+    : (de ? `\nEs fehlen noch ${fallos} Punkt(e).` : `\nQuedan ${fallos} cosa(s) por arreglar.`)
+  return [cabecera, '', ...lineas, cierre].join('\n')
+}
+
 export async function generarContrato(datos, today = todayKey()) {
   const g = config.google
   // «MV <Nombre Apellido>»: el nombre que dicta el manual de la empresa

@@ -203,6 +203,10 @@ const REGLAS = {
     // a docDraft). "protocolo de entrada/salida/entrega".
     protocoloGuiado: /^(?:(?:haz(?:me)?|prepara(?:me)?|nuevo|iniciar?|empezar?)\s+)?(?:el\s+|un\s+)?protocolo\s+(?:de\s+)?(entrada|salida|entrega)\b/,
     // "contrato para Max Muster, habitación 204, 850, desde el 1 de octubre"
+    // Comprobar la cadena de contratos. Va ANTES que contratoAdd en la
+    // cadena de reglas: «¿puedes hacer contratos?» es una pregunta, no la
+    // orden de crear uno para alguien llamado «?».
+    contratoDiag: /^(?:(?:puedes|sabes)\s+(?:hacer|generar|crear)\s+contratos?|diagn[oó]stico\s+de\s+contratos?|comprueba\s+(?:los\s+)?contratos?|contratos?\s+(?:funciona|van|est[aá]n\s+listos))\b.*$/,
     contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     // "contrato de la 204" · "contrato de Koubaa" (consultar, no crear)
     vertragInfo: /^(?:contrato|mietvertrag|vertrag)\s+(?:de|del|de la|da|do)\s*(?:la\s+|el\s+)?(?:habitacion\s+|zimmer\s+|quarto\s+)?([\w.\-]+)\??$/,
@@ -329,6 +333,7 @@ const REGLAS = {
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     docDraft: /(?:vertrag|mietvertrag|protokoll|ubergabeprotokoll|dokument|brief|vorlage)[\s\S]*\b(?:muster|beispiel|vorlage|entwurf)\b|\b(?:muster|beispiel|vorlage|entwurf)\b[\s\S]*(?:vertrag|mietvertrag|protokoll|dokument|brief)/,
     protocoloGuiado: /^(?:(?:mach(?:e)?|erstelle?|neues)\s+)?(?:ein\s+)?(?:ubergabeprotokoll|abnahmeprotokoll|uebergabeprotokoll|protokoll)\b/,
+    contratoDiag: /^(?:kannst\s+du\s+(?:miet)?vertr[äa]ge\s+(?:machen|erstellen)|diagnose\s+(?:miet)?vertr[äa]ge|(?:miet)?vertr[äa]ge\s+pr[üu]fen)\b.*$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet)?vertrag\s+(?:fur|an)\s+(.+)$/,
     // Consultar es "vertrag von 204"; crear es "vertrag für ..." (contratoAdd).
     vertragInfo: /^(?:mietvertrag|vertrag)\s+(?:von|vom)\s*(?:zimmer\s+)?([\w.\-]+)\??$/,
@@ -439,6 +444,7 @@ const REGLAS = {
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     docDraft: /(?:contrato|protocolo|documento|carta|minuta)[\s\S]*\b(?:amostra|exemplo|modelo|rascunho|minuta)\b|\b(?:amostra|exemplo|modelo|rascunho|minuta)\b[\s\S]*(?:contrato|protocolo|documento|carta)/,
     protocoloGuiado: /^(?:(?:faz(?:-me)?|prepara|novo)\s+)?(?:o\s+|um\s+)?protocolo\s+(?:de\s+)?(entrada|saida|entrega)\b/,
+    contratoDiag: /^(?:podes\s+(?:fazer|criar)\s+contratos?|diagn[oó]stico\s+de\s+contratos?|verifica(?:r)?\s+contratos?)\b.*$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:para|de|a)\s+(.+)$/,
     vertragInfo: /^(?:contrato)\s+(?:de|do|da)\s*(?:o\s+|a\s+)?(?:quarto\s+)?([\w.\-]+)\??$/,
     mietenSum: /^(?:rendas)(?:\s+(?:de|do|da)\s+(\S+))?\??$/,
@@ -630,6 +636,10 @@ function parseInLang(text, ctx, lang) {
   // la palabra "habitación" y el hotel se lo quedaría. Como en los contactos,
   // hace falta el texto TAL CUAL se escribió: normalizado destrozaría el
   // nombre del inquilino.
+  // Antes de crear: "¿puedes hacer contratos?" es una pregunta sobre el
+  // estado, no la orden de crear un contrato para alguien llamado "?".
+  if (cfg.contratoDiag && cfg.contratoDiag.test(t)) return { action: 'contrato_diag' }
+
   const contrato = cfg.contratoAdd ? t.match(cfg.contratoAdd) : null
   if (contrato) {
     const enCrudo = raw.match(/contrato\s+(?:para|de|a)\s+(.+)$|vertrag\s+(?:fur|für|an)\s+(.+)$/i)
