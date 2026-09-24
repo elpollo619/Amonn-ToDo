@@ -33,7 +33,7 @@ import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
-import { SISTEMAS, formatSistema, formatListaSistemas } from './sistemas.js'
+import { SISTEMAS, formatSistema, formatListaSistemas, formatDocumentos } from './sistemas.js'
 import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion, registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado, fechaSuiza } from './edificios.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
@@ -1881,6 +1881,10 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       const n = await forgetFact(intent.texto)
       return n > 0 ? t(lang, 'fact_forgotten', { n }) : t(lang, 'fact_forget_none', { que: intent.texto })
     }
+
+    // Qué documentos sabe redactar, con el ejemplo de cómo se piden.
+    case 'documentos_list':
+      return formatDocumentos(lang)
 
     // Los contratos que ha generado el asistente. Ojo: NO son todos los
     // contratos de la empresa (esos viven en el Excel y se consultan aparte),

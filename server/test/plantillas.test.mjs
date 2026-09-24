@@ -9,6 +9,7 @@ import assert from 'node:assert/strict'
 import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
 import { parseContrato, parseBaja } from '../src/contratos.js'
 import { parseWithRules } from '../src/assistant.js'
+import { SISTEMAS, formatDocumentos } from '../src/sistemas.js'
 
 const HOY = '2026-09-24'
 const ctx = (lang = 'es') => ({ users: [], sender: '+41765683445', today: HOY, lang, openTasks: [] })
@@ -276,4 +277,39 @@ test('los datos de las llaves NUNCA se inventan', () => {
   assert.equal(h['{{Objekt}}'], 'WHG 13')
   assert.equal(h['{{M1VName}}'], 'Max')
   assert.equal(h['{{M1Name}}'], 'Muster')
+})
+
+// ── «Que documentos sabes hacer?» ──────────────────────────────────────────
+
+test('la lista de documentos no se queda desactualizada', () => {
+  // Si se anade un tipo al catalogo y nadie lo pone en la lista, no existe
+  // para quien pregunta. Esta prueba obliga a mantener las dos a la par.
+  // Sin tildes: los ejemplos dicen «habitación» y la pista es «habitacion».
+  const ejemplos = (SISTEMAS.asistente.es.documentos ?? []).join(' | ')
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const pistas = {
+    longstay: 'habitacion',
+    garaje: 'parking',
+    trastero: 'lagerraum',
+    vivienda: 'vivienda',
+    bajaConfirmacion: 'baja',
+    llaves: 'llaves',
+  }
+  for (const [clave, pista] of Object.entries(pistas)) {
+    assert.ok(PLANTILLAS[clave], `falta la plantilla ${clave}`)
+    assert.ok(ejemplos.includes(pista), `el catalogo tiene «${clave}» pero la lista de documentos no lo menciona`)
+  }
+  assert.equal(Object.keys(PLANTILLAS).length, Object.keys(pistas).length,
+    'hay una plantilla nueva: anadela a SISTEMAS.asistente.documentos y a esta prueba')
+})
+
+test('«que documentos sabes hacer?» no pisa a «que sistemas usamos?»', () => {
+  assert.equal(parseWithRules('que documentos sabes hacer?', ctx()).action, 'documentos_list')
+  assert.equal(parseWithRules('que sistemas usamos?', ctx()).action, 'sistema_list')
+  assert.equal(parseWithRules('welche Dokumente?', ctx('de')).action, 'documentos_list')
+})
+
+test('la lista avisa de que no se inventa nada', () => {
+  assert.match(formatDocumentos('es'), /no me lo invento/)
+  assert.match(formatDocumentos('de'), /erfinde ich nicht/)
 })

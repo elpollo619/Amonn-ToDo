@@ -164,7 +164,16 @@ export const SISTEMAS = {
     alias: ['asistente', 'el asistente', 'tu mismo', 'quien eres', 'assistent', 'bot'],
     es: {
       queEs: 'Yo. Un asistente de la empresa que trabaja por WhatsApp (+41 76 226 04 47) y guarda todo en un servidor propio, en la oficina.',
-      usamos: 'Tareas del equipo, citas, contactos, compra de oficina, gastos y kilometraje, residuos, contratos de alquiler, impagos, recibos, meteo de obra, precios de Casa Reto y datos del hotel.',
+      usamos: 'Tareas del equipo, citas, contactos, compra de oficina, gastos y kilometraje, residuos, documentos de alquiler, impagos, recibos, meteo de obra, precios de Casa Reto y datos del hotel.',
+      documentos: [
+        'contrato para Max Muster, B22, habitación 3, 850, desde el 1 de octubre',
+        'contrato de parking para Max Muster, A4, plaza AEP 15, 130, pauschal 20, desde el 1 de marzo',
+        'contrato para Max Muster, A14, Lagerraum Lager 1, 550, desde el 1 de marzo',
+        'contrato de vivienda para Max Muster, I16, 3½-Zimmerwohnung EG, 1500, pauschal 230, desde el 1 de octubre',
+        'confirma la baja de Max Muster, B22, habitación 3, sale el 31 de octubre, entrega el 30 de octubre a las 10:00',
+        'recibo de llaves para Max Muster, A4, habitación 13',
+        'factura 850 para Max Muster, habitación 204',
+      ],
       estado: 'EN MARCHA. Desde el 24.09.2026 hay además un vigilante que avisa por WhatsApp si dejo de responder, y ya genero los contratos de alquiler en Google Docs.',
       puedesPreguntar: ['¿qué tengo hoy?', '¿qué sabes hacer?', '¿qué sistemas usamos?', 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'],
       ojo: 'Entiendo español, alemán y portugués, y también notas de voz. Las reglas van primero; solo cuando no entiendo pido ayuda a una IA externa, y a esa nunca le mando contraseñas ni números de cuenta.',
@@ -229,6 +238,29 @@ export function formatSistema(sistema, lang = 'es') {
   }
   if (f.ojo) partes.push('', `⚠️ ${de ? 'Zu beachten' : 'Ojo'}: ${f.ojo}`)
   return partes.join('\n')
+}
+
+/**
+ * Los documentos que el asistente sabe redactar, con un ejemplo de cómo se
+ * piden. Sale de la propia ficha para que no haya dos listas que mantener:
+ * si se añade un tipo nuevo y no se pone aquí, no existe para quien pregunta.
+ */
+export function formatDocumentos(lang = 'es') {
+  const de = lang === 'de'
+  const ejemplos = SISTEMAS.asistente.es.documentos ?? []
+  return [
+    de ? '*Dokumente, die ich schreiben kann*' : '*Documentos que sé redactar*',
+    '',
+    de
+      ? 'Schreib mir einfach so (auf Deutsch geht auch):'
+      : 'Escríbeme tal cual (también en alemán o portugués):',
+    '',
+    ...ejemplos.map((e) => `• «${e}»`),
+    '',
+    de
+      ? '_Was ich nicht weiss, erfinde ich nicht: es steht «A RELLENAR» im Dokument._'
+      : '_Lo que no sé no me lo invento: sale «A RELLENAR» en el documento._',
+  ].join('\n')
 }
 
 /** El índice: qué sistemas hay, en una línea cada uno. */
