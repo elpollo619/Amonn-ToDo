@@ -17,7 +17,10 @@ on:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    # Runner ARM NATIVO. El NAS es aarch64, así que la imagen tiene que ser
+    # arm64; construirla aquí de forma nativa evita la emulación QEMU que se
+    # colgó dos veces el 15.09.2026. Gratis porque el repositorio es público.
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -25,11 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Sin QEMU: solo se construye para amd64. El NAS (UGREEN DXP6800 Pro,
-      # Intel) es amd64 y la emulación ARM se quedó colgada dos veces seguidas
-      # el 15.09.2026 (más de 30 minutos en «npm ci» bajo QEMU, con un arreglo
-      # urgente esperando). Si algún día hace falta ARM, se añade de nuevo
-      # docker/setup-qemu-action y linux/arm64 en platforms.
+      # Sin QEMU a propósito: el runner ya es ARM, así que «npm ci» corre
+      # nativo. No se añada docker/setup-qemu-action ni linux/amd64: la
+      # emulación es justo lo que se colgó (más de 30 min) el 15.09.2026, y
+      # nadie consume la imagen amd64.
       - name: Configurar Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -49,11 +51,16 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      - name: Construir y publicar (amd64)
+      - name: Construir y publicar (arm64)
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
+          # SOLO arm64: el NAS (UGREEN, aarch64) es el único consumidor. Del
+          # 15 al 24.09.2026 se publicó amd64 por creer que el NAS era Intel
+          # y el servidor estuvo 9 días en bucle de reinicio con
+          # «exec format error» — el asistente, mudo. Comprobar con
+          # `uname -m` en el NAS antes de tocar esta línea.
+          platforms: linux/arm64
           # Manifiesto CLÁSICO (sin índice OCI ni attestations). Al pasar a
           # amd64 solo, buildx publicaba un índice de una plataforma + firma de
           # procedencia, y Watchtower 1.7.1 en el NAS lo daba por «sin cambios»

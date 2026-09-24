@@ -1,5 +1,34 @@
 # Empieza por aquí
 
+> **🔴 24.09.2026 — EL NAS ES `aarch64`, NO Intel. La imagen DEBE ser arm64.**
+> El asistente estuvo **MUDO 9 días** (15→24.09) y nadie lo notó. El commit
+> `988ae2a` quitó `linux/arm64` del CI dando por hecho que «el NAS UGREEN
+> DXP6800 Pro es Intel». El NAS real responde **`aarch64`**: desde entonces
+> `latest` era amd64 y `amonn-server` moría al arrancar con
+> `exec /usr/local/bin/docker-entrypoint.sh: exec format error`
+> (**10 396 reinicios**). La base de datos estaba sana: esta vez NO era el
+> problema de `pgdata`.
+>
+> **Arreglado en dos pasos:**
+> 1. *Al momento:* el compose del NAS se fijó a `sha-529842c`, la última
+>    imagen arm64 publicada (copia previa en
+>    `docker-compose.yaml.bak-arm64-20260924`). El asistente volvió a hablar.
+> 2. *De raíz:* el workflow construye ahora en **runner ARM nativo**
+>    (`ubuntu-24.04-arm`, gratis porque el repo es público) y publica **solo
+>    `linux/arm64`**. Sin QEMU — la emulación era justo lo que se colgaba y
+>    motivó el commit equivocado. Se conservan `provenance: false` y
+>    `sbom: false` (manifiesto clásico) para que Watchtower siga viendo las
+>    novedades.
+>
+> ⚠️ **Cuando el CI publique `latest` en arm64, devolver el compose a
+> `latest`** para que Watchtower vuelva a actualizar solo:
+> `sed -i "s|amonn-todo:sha-529842c|amonn-todo:latest|" /volume1/docker/docker-compose.yaml`
+> y `docker compose -p amonn -f docker-compose.yaml up -d server`.
+>
+> 🩺 **Lección: nadie vigilaba que el asistente estuviera vivo.** `/api/version`
+> no responde cuando el contenedor no arranca, pero nada avisa. Vale la pena
+> un aviso por WhatsApp si el servidor lleva X minutos sin responder.
+
 > **FUNNEL ENCENDIDO (09.09.2026).** La app es pública en
 > **https://nas-amonn.tail850d70.ts.net** y `APP_URL` ya está en el compose
 > del NAS, así que los enlaces del asistente (PDFs de facturas y Mahnungen,
@@ -340,6 +369,11 @@ existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido
 
+- **La arquitectura se comprueba, no se deduce.** El NAS es `aarch64`
+  (`uname -m`), aunque la ficha del modelo diga Intel. Publicar amd64 no da
+  un error de despliegue: la imagen se descarga bien, el contenedor se crea
+  bien, y solo al ejecutar sale `exec format error` en bucle. Nueve días
+  mudo (15–24.09.2026).
 - **`create table if not exists` NO añade columnas** a una tabla que ya
   existe. Usa `alter table … add column if not exists`.
 - **El campo es `due_date`, no `dueDate`.** Escribirlo mal no da error: la
