@@ -414,6 +414,40 @@ export function formatDiagnosticoContratos(pasos, lang = 'es') {
 }
 
 /**
+ * Datos de una confirmación de baja: «Bokor Ioan, A4, habitación 31, sale el
+ * 31 de octubre, entrega el 30 de octubre a las 10:00».
+ *
+ * Se apoya en parseContrato para lo común (nombre, objeto, edificio) y añade
+ * lo suyo: la fecha de salida, y el día y la hora de la entrega. Ninguna se
+ * inventa —en una baja los plazos tienen consecuencias legales—, así que lo
+ * que no venga se marca para rellenar a mano.
+ */
+export function parseBaja(texto, today = todayKey(), lang = 'es') {
+  const base = parseContrato(texto, today, lang)
+  const datos = { ...base, abnahmeDatum: null, abnahmeZeit: null, kuendigungDatum: null }
+
+  // La hora de la entrega: «a las 10:00», «um 10.30», «10h».
+  const hora = String(texto).match(/(?:a\s+las|um|[àa]s)\s*(\d{1,2})[:.h]?(\d{2})?/i)
+  if (hora) datos.abnahmeZeit = `${hora[1].padStart(2, '0')}:${hora[2] ?? '00'}`
+
+  // Las fechas que se nombran con su palabra. `desde` ya lo sacó
+  // parseContrato de la primera fecha suelta y aquí es la SALIDA.
+  for (const [clave, patron] of [
+    ['abnahmeDatum', /(?:entrega|abnahme|[üu]bergabe|entrega\s+el)\s+(?:el\s+|am\s+)?([^,;]+)/i],
+    ['kuendigungDatum', /(?:carta\s+de\s+baja|k[üu]ndigung\s+vom|baja\s+del)\s+(?:el\s+)?([^,;]+)/i],
+  ]) {
+    const m = String(texto).match(patron)
+    if (!m) continue
+    const f = parseDateAnyLang(m[1], today, lang)
+    if (f) datos[clave] = f.key
+  }
+  const faltan = []
+  if (!datos.nombre) faltan.push('nombre')
+  if (!datos.desde) faltan.push('fecha de salida')
+  return { ...datos, faltan }
+}
+
+/**
  * El id del Google Doc de una plantilla del catálogo.
  *
  * Se busca POR NOMBRE dentro de la carpeta de contratos, para que añadir un

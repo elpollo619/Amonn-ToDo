@@ -43,7 +43,7 @@ import { traducir, redactarBorrador, redactarDocumento } from './redactar.js'
 import { buscarGlobal, formatBusqueda } from './buscar.js'
 import { addAbsence, listAbsences, ausenciaDe } from './ausencias.js'
 import { addReading, listReadings, detectarAnomalia, serieDe, TIPOS, NOMBRES as NOMBRES_CONTADOR } from './contadores.js'
-import { contratosConfigurados, parseContrato, generarContrato, generarDocumento, diagnosticoContratos, formatDiagnosticoContratos } from './contratos.js'
+import { contratosConfigurados, parseContrato, parseBaja, generarContrato, generarDocumento, diagnosticoContratos, formatDiagnosticoContratos } from './contratos.js'
 import { tipoDeDocumento, PLANTILLAS } from './plantillas.js'
 import { fetchDashboard, analizarPrecios } from './precios.js'
 import { huespedesConfigurado, listarMensajes, responderHuesped } from './huespedes.js'
@@ -1604,6 +1604,42 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
         return out
       } catch (err) {
         return t(lang, 'invoice_error', { motivo: err.message.slice(0, 140) })
+      }
+    }
+
+    // Confirmación de baja. Es una CARTA, no un contrato: se genera con su
+    // propia plantilla y no toca el registro de contratos generados.
+    case 'baja_confirmar': {
+      if (!contratosConfigurados()) {
+        const pasos = await diagnosticoContratos().catch(() => null)
+        return pasos ? formatDiagnosticoContratos(pasos, lang) : t(lang, 'contract_not_configured')
+      }
+      const d = parseBaja(intent.texto, today, lang)
+      if (d.faltan.length) {
+        return `Para la confirmación de baja me falta: ${d.faltan.join(', ')}.\n\n` +
+          `Por ejemplo: «confirma la baja de Max Muster, B22, habitación 3, sale el 31 de octubre, entrega el 30 de octubre a las 10:00»`
+      }
+      const edB = await resolverEdificio(intent.texto).catch(() => null)
+      try {
+        const c = await generarDocumento('bajaConfirmacion', { ...d, direccion: edB?.direccion ?? '' }, today)
+        const avisos = []
+        if (edB?.direccion) avisos.push(`🏠 Finca: ${edB.direccion}`)
+        // Los huecos que quedan a mano se dicen aquí, no se descubren al
+        // imprimir: en una baja las fechas tienen consecuencias legales.
+        const aMano = []
+        if (!d.abnahmeDatum) aMano.push('día de la entrega')
+        if (!d.abnahmeZeit) aMano.push('hora de la entrega')
+        if (!d.kuendigungDatum) aMano.push('fecha de la carta de baja')
+        if (aMano.length) avisos.push(`✏️ Queda por rellenar a mano: ${aMano.join(', ')}.`)
+        return [
+          `📄 Confirmación de baja lista: ${d.nombre} · sale el ${String(d.desde).split('-').reverse().join('.')}`,
+          '',
+          `✏️ Revisar: ${c.docUrl}`,
+          `🖨️ PDF: ${c.pdfUrl}`,
+          ...(avisos.length ? ['', ...avisos] : []),
+        ].join('\n')
+      } catch (err) {
+        return t(lang, 'contract_error', { motivo: err.message.slice(0, 160) })
       }
     }
 

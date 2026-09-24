@@ -94,6 +94,42 @@ export const PLANTILLAS = {
       }
     },
   },
+  // Confirmación de baja. NO es un contrato: es la carta que se manda al
+  // inquilino cuando avisa de que se va, y que fija el día y la hora de la
+  // entrega del objeto. Por eso se pide con otras palabras («confirma la baja
+  // de …») y tiene su propia intención.
+  //
+  // ⚠️ Las fechas de aquí NO se inventan ninguna: la de la carta de baja, la
+  // de salida y la de la entrega las pone quien escribe. Si falta alguna, se
+  // marca a mano. Poner una fecha equivocada en una confirmación de baja
+  // tiene consecuencias legales (plazos de preaviso).
+  bajaConfirmacion: {
+    clave: 'bajaConfirmacion',
+    etiqueta: 'Confirmación de baja (Bestätigung Kündigung)',
+    docEnDrive: '04 Maske Bestaetigung Kuendigung (Vorlage Assistent)',
+    nombreDoc: (d) => `Bestätigung Kündigung ${d.nombre}`,
+    huecos: (d, hoy) => {
+      const { pila, apellido } = partirNombre(d.nombre)
+      return {
+        '{{M1VName}}': pila,
+        '{{M1Name}}': apellido,
+        '{{Anrede}}': d.anrede ?? 'geehrte/r',
+        '{{MieterAdresse}}': d.mieterAdresse || aMano('dirección del inquilino'),
+        '{{MieterOrt}}': d.mieterOrt || aMano('CP y localidad'),
+        '{{Liegenschaft}}': d.direccion || aMano('dirección de la finca'),
+        '{{Objekt}}': d.objeto ?? String(d.habitacion ?? ''),
+        '{{ObjektZusatz}}': d.objetoZusatz ?? '',
+        '{{Mitbenutzung}}': d.mitbenutzung ?? '',
+        '{{VertragDatum}}': d.vertragDatum ? fecha(d.vertragDatum) : aMano('fecha del contrato'),
+        '{{KuendigungDatum}}': d.kuendigungDatum ? fecha(d.kuendigungDatum) : aMano('fecha de la carta de baja'),
+        '{{Auszug}}': d.desde ? fecha(d.desde) : aMano('fecha de salida'),
+        '{{AbnahmeDatum}}': d.abnahmeDatum ? fecha(d.abnahmeDatum) : aMano('día de la entrega'),
+        '{{AbnahmeZeit}}': d.abnahmeZeit ?? aMano('hora'),
+        '{{Datum}}': fecha(hoy),
+      }
+    },
+  },
+
   // Trastero, cuarto de hobby o almacén. Casi igual que el garaje, con dos
   // diferencias que vienen del contrato real: el preaviso es de SEIS meses
   // (no uno) y la fianza es de un mes de alquiler (no 100 fijos).

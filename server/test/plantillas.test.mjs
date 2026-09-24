@@ -7,7 +7,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
-import { parseContrato } from '../src/contratos.js'
+import { parseContrato, parseBaja } from '../src/contratos.js'
 import { parseWithRules } from '../src/assistant.js'
 
 const HOY = '2026-09-24'
@@ -204,4 +204,43 @@ test('y esto NO cambia como se leen habitaciones y plazas', () => {
   assert.equal(parseContrato('Max, B22, habitacion 3, 800', HOY, 'es').habitacion, '3')
   assert.equal(parseContrato('Otto, A4, plaza AEP 15, 130', HOY, 'es').habitacion, 'AEP 15')
   assert.equal(parseContrato('Max, B22, habitacion 3, 800', HOY, 'es').objeto, null)
+})
+
+// ── Confirmacion de baja ───────────────────────────────────────────────────
+//
+// Es una CARTA, no un contrato, y sus fechas tienen consecuencias legales
+// (plazos de preaviso). Por eso ninguna se inventa: lo que no se diga sale
+// marcado para rellenar a mano.
+
+test('«confirma la baja de X» NO es una orden de crear un contrato', () => {
+  const r = parseWithRules('confirma la baja de Max Muster, B22, habitacion 3, sale el 31 de octubre', ctx())
+  assert.equal(r.action, 'baja_confirmar')
+  // Y crear sigue creando.
+  assert.equal(parseWithRules('contrato para Max Muster, B22, habitacion 3, 800, desde el 1 de octubre', ctx()).action, 'contrato_add')
+})
+
+test('lee la salida, el dia y la hora de la entrega', () => {
+  const d = parseBaja('Max Muster, B22, habitacion 3, sale el 31 de octubre, entrega el 30 de octubre a las 10:00', HOY, 'es')
+  assert.equal(d.nombre, 'Max Muster')
+  assert.equal(d.desde, '2026-10-31', 'la salida')
+  assert.equal(d.abnahmeDatum, '2026-10-30', 'el dia de la entrega')
+  assert.equal(d.abnahmeZeit, '10:00')
+  assert.deepEqual(d.faltan, [])
+})
+
+test('sin fecha de salida, lo pide en vez de inventarla', () => {
+  const d = parseBaja('Max Muster, B22, habitacion 3', HOY, 'es')
+  assert.ok(d.faltan.includes('fecha de salida'))
+})
+
+test('las fechas que no se dicen quedan MARCADAS, nunca supuestas', () => {
+  const d = parseBaja('Anna Test, A4, habitacion 5, sale el 30 de noviembre', HOY, 'es')
+  assert.equal(d.abnahmeDatum, null)
+  assert.equal(d.abnahmeZeit, null)
+  const h = PLANTILLAS.bajaConfirmacion.huecos(d, HOY)
+  assert.match(h['{{AbnahmeDatum}}'], /A RELLENAR/)
+  assert.match(h['{{AbnahmeZeit}}'], /A RELLENAR/)
+  assert.match(h['{{KuendigungDatum}}'], /A RELLENAR/)
+  // La salida sí se sabe y se escribe.
+  assert.equal(h['{{Auszug}}'], '30.11.2026')
 })
