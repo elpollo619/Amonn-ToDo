@@ -61,6 +61,14 @@ export const config = {
     contractTemplateId: process.env.GOOGLE_CONTRACT_TEMPLATE_ID ?? '',
     // Carpeta de Drive donde dejar los contratos generados (opcional).
     contractsFolderId: process.env.GOOGLE_CONTRACTS_FOLDER_ID ?? '',
+    // Actuar EN NOMBRE de una persona en vez de como cuenta de servicio. Hace
+    // falta porque una cuenta de servicio tiene CERO espacio en Drive y no
+    // puede ser dueña de los contratos que crea (solo se salva con una unidad
+    // compartida de Workspace, que la empresa no tiene). Si están los tres,
+    // este modo manda sobre GOOGLE_SA_KEY.
+    clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    refreshToken: process.env.GOOGLE_REFRESH_TOKEN ?? '',
   },
   // PreisPilot: el motor de precios de Casa Reto (Supabase, proyecto
   // hansamonn-vermietung). Su función `dashboard` es pública, por eso la

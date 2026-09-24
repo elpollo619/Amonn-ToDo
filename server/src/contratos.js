@@ -31,11 +31,66 @@ import { parseDateAnyLang, todayKey } from './dates.js'
 
 export function contratosConfigurados() {
   const g = config.google ?? {}
-  return Boolean(g.serviceAccountKey && g.contractTemplateId)
+  return Boolean((g.refreshToken || g.serviceAccountKey) && g.contractTemplateId)
+}
+
+/**
+ * ¿Trabajamos EN NOMBRE de una persona (OAuth) o como cuenta de servicio?
+ *
+ * Por qué hay dos modos (24.09.2026): una cuenta de servicio tiene CERO
+ * espacio propio en Drive, así que no puede ser dueña de los contratos que
+ * crea; eso solo se arregla con una unidad compartida de Google Workspace,
+ * que la empresa no tiene. Actuando en nombre de una persona, los documentos
+ * son suyos y gastan su espacio, y funciona con una cuenta de Google normal.
+ *
+ * Se conserva el modo cuenta de servicio porque el día que haya Workspace es
+ * el modo bueno: nada que caduque y nada atado a la cuenta de una persona.
+ */
+export function modoContratos() {
+  const g = config.google ?? {}
+  if (g.refreshToken && g.clientId && g.clientSecret) return 'usuario'
+  if (g.serviceAccountKey) return 'cuenta_de_servicio'
+  return 'sin_configurar'
 }
 
 let token = null
 let caduca = 0
+
+/**
+ * Token actuando EN NOMBRE de la persona que autorizó una vez.
+ *
+ * El refresh token no caduca por tiempo, pero SÍ deja de valer si esa persona
+ * revoca el acceso en su cuenta de Google, o si la pantalla de consentimiento
+ * se queda en modo «prueba» (ahí Google los caduca a los 7 días). Por eso el
+ * error se explica en cristiano en vez de soltar el 400 de Google: es lo
+ * primero que hay que mirar si un día los contratos dejan de salir.
+ */
+async function conseguirTokenDeUsuario(ahora) {
+  const g = config.google
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: g.clientId,
+      client_secret: g.clientSecret,
+      refresh_token: g.refreshToken,
+      grant_type: 'refresh_token',
+    }),
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!res.ok) {
+    const detalle = (await res.text()).slice(0, 200)
+    throw new Error(
+      `Google ya no acepta el permiso guardado (${res.status}). Suele ser que se revocó el acceso ` +
+      `a la app en la cuenta de Google, o que la app sigue en modo de prueba (ahí el permiso caduca ` +
+      `a los 7 días). Hay que volver a autorizar. Detalle: ${detalle}`,
+    )
+  }
+  const j = await res.json()
+  token = j.access_token
+  caduca = ahora + (j.expires_in ?? 3600) * 1000
+  return token
+}
 
 /** La clave de la cuenta de servicio, venga como JSON directo o en base64. */
 function leerClave() {
@@ -46,10 +101,14 @@ function leerClave() {
   return JSON.parse(texto)
 }
 
-/** Token OAuth de la cuenta de servicio (JWT RS256), cacheado ~1 hora. */
+/**
+ * Token de acceso, cacheado ~1 hora. Dos caminos según `modoContratos()`:
+ * en nombre de una persona (refresh token) o como cuenta de servicio (JWT).
+ */
 async function conseguirToken() {
   const ahora = Date.now()
   if (token && ahora < caduca - 60_000) return token
+  if (modoContratos() === 'usuario') return conseguirTokenDeUsuario(ahora)
   const clave = leerClave()
   const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url')
   const iat = Math.floor(ahora / 1000)
@@ -173,6 +232,44 @@ export async function diagnosticoContratos() {
   const anota = (clave, etiqueta, estado, queHacer = '') =>
     pasos.push({ clave, etiqueta, estado, queHacer })
 
+  // Modo «en nombre de una persona»: la credencial es otra y la comprobación
+  // de espacio no aplica (el espacio es el de esa persona, no el de un robot).
+  if (modoContratos() === 'usuario') {
+    try {
+      await conseguirToken()
+      anota('credencial', 'El permiso de Google (en nombre de una persona)', 'ok')
+    } catch (e) {
+      anota('credencial', 'El permiso de Google (en nombre de una persona)', 'falla',
+        String(e.message).slice(0, 260))
+      return pasos
+    }
+    for (const [clave2, etiqueta, id, escribe] of [
+      ['plantilla', 'La plantilla del contrato', g.contractTemplateId, false],
+      ['carpeta', 'La carpeta donde guardar los contratos', g.contractsFolderId, true],
+    ]) {
+      if (!id) {
+        anota(clave2, etiqueta, clave2 === 'carpeta' ? 'saltado' : 'falla',
+          clave2 === 'carpeta'
+            ? 'No hay GOOGLE_CONTRACTS_FOLDER_ID; los contratos nacerían sueltos en el Drive.'
+            : 'Falta GOOGLE_CONTRACT_TEMPLATE_ID.')
+        continue
+      }
+      try {
+        const f = await llamar(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?supportsAllDrives=true&fields=id,name,mimeType,capabilities(canAddChildren)`,
+        )
+        if (escribe && f.capabilities?.canAddChildren === false) {
+          anota(clave2, `${etiqueta} «${f.name}»`, 'falla', 'La veo pero no puedo escribir en ella.')
+        } else {
+          anota(clave2, `${etiqueta} «${f.name}»`, 'ok')
+        }
+      } catch (e) {
+        anota(clave2, etiqueta, 'falla', `No la puedo abrir (${String(e.message).slice(0, 110)}).`)
+      }
+    }
+    return pasos
+  }
+
   // 1. ¿Hay credencial y se puede leer?
   let clave = null
   if (!g.serviceAccountKey) {
@@ -243,6 +340,30 @@ export async function diagnosticoContratos() {
       anota('carpeta', 'La carpeta de contratos', 'falla',
         `No la puedo abrir (${String(e.message).slice(0, 110)}). Compártela con ${clave.client_email} como Editor.`)
     }
+  }
+
+  // 5. ¿Puede la cuenta de servicio SER DUEÑA de un fichero nuevo?
+  //
+  // Este paso nació de un fallo real (24.09.2026): los cuatro pasos anteriores
+  // salieron en verde y aun así crear un contrato moría con
+  // «Google 403: The user's Drive storage quota has been exceeded».
+  // No era que el Drive de Cris estuviera lleno: una cuenta de servicio tiene
+  // CERO almacenamiento propio (`storageQuota.limit === "0"`), y al copiar la
+  // plantilla la copia nacería siendo suya. Desde 2022 eso solo funciona
+  // contra una unidad compartida, que exige Google Workspace.
+  // Un diagnóstico que decía «todo listo» y luego fallaba es peor que no
+  // tenerlo: por eso se comprueba aquí, antes de prometer nada.
+  try {
+    const about = await llamar('https://www.googleapis.com/drive/v3/about?fields=storageQuota')
+    if (String(about?.storageQuota?.limit ?? '') === '0') {
+      anota('cuota', 'La cuenta de servicio puede crear documentos', 'falla',
+        'La cuenta de servicio no tiene espacio propio en Drive (límite 0), así que no puede ser dueña de los contratos que cree. Hace falta una de dos: una unidad compartida de Google Workspace, o que el asistente actúe EN NOMBRE de una persona (OAuth con GOOGLE_REFRESH_TOKEN) para que los documentos sean de ella.')
+    } else {
+      anota('cuota', 'La cuenta de servicio puede crear documentos', 'ok')
+    }
+  } catch (e) {
+    anota('cuota', 'La cuenta de servicio puede crear documentos', 'falla',
+      `No he podido comprobar el espacio disponible (${String(e.message).slice(0, 110)}).`)
   }
 
   return pasos
