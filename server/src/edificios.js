@@ -178,6 +178,69 @@ export async function habitacionOcupada(codigoEdificio, habitacion) {
   }
 }
 
+// ── Contratos que ha generado el propio asistente ─────────────────────────
+//
+// Existe por trazabilidad: sin esto, de un contrato solo queda un documento
+// suelto en Drive y un mensaje de WhatsApp que se pierde hacia arriba.
+
+/** Deja constancia de un contrato recién generado. */
+export async function registrarContrato(datos) {
+  const { rows } = await query(
+    `insert into contratos_generados
+       (nombre, habitacion, edificio, direccion, alquiler, deposito, desde, doc_id, doc_url, creado_por)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     returning *`,
+    [
+      datos.nombre, String(datos.habitacion), datos.edificio ?? null, datos.direccion ?? null,
+      datos.alquiler ?? null, datos.deposito ?? null, datos.desde ?? null,
+      datos.docId, datos.docUrl, datos.creadoPor ?? null,
+    ],
+  )
+  return rows[0]
+}
+
+/** Los últimos contratos generados, para «¿qué contratos has hecho?». */
+export async function contratosGenerados(limite = 10) {
+  const { rows } = await query(
+    `select c.*, u.full_name as autor
+       from contratos_generados c
+       left join users u on u.id = c.creado_por
+      order by c.created_at desc
+      limit $1`,
+    [limite],
+  )
+  return rows
+}
+
+/**
+ * ¿Ya se generó hace poco un contrato igual? Mismo nombre y misma habitación
+ * en los últimos 30 días.
+ *
+ * No bloquea: repetir un contrato es legítimo (se corrigió un dato, se
+ * reimprime). Pero hacerlo sin darse cuenta llena el Drive de documentos
+ * casi idénticos y luego nadie sabe cuál se firmó.
+ */
+export async function contratoRepetido(nombre, habitacion) {
+  const { rows } = await query(
+    `select * from contratos_generados
+      where lower(nombre) = lower($1) and habitacion = $2
+        and created_at > now() - interval '30 days'
+      order by created_at desc limit 1`,
+    [String(nombre ?? '').trim(), String(habitacion ?? '').trim()],
+  )
+  return rows[0] ?? null
+}
+
+/** Como se lee en el móvil. */
+export function formatContratoGenerado(c) {
+  const f = (d) => (d ? String(d).slice(0, 10).split('-').reverse().join('.') : '')
+  const cuando = f(c.created_at ?? c.createdAt)
+  const partes = [`• *${c.nombre}* · hab. ${c.habitacion}`]
+  if (c.edificio) partes.push(` (${c.edificio})`)
+  const detalle = [c.alquiler ? `CHF ${c.alquiler}/mes` : '', c.desde ? `desde ${f(c.desde)}` : ''].filter(Boolean).join(' · ')
+  return `${partes.join('')}\n   ${detalle}${detalle ? ' · ' : ''}hecho el ${cuando}${c.autor ? ` por ${c.autor}` : ''}\n   ${c.doc_url ?? c.docUrl}`
+}
+
 /**
  * Todo lo que hay que saber del edificio para un contrato, en una llamada.
  *

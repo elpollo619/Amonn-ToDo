@@ -462,3 +462,28 @@ create table if not exists seen_mails (
 );
 alter table seen_mails add column if not exists subject_key text;
 create index if not exists seen_mails_asunto on seen_mails (subject_key, seen_at);
+
+-- Contratos que ha generado el asistente. Existe por trazabilidad: sin esto,
+-- lo único que queda de un contrato es un documento suelto en Drive y un
+-- mensaje de WhatsApp que se pierde hacia arriba. Aquí se puede preguntar
+-- «¿qué contratos has hecho este mes?» y detectar que se está repitiendo uno.
+--
+-- ⚠️ NO sustituye al Excel maestro (mietvertraege), que sigue siendo la fuente
+-- de verdad de los contratos DE LA EMPRESA. Esta tabla solo sabe de los que
+-- ha generado el propio asistente.
+create table if not exists contratos_generados (
+  id           uuid primary key default gen_random_uuid(),
+  nombre       text not null,
+  habitacion   text not null,
+  edificio     text,                       -- código: B22, A14…
+  direccion    text,                       -- la finca escrita en el contrato
+  alquiler     text,
+  deposito     text,
+  desde        date,
+  doc_id       text not null,              -- id del Google Doc
+  doc_url      text not null,
+  creado_por   uuid references users(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists contratos_generados_fecha on contratos_generados (created_at desc);
+create index if not exists contratos_generados_quien on contratos_generados (lower(nombre), habitacion);

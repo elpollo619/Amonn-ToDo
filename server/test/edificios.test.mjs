@@ -11,6 +11,7 @@ import { initDb, query, pool } from '../src/db.js'
 import {
   direccionDeEdificio, listarEdificios, edificioEnTexto, edificioDeHabitacion,
   formatDireccion, habitacionOcupada, resolverEdificio,
+  registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado,
 } from '../src/edificios.js'
 import { camposDePlantilla } from '../src/contratos.js'
 
@@ -84,6 +85,30 @@ const campos = camposDePlantilla(
 check('la dirección va al hueco de la plantilla', campos['{{Liegenschaft}}'] === 'Probeweg 22, 3053 Testort')
 const sinDir = camposDePlantilla({ nombre: 'Max Muster', habitacion: '3', alquiler: '850', desde: '2026-10-01' }, '2026-09-24')
 check('sin dirección, deja un aviso VISIBLE (no un hueco en blanco)', /A RELLENAR/.test(sinDir['{{Liegenschaft}}']), sinDir['{{Liegenschaft}}'])
+
+console.log('\n8. QUEDA CONSTANCIA DE LOS CONTRATOS GENERADOS')
+await query(`delete from contratos_generados where nombre like 'ZZTest%'`)
+check('al principio no hay ninguno mío', (await contratosGenerados(50)).every((c) => !c.nombre.startsWith('ZZTest')))
+const guardado = await registrarContrato({
+  nombre: 'ZZTest Persona', habitacion: '3', edificio: 'TEST2',
+  direccion: 'Probeweg 22, 3053 Testort', alquiler: '800', deposito: '500',
+  desde: '2026-12-01', docId: 'doc-abc', docUrl: 'https://docs.google.com/document/d/doc-abc/edit',
+})
+check('se guarda con su edificio y su finca', guardado.edificio === 'TEST2' && guardado.direccion.includes('Probeweg'))
+const lista = await contratosGenerados(5)
+check('aparece en la lista', lista.some((c) => c.nombre === 'ZZTest Persona'))
+check('el texto lleva nombre, habitación y enlace', (() => {
+  const txt = formatContratoGenerado(lista.find((c) => c.nombre === 'ZZTest Persona'))
+  return txt.includes('ZZTest Persona') && txt.includes('hab. 3') && txt.includes('docs.google.com')
+})())
+
+console.log('\n9. AVISA SI SE REPITE UN CONTRATO')
+const rep = await contratoRepetido('ZZTest Persona', '3')
+check('detecta el mismo nombre y habitación', Boolean(rep) && rep.doc_id === 'doc-abc')
+check('no confunde otra habitación', (await contratoRepetido('ZZTest Persona', '9')) === null)
+check('no confunde a otra persona', (await contratoRepetido('ZZOtra Persona', '3')) === null)
+check('da igual mayúsculas o minúsculas', Boolean(await contratoRepetido('zztest persona', '3')))
+await query(`delete from contratos_generados where nombre like 'ZZTest%'`)
 
 await query(`delete from mietvertraege where objgrp in ('TEST1','TEST2','TESTAMB')`)
 await pool.end()

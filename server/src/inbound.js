@@ -34,7 +34,7 @@ import { addContact, buscarContactos, formatContacto, listByCompany } from './co
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
 import { SISTEMAS, formatSistema, formatListaSistemas } from './sistemas.js'
-import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion } from './edificios.js'
+import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion, registrarContrato, contratosGenerados, contratoRepetido, formatContratoGenerado } from './edificios.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
@@ -1629,6 +1629,11 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       // el edificio en esta empresa (la «1» existe en diez), así que deducirlo
       // sería jugar a la lotería con un papel que se firma. Si el mensaje
       // nombra el edificio («B22 habitación 3», «en Bernstrasse 22»), va solo.
+      // Si ya se hizo uno igual hace poco, se dice ANTES de crear otro: si no,
+      // el Drive se llena de documentos casi idénticos y luego nadie sabe cuál
+      // se firmó. No bloquea —rehacer un contrato es legítimo—, solo avisa.
+      const repe = await contratoRepetido(datos.nombre, datos.habitacion).catch(() => null)
+
       const ed = await resolverEdificio(intent.texto).catch(() => null)
       if (ed?.preguntar) {
         const lista = (ed.opciones ?? []).slice(0, 14).map((o) => `   • ${o}`).join('\n')
@@ -1647,8 +1652,24 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
           desde: String(datos.desde).split('-').reverse().join('.'),
           doc: c.docUrl, pdf: c.pdfUrl,
         })
+        // Queda constancia. Si falla el registro NO se pierde el contrato: el
+        // documento ya existe y es lo que importa; se avisa por consola.
+        await registrarContrato({
+          nombre: datos.nombre, habitacion: datos.habitacion,
+          edificio: ed?.codigo ?? null, direccion: ed?.direccion ?? null,
+          alquiler: datos.alquiler, deposito: datos.deposito,
+          desde: datos.desde, docId: c.id, docUrl: c.docUrl, creadoPor: user.id,
+        }).catch((e) => console.error(`[contratos] no pude registrarlo: ${e.message}`))
+
         const extra = []
         if (ed?.direccion) extra.push(`🏠 Finca: ${ed.direccion}`)
+        if (repe) {
+          extra.push(
+            `📋 Ya hice un contrato para ${repe.nombre} (hab. ${repe.habitacion}) el ` +
+            `${String(repe.created_at).slice(0, 10).split('-').reverse().join('.')}. ` +
+            `Si era para corregirlo, quédate con el nuevo y borra el viejo:\n   ${repe.doc_url}`,
+          )
+        }
         // Aviso, no bloqueo: los datos son una foto del Excel y el inquilino
         // anterior puede haberse ido ya. Pero alquilar dos veces la misma
         // habitación es un error caro, y más vale verlo antes de imprimir.
@@ -1792,6 +1813,23 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'fact_only_admin')
       const n = await forgetFact(intent.texto)
       return n > 0 ? t(lang, 'fact_forgotten', { n }) : t(lang, 'fact_forget_none', { que: intent.texto })
+    }
+
+    // Los contratos que ha generado el asistente. Ojo: NO son todos los
+    // contratos de la empresa (esos viven en el Excel y se consultan aparte),
+    // solo los que se hicieron por aquí. El texto lo deja claro para que
+    // nadie confunda una cosa con la otra.
+    case 'contratos_hechos': {
+      const hechos = await contratosGenerados(10)
+      if (hechos.length === 0) {
+        return '📄 Todavía no he generado ningún contrato.\n\nPara hacer uno: «contrato para Max Muster, B22, habitación 3, 850, desde el 1 de noviembre».'
+      }
+      return [
+        `*Contratos que he generado* (${hechos.length} últimos)`,
+        '_Solo los hechos por mí; los de la empresa están en el Excel._',
+        '',
+        ...hechos.map(formatContratoGenerado),
+      ].join('\n')
     }
 
     // Los edificios de la empresa, con su dirección. Sale de los contratos
