@@ -132,6 +132,33 @@ export const PLANTILLAS = {
     },
   },
 
+  // Recibo de llaves. Se firma al entregar las llaves y es la prueba de qué
+  // se dio exactamente; por eso los datos de las llaves (cuántas, de qué
+  // tipo, número de la instalación) NO se inventan nunca: si no se dicen,
+  // salen marcados y los rellena quien está delante con el manojo en la mano.
+  llaves: {
+    clave: 'llaves',
+    etiqueta: 'Recibo de llaves (Schlüsselquittung)',
+    docEnDrive: 'Maske Schluessquittung (Vorlage Assistent)',
+    nombreDoc: (d) => `Schlüsselquittung ${d.nombre}`,
+    huecos: (d, hoy) => {
+      const { pila, apellido } = partirNombre(d.nombre)
+      return {
+        '{{M1VName}}': pila,
+        '{{M1Name}}': apellido,
+        '{{MieterAdresse}}': d.mieterAdresse || d.direccion || aMano('dirección'),
+        '{{MieterOrt}}': d.mieterOrt || aMano('CP y localidad'),
+        '{{Objekt}}': d.objeto ?? (d.habitacion ? String(d.habitacion) : aMano('objeto')),
+        '{{Anzahl}}': d.anzahl ?? aMano('cuántas'),
+        '{{Typ}}': d.typ ?? aMano('tipo'),
+        '{{Anlagenummer}}': d.anlagenummer ?? aMano('nº instalación'),
+        '{{Bezeichnung}}': d.bezeichnung ?? aMano('designación'),
+        '{{Bemerkungen}}': d.bemerkungen ?? '',
+        '{{Datum}}': fecha(hoy),
+      }
+    },
+  },
+
   // Trastero, cuarto de hobby o almacén. Casi igual que el garaje, con dos
   // diferencias que vienen del contrato real: el preaviso es de SEIS meses
   // (no uno) y la fianza es de un mes de alquiler (no 100 fijos).

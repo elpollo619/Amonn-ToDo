@@ -208,6 +208,7 @@ const REGLAS = {
     // Comprobar la cadena de contratos. Va ANTES que contratoAdd en la
     // cadena de reglas: «¿puedes hacer contratos?» es una pregunta, no la
     // orden de crear uno para alguien llamado «?».
+    llavesRecibo: /^(?:recibo\s+de\s+llaves\s+(?:de|para|a)\s+(.+)|quittung\s+de\s+llaves\s+(?:de|para)\s+(.+))$/,
     bajaConfirmar: /^(?:confirma(?:r)?\s+(?:la\s+)?baja\s+(?:de|a|para)\s+(.+)|carta\s+de\s+baja\s+(?:de|para)\s+(.+))$/,
     contratoDiag: /^(?:(?:puedes|sabes)\s+(?:hacer|generar|crear)\s+contratos?|diagn[oó]stico\s+de\s+contratos?|comprueba\s+(?:los\s+)?contratos?|contratos?\s+(?:funciona|van|est[aá]n\s+listos))\b.*$/,
     // El «de parking/garaje/trastero» se deja FUERA del nombre: si no, el
@@ -340,6 +341,7 @@ const REGLAS = {
     contadorList: /^(?:zahlerstande|zaehlerstande|ablesungen|zahlerstand)(?:\s+(\S+))?\??$/,
     docDraft: /(?:vertrag|mietvertrag|protokoll|ubergabeprotokoll|dokument|brief|vorlage)[\s\S]*\b(?:muster|beispiel|vorlage|entwurf)\b|\b(?:muster|beispiel|vorlage|entwurf)\b[\s\S]*(?:vertrag|mietvertrag|protokoll|dokument|brief)/,
     protocoloGuiado: /^(?:(?:mach(?:e)?|erstelle?|neues)\s+)?(?:ein\s+)?(?:ubergabeprotokoll|abnahmeprotokoll|uebergabeprotokoll|protokoll)\b/,
+    llavesRecibo: /^(?:schl[üu]sselquittung\s+(?:f[üu]r\s+)?(.+))$/,
     bajaConfirmar: /^(?:k[üu]ndigung\s+best[äa]tigen\s+(?:f[üu]r\s+)?(.+)|best[äa]tigung\s+k[üu]ndigung\s+(?:f[üu]r\s+)?(.+))$/,
     contratoDiag: /^(?:kannst\s+du\s+(?:miet)?vertr[äa]ge\s+(?:machen|erstellen)|diagnose\s+(?:miet)?vertr[äa]ge|(?:miet)?vertr[äa]ge\s+pr[üu]fen)\b.*$/,
     contratoAdd: /^(?:(?:mach(?:e)?|erstelle?|neuer)\s+)?(?:einen\s+|den\s+)?(?:miet|garagen|parkplatz|wohnungs)?vertrag\s+(?:fur|an)\s+(.+)$/,
@@ -454,6 +456,7 @@ const REGLAS = {
     contadorList: /^(?:leituras|contadores)(?:\s+(?:de\s+)?(?:a\s+|o\s+)?(\S+))?\??$/,
     docDraft: /(?:contrato|protocolo|documento|carta|minuta)[\s\S]*\b(?:amostra|exemplo|modelo|rascunho|minuta)\b|\b(?:amostra|exemplo|modelo|rascunho|minuta)\b[\s\S]*(?:contrato|protocolo|documento|carta)/,
     protocoloGuiado: /^(?:(?:faz(?:-me)?|prepara|novo)\s+)?(?:o\s+|um\s+)?protocolo\s+(?:de\s+)?(entrada|saida|entrega)\b/,
+    llavesRecibo: /^(?:recibo\s+de\s+chaves\s+(?:de|para)\s+(.+))$/,
     bajaConfirmar: /^(?:confirma(?:r)?\s+(?:a\s+)?sa[ií]da\s+(?:de|para)\s+(.+))$/,
     contratoDiag: /^(?:podes\s+(?:fazer|criar)\s+contratos?|diagn[oó]stico\s+de\s+contratos?|verifica(?:r)?\s+contratos?)\b.*$/,
     contratoAdd: /^(?:(?:faz|cria(?:r)?|novo)\s+)?(?:um\s+|o\s+)?contrato\s+(?:de\s+(?:parking|garagem|lugar)\s+)?(?:para|de|a)\s+(.+)$/,
@@ -649,6 +652,14 @@ function parseInLang(text, ctx, lang) {
   // nombre del inquilino.
   // Antes de crear: "¿puedes hacer contratos?" es una pregunta sobre el
   // estado, no la orden de crear un contrato para alguien llamado "?".
+  // El recibo de llaves: también antes de crear contrato.
+  const llaves = cfg.llavesRecibo ? t.match(cfg.llavesRecibo) : null
+  if (llaves) {
+    const enCrudo = raw.match(/llaves\s+(?:de|para|a)\s+(.+)$|schl[üu]sselquittung\s+(?:f[üu]r\s+)?(.+)$|chaves\s+(?:de|para)\s+(.+)$/i)
+    const texto = (enCrudo?.[1] ?? enCrudo?.[2] ?? enCrudo?.[3] ?? llaves[1] ?? llaves[2] ?? '').trim()
+    if (texto) return { action: 'llaves_recibo', texto }
+  }
+
   // La confirmación de baja va antes que crear contrato: «confirma la baja
   // de Max» no es una orden de hacerle un contrato nuevo a nadie.
   const baja = cfg.bajaConfirmar ? t.match(cfg.bajaConfirmar) : null

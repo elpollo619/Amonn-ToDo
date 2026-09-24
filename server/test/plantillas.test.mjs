@@ -244,3 +244,36 @@ test('las fechas que no se dicen quedan MARCADAS, nunca supuestas', () => {
   // La salida sí se sabe y se escribe.
   assert.equal(h['{{Auszug}}'], '30.11.2026')
 })
+
+// ── Recibo de llaves ───────────────────────────────────────────────────────
+
+test('«recibo de llaves para X» tiene su propia orden', () => {
+  assert.equal(parseWithRules('recibo de llaves para Max Muster, A4, habitacion 13', ctx()).action, 'llaves_recibo')
+  assert.equal(parseWithRules('Schlusselquittung fur Anna Test, A4, WHG 13', ctx('de')).action, 'llaves_recibo')
+})
+
+test('las cuatro ordenes de documentos no se pisan entre si', () => {
+  const casos = [
+    ['contrato para Max Muster, B22, habitacion 3, 800, desde el 1 de octubre', 'contrato_add'],
+    ['confirma la baja de Max Muster, B22, habitacion 3, sale el 31 de octubre', 'baja_confirmar'],
+    ['recibo de llaves para Max Muster, A4, habitacion 13', 'llaves_recibo'],
+    ['puedes hacer contratos?', 'contrato_diag'],
+  ]
+  for (const [frase, esperado] of casos) {
+    assert.equal(parseWithRules(frase, ctx()).action, esperado, `"${frase}" fue a otra regla`)
+  }
+})
+
+test('los datos de las llaves NUNCA se inventan', () => {
+  // Se firman con el manojo delante: cuantas, de que tipo y con que numero
+  // de instalacion lo sabe quien esta alli, no el asistente.
+  const h = PLANTILLAS.llaves.huecos({ nombre: 'Max Muster', habitacion: 'WHG 13' }, HOY)
+  assert.match(h['{{Anzahl}}'], /A RELLENAR/)
+  assert.match(h['{{Typ}}'], /A RELLENAR/)
+  assert.match(h['{{Anlagenummer}}'], /A RELLENAR/)
+  assert.match(h['{{Bezeichnung}}'], /A RELLENAR/)
+  // Lo que si se sabe, se escribe.
+  assert.equal(h['{{Objekt}}'], 'WHG 13')
+  assert.equal(h['{{M1VName}}'], 'Max')
+  assert.equal(h['{{M1Name}}'], 'Muster')
+})

@@ -1607,6 +1607,31 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       }
     }
 
+    // Recibo de llaves. Se firma con el manojo delante, así que los datos de
+    // las llaves se dejan a mano si no se dicen — y se avisa de cuáles son.
+    case 'llaves_recibo': {
+      if (!contratosConfigurados()) {
+        const pasos = await diagnosticoContratos().catch(() => null)
+        return pasos ? formatDiagnosticoContratos(pasos, lang) : t(lang, 'contract_not_configured')
+      }
+      const dl = parseContrato(intent.texto, today, lang)
+      if (!dl.nombre) return 'Dime de quién es el recibo. Por ejemplo: «recibo de llaves para Max Muster, A4, habitación 13».'
+      const edL = await resolverEdificio(intent.texto).catch(() => null)
+      try {
+        const c = await generarDocumento('llaves', { ...dl, direccion: edL?.direccion ?? '' }, today)
+        return [
+          `🔑 Recibo de llaves listo: ${dl.nombre}${dl.habitacion ? ` · ${dl.habitacion}` : ''}`,
+          '',
+          `✏️ Revisar: ${c.docUrl}`,
+          `🖨️ PDF: ${c.pdfUrl}`,
+          '',
+          '✏️ Los datos de las llaves (cuántas, tipo, nº de instalación y designación) van a mano: se rellenan con el manojo delante.',
+        ].join('\n')
+      } catch (err) {
+        return t(lang, 'contract_error', { motivo: err.message.slice(0, 160) })
+      }
+    }
+
     // Confirmación de baja. Es una CARTA, no un contrato: se genera con su
     // propia plantilla y no toca el registro de contratos generados.
     case 'baja_confirmar': {
