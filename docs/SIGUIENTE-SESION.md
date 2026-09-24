@@ -278,6 +278,19 @@ chat; no están en el repo).
    lo dice con nombre y fecha. Es aviso, no bloqueo: los datos son una foto
    del Excel y pueden estar viejos.
 
+   **Queda constancia:** tabla `contratos_generados` (quién, habitación,
+   edificio, finca, importe, enlace y quién lo pidió). Se consulta con
+   «¿qué contratos has hecho?» / «últimos contratos». ⚠️ Son SOLO los hechos
+   por el asistente; los de la empresa siguen en el Excel (`mietvertraege`),
+   y el propio mensaje lo aclara para que nadie confunda las dos listas.
+   Si se pide dos veces el mismo (mismo nombre + habitación en 30 días), lo
+   avisa y enseña el anterior — sin bloquear, que rehacer un contrato es
+   legítimo.
+   ⚠️ **Trampa de fechas que ya mordió:** `created_at` es `timestamptz` y el
+   driver la da como objeto `Date`, así que `String(d).slice(0,10)` devuelve
+   «Thu Sep 24», no un ISO. Las columnas `date` sí llegan como texto, y por eso
+   el mismo patrón funciona en otros sitios. Usar `fechaSuiza()`.
+
    Si un día falla: preguntar al asistente **«¿puedes hacer contratos?»** —
    comprueba la cadena eslabón a eslabón y dice qué arreglar. Las dos causas
    probables de un fallo nuevo son que se revoque el acceso a la app en la
