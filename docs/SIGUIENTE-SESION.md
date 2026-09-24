@@ -329,6 +329,25 @@ chat; no están en el repo).
    4. Comprobar al final que no queda ningún dato de la persona real, y listar
       los `{{huecos}}` resultantes.
 
+   🔴 **Mietzinsanpassung (ajuste de alquiler): NO es un documento normal.**
+   Se miró la plantilla real el 24.09.2026 y dice literalmente *«In der
+   Beilage erhalten Sie das amtlich genehmigte Formular»*: la carta es solo
+   el ACOMPAÑAMIENTO; la notificación legal va en un **formulario oficial
+   homologado por el cantón** que NO está en el Drive. Generar solo la carta
+   no sirve —y podría hacer creer que el ajuste está notificado cuando no lo
+   está—.
+   Lo que sí tiene valor y es mecánico: el **cálculo** que lleva dentro
+   (variación del tipo hipotecario + adaptación a la inflación por índice +
+   aumento general de costes 0,5 %/año = variación total %). Eso es
+   aritmética propensa a errores a mano y se puede automatizar sin riesgo
+   legal, dejando que la notificación siga yendo en el formulario oficial.
+   Antes de programar nada: preguntar a Cris qué formulario usan hoy.
+
+   🔴 **`Maske Rechnung` (facturas): DESCARTADA a propósito.** El asistente ya
+   emite QR-Rechnung suiza de verdad (`cobros.js`) con referencia QRR, que es
+   lo que permite conciliar los pagos del banco. Rellenar un Word sería un
+   paso atrás.
+
    Plantillas pendientes de convertir, ya localizadas en el Drive (carpeta
    `1amzC55fx3Y6unMOAZV2uBtj6ccEQ3H0y`): **MV Whg** (vivienda), **MV Keller +
    Bastelraum** (trastero), **Bestätigung Kündigung**, **Mietzinsanpassung**
