@@ -117,7 +117,9 @@ export const PLANTILLAS = {
         '{{MieterAdresse}}': d.mieterAdresse || aMano('dirección del inquilino'),
         '{{MieterOrt}}': d.mieterOrt || aMano('CP y localidad'),
         '{{Liegenschaft}}': d.direccion || aMano('dirección de la finca'),
-        '{{Objekt}}': d.objeto ?? String(d.habitacion ?? ''),
+        // Si solo se dio un número, se escribe como en los contratos
+        // («Zimmer Nr. 31»); un «31» suelto en una carta no dice nada.
+        '{{Objekt}}': d.objeto ?? (d.habitacion ? `Zimmer Nr. ${d.habitacion}` : aMano('objeto alquilado')),
         '{{ObjektZusatz}}': d.objetoZusatz ?? '',
         '{{Mitbenutzung}}': d.mitbenutzung ?? '',
         '{{VertragDatum}}': d.vertragDatum ? fecha(d.vertragDatum) : aMano('fecha del contrato'),
