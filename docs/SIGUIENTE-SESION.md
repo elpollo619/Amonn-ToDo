@@ -147,6 +147,7 @@ Todo esto está **desplegado y probado con datos reales**:
 | Compra | «Falta café» · «¿Qué falta?» · «Todo comprado» |
 | Citas | «Cita con Baumgartner el martes a las 14:00» + calendario `.ics` suscribible |
 | Contactos | «Teléfono de Baumgartner» · «Guarda contacto: …» (34 importados) |
+| **Sistemas de la empresa** | «¿qué sistemas usamos?» · «¿qué es Apaleo?» · «para qué sirve LIKE MAGIC» · «was ist Apaleo?» → ficha corta con qué es, para qué lo usamos, **si está pagado/conectado** y qué falta. Pensado para que el jefe se responda solo. En `server/src/sistemas.js` (es + de; pt cae a es). **Sin permiso a propósito**: entender la propia empresa no expone datos de nadie |
 | Spesen | «Gasto 37.90 Landi Kabelbinder», o mandar el PDF y contestar importe/día/propiedad |
 | Kilometraje | «120 km a Gampelen» → fila del Spesen en URE FZ (cuenta 6200) a la tarifa de `KM_RAPPEN` = **80 rp/km** (CHF 0.80, confirmada por Cris el 09.09.2026 y puesta en el compose del NAS; el valor por defecto del código es 70); «kilómetros» o «kilómetros 2026» suma el año |
 | Gasto por comercio | «¿cuánto gastamos en IKEA este año?» · «gasto en Coop este mes» → total, número de gastos y los cinco últimos |
@@ -405,6 +406,12 @@ existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido
 
+- **La regla del hotel se queda con casi cualquier frase.** `cfg.hotel` dispara
+  con «apaleo», «reservas», «cuartos», «libres»… así que «¿qué es Apaleo?»
+  acababa consultando el parte del día en vez de explicar qué es Apaleo. Las
+  fichas de sistemas tienen que ir **ANTES** de esa regla, y solo con pregunta
+  explícita; el nombre a secas se deja pasar y se atiende al final de la
+  cadena, para no quitarle a nadie lo que ya usaba (24.09.2026).
 - **La arquitectura se comprueba, no se deduce.** El NAS es `aarch64`
   (`uname -m`), aunque la ficha del modelo diga Intel. Publicar amd64 no da
   un error de despliegue: la imagen se descarga bien, el contenedor se crea

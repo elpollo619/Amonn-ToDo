@@ -16,6 +16,7 @@ import { resolvePerson, resolveTask } from './aliases.js'
 import { matchStateByName } from './states.service.js'
 import { DOSSIER } from './empresa.js'
 import { NOMBRES_PERMISO as NOMBRES_PERMISO_RULES } from './permisos.js'
+import { buscarSistema } from './sistemas.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -153,6 +154,10 @@ const REGLAS = {
     conocimientoAddRaw: /(?:recuerda|ten en cuenta|que sepas|para que sepas|toma nota de|anota|apunta)\s+que\s+([\s\S]+)$/i,
     conocimientoList: /^(?:qu[eé]\s+has\s+aprendido|qu[eé]\s+recuerdas|(?:lista\s+de\s+)?conocimiento|qu[eé]\s+sabes\s+de\s+memoria)\b\??$/,
     conocimientoForget: /^(?:olvida(?:te)?)\s+(?:que\s+|lo\s+de\s+|de\s+)?(.+)$/,
+    // Fichas de sistemas. "sistemaInfo" es deliberadamente amplia: la criba de
+    // verdad no es la regex, es que el nombre corresponda a un sistema real.
+    sistemaList: /^(?:qu[eé]\s+(?:sistemas|programas|herramientas|aplicaciones)|(?:lista\s+de\s+)?sistemas|qu[eé]\s+(?:sistemas|programas)\s+(?:usamos|tenemos|hay))\b.*$/,
+    sistemaInfo: /^(?:qu[eé]\s+es|para\s+qu[eé]\s+(?:sirve|es|usamos)|expl[ií]came|h[aá]blame\s+de|c[oó]mo\s+funciona|qu[eé]\s+hace|info(?:rmaci[oó]n)?\s+(?:de|sobre))\s+(?:el\s+|la\s+|los\s+|las\s+|lo\s+de\s+)?(.+?)\s*\??$/,
     // Dinero entrado (abonos ya importados de un camt).
     dineroBusca: /^(?:pag[oó]|ha\s+pagado|entr[oó]\s+algo\s+de|pagos?\s+de)\s+(.+?)\s*\??$/,
     dineroLista: /^(?:qu[eé]\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|(?:dinero|pagos|abonos|cobros|ingresos)\s+entrad[oa]s?|cu[aá]nto\s+(?:dinero\s+)?(?:entr[oó]|ha\s+entrado)|entradas?\s+de\s+dinero|abonos)\b\s*(.*)$/,
@@ -298,6 +303,8 @@ const REGLAS = {
     conocimientoAddRaw: /(?:merk(?:e)? dir|notiere?|zur info|damit du es weisst)\s*[:,]?\s*(?:dass\s+)?([\s\S]+)$/i,
     conocimientoList: /^(?:was\s+hast\s+du\s+gelernt|was\s+weisst\s+du\s+auswendig|wissen)\b\??$/,
     conocimientoForget: /^(?:vergiss)\s+(?:dass\s+)?(.+)$/,
+    sistemaList: /^(?:welche\s+(?:systeme|programme|tools|anwendungen)|systeme)\b.*$/,
+    sistemaInfo: /^(?:was\s+ist|wof[üu]r\s+(?:ist|brauchen\s+wir|nutzen\s+wir)|erkl[äa]r(?:e)?\s+mir|wie\s+funktioniert|was\s+macht|info(?:rmationen)?\s+(?:zu|[üu]ber))\s+(?:der\s+|die\s+|das\s+)?(.+?)\s*\??$/,
     dineroBusca: /^(?:hat\s+(.+?)\s+bezahlt|zahlung(?:en)?\s+von\s+(.+?))\s*\??$/,
     dineroLista: /^(?:was\s+ist\s+eingegangen|welche\s+zahlungen|geldeingang|wie\s+viel\s+ist\s+eingegangen|eing[äa]nge)\b\s*(.*)$/,
     gastoAdd: /^(?:spesen|spese|auslage|beleg|quittung)\s*[:,-]?\s*(.+)$/,
@@ -404,6 +411,10 @@ const REGLAS = {
     conocimientoAddRaw: /(?:lembra(?:-te)?|para que saibas|anota|toma nota)\s+(?:de\s+)?que\s+([\s\S]+)$/i,
     conocimientoList: /^(?:o\s+que\s+aprendeste|o\s+que\s+sabes\s+de\s+cor|conhecimento)\b\??$/,
     conocimientoForget: /^(?:esquece)\s+(?:que\s+)?(.+)$/,
+    // En portugués la ficha se responde en español (ver sistemas.js): mejor una
+    // respuesta cierta en otro idioma que ninguna.
+    sistemaList: /^(?:que\s+(?:sistemas|programas|ferramentas)|sistemas)\b.*$/,
+    sistemaInfo: /^(?:o\s+que\s+[eé]|para\s+que\s+(?:serve|usamos)|explica(?:-me)?|como\s+funciona|o\s+que\s+faz|info(?:rma[cç][aã]o)?\s+(?:de|sobre))\s+(?:o\s+|a\s+|os\s+|as\s+)?(.+?)\s*\??$/,
     dineroBusca: /^(?:(.+?)\s+pagou|pagamento\s+de\s+(.+?)|entrou\s+algo\s+de\s+(.+?))\s*\??$/,
     dineroLista: /^(?:que\s+entrou|quanto\s+entrou|pagamentos\s+entrados|entradas\s+de\s+dinheiro)\b\s*(.*)$/,
     gastoAdd: /^(?:despesa|despesas|gasto|recibo|talao)\s*[:,-]?\s*(.+)$/,
@@ -674,6 +685,23 @@ function parseInLang(text, ctx, lang) {
       else { proyecto = ''; trabajos = rest }
     }
     if (proyecto || trabajos) return { action: 'obra_add', proyecto, trabajos }
+  }
+
+  // Ficha de un sistema, PERO solo cuando se pregunta explícitamente qué es
+  // ("¿qué es Apaleo?", "para qué sirve LIKE MAGIC").
+  //
+  // ⚠️ Tiene que ir justo ANTES de la regla del hotel, porque esa regla se
+  // queda con cualquier frase que diga "apaleo", "reservas" o "cuartos" — y
+  // "¿qué es Apaleo?" acababa consultando el parte del hotel en vez de
+  // explicar qué es Apaleo. Al revés NO vale.
+  //
+  // Y solo con la pregunta explícita: "apaleo" a secas sigue dando el parte
+  // del día, que es lo que el equipo usa a diario. Aquí no se le quita nada a
+  // nadie; se añade una puerta nueva.
+  const preguntaSistema = cfg.sistemaInfo ? t.match(cfg.sistemaInfo) : null
+  if (preguntaSistema) {
+    const hit = buscarSistema(preguntaSistema[1] ?? '')
+    if (hit) return { action: 'sistema_info', clave: hit.clave }
   }
 
   if (cfg.hotel && cfg.hotel.test(t)) return { action: 'hotel', texto: t }
@@ -1101,6 +1129,10 @@ function parseInLang(text, ctx, lang) {
     }
   }
 
+  // El índice de sistemas ("¿qué sistemas usamos?"). Va abajo, con las
+  // consultas generales: no compite con nada.
+  if (cfg.sistemaList && cfg.sistemaList.test(t)) return { action: 'sistema_list' }
+
   // Búsqueda global (Fase 1). Va la ÚLTIMA de las reglas, después de todas las
   // intenciones específicas (contactos, contratos, decisiones, listas de
   // tareas…) para no pisarlas, y antes solo del fallback a Gemini/desconocido.
@@ -1111,6 +1143,17 @@ function parseInLang(text, ctx, lang) {
     const enCrudo = cfg.buscarRaw ? raw.match(cfg.buscarRaw) : null
     const texto = (enCrudo?.[1] ?? busca[1] ?? '').trim().replace(/[?¿]+$/, '').trim()
     if (texto) return { action: 'buscar', texto }
+  }
+
+  // Último recurso antes de rendirse: si el mensaje es CORTO y nombra un
+  // sistema, damos su ficha. Al estar aquí abajo, el propio orden de la cadena
+  // hace el trabajo sin casos especiales: "apaleo" ya se lo quedó la regla del
+  // hotel mucho antes, y "like magic" —que no le interesa a nadie más— llega
+  // hasta aquí y se responde. Corto, porque una frase larga que menciona un
+  // sistema de pasada no es una pregunta sobre ese sistema.
+  if (t.split(/\s+/).filter(Boolean).length <= 3) {
+    const soloNombre = buscarSistema(t)
+    if (soloNombre) return { action: 'sistema_info', clave: soloNombre.clave }
   }
 
   return { action: 'unknown' }

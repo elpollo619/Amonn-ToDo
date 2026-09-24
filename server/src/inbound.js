@@ -33,6 +33,7 @@ import { createAppointment, listAppointments } from './agenda.js'
 import { addContact, buscarContactos, formatContacto, listByCompany } from './contactos.js'
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
+import { SISTEMAS, formatSistema, formatListaSistemas } from './sistemas.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
@@ -1747,6 +1748,21 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'fact_only_admin')
       const n = await forgetFact(intent.texto)
       return n > 0 ? t(lang, 'fact_forgotten', { n }) : t(lang, 'fact_forget_none', { que: intent.texto })
+    }
+
+    // Fichas de los sistemas de la empresa. A propósito SIN permiso: saber qué
+    // es Apaleo o por qué Beds24 está a medias no expone ningún dato de
+    // nadie, y el objetivo es justo que quien pregunte no tenga que pedir
+    // permiso para entender su propia empresa.
+    case 'sistema_list':
+      return formatListaSistemas(lang)
+
+    case 'sistema_info': {
+      const sis = SISTEMAS[intent.clave]
+      // Si la clave no existiera (nunca debería: la pone el propio parser),
+      // mejor el índice que un error.
+      if (!sis) return formatListaSistemas(lang)
+      return formatSistema(sis, lang)
     }
 
     case 'averia_add': {
