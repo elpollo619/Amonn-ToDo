@@ -291,6 +291,36 @@ chat; no están en el repo).
    «Thu Sep 24», no un ISO. Las columnas `date` sí llegan como texto, y por eso
    el mismo patrón funciona en otros sitios. Usar `fechaSuiza()`.
 
+   **Catálogo de documentos (24.09.2026).** `server/src/plantillas.js`. Una
+   plantilla se identifica por su NOMBRE dentro de la carpeta «Contratos
+   generados», no por otra variable en el compose: añadir un tipo es dejar el
+   Google Doc ahí y registrar sus huecos. Hoy hay dos: **longstay** y
+   **garaje** (aparcamiento), este último probado en producción.
+
+   🔴 **LAS PLANTILLAS .docx DE LA EMPRESA NO ESTÁN VACÍAS.** Son el último
+   contrato combinado: traen dentro nombre, dirección, plaza e importes de una
+   persona real (la de garaje traía los de un inquilino de Höheweg 8b). Usar
+   una tal cual produciría contratos con datos de otro. **Vaciarla es parte
+   del trabajo**, y el procedimiento ya está probado:
+
+   1. Convertir el .docx a Google Doc: `files.copy` con
+      `mimeType: application/vnd.google-apps.document` hacia la carpeta.
+   2. Leer los párrafos CRUDOS (`documents.get`), no el texto exportado: lo
+      que parecen columnas son **tabulaciones**, no tablas.
+   3. Sustituir con `replaceAllText` usando el CONTEXTO como ancla, para que
+      cada búsqueda sea única. La clave: «3074 Muri» sale dos veces —empresa e
+      inquilino—, pero `"3074 Muri\t3074 Muri"` solo una.
+   4. Comprobar al final que no queda ningún dato de la persona real, y listar
+      los `{{huecos}}` resultantes.
+
+   Plantillas pendientes de convertir, ya localizadas en el Drive (carpeta
+   `1amzC55fx3Y6unMOAZV2uBtj6ccEQ3H0y`): **MV Whg** (vivienda), **MV Keller +
+   Bastelraum** (trastero), **Bestätigung Kündigung**, **Mietzinsanpassung**
+   (esta engancha con el vigilante del Referenzzinssatz que ya existe),
+   **Schlüssquittung** (engancha con el protocolo de entrega), las facturas
+   (`Maske Rechnung`) y el bloque de **Betreibung** (cobro judicial), que es
+   la continuación natural del Mahnwesen.
+
    Si un día falla: preguntar al asistente **«¿puedes hacer contratos?»** —
    comprueba la cadena eslabón a eslabón y dice qué arreglar. Las dos causas
    probables de un fallo nuevo son que se revoque el acceso a la app en la
