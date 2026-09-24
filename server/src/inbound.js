@@ -1707,9 +1707,11 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       }
 
       // Qué documento se pide: contrato de habitación (lo de siempre) o de
-      // plaza de aparcamiento. El tipo se saca de la frase; por defecto,
-      // Longstay, que es lo que la gente escribe a diario.
-      const tipoDoc = tipoDeDocumento(intent.texto)
+      // plaza de aparcamiento. Manda la pista del prefijo («contrato de
+      // parking para …»), porque esa palabra ya no está en intent.texto: se
+      // recorta al interpretar la orden. Si no hay prefijo, se lee el cuerpo;
+      // por defecto, Longstay, que es lo que la gente escribe a diario.
+      const tipoDoc = intent.tipoPista ?? tipoDeDocumento(intent.texto)
 
       try {
         const c = await generarDocumento(tipoDoc, { ...datos, direccion: ed?.direccion ?? '' }, today)

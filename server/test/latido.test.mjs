@@ -5,7 +5,7 @@
 // nada. Aquí se comprueba exactamente cuándo habla y cuándo se calla.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { decidir, estaVivo, duracion, mensaje, elegirSesion } from '../../scripts/latido.mjs'
+import { decidir, deshacerAviso, estaVivo, duracion, mensaje, elegirSesion } from '../../scripts/latido.mjs'
 
 const INICIO = { fallos: 0, avisado: false, caidoDesde: null, ultimoAviso: null }
 const MIN = 60_000
@@ -132,4 +132,46 @@ test('elegirSesion: manda la que está ready, no la primera de la lista', () => 
   assert.equal(elegirSesion([]), null)
   assert.equal(elegirSesion(null), null, 'el Gateway puede devolver cualquier cosa')
   assert.equal(elegirSesion([{ sessionId: 'c', status: 'ready' }]), 'c', 'admite las dos formas del campo')
+})
+
+test('el aviso respira: la línea en blanco tras la cabecera se queda', () => {
+  // El `.filter((l) => l !== '')` del final se llevaba TODAS las líneas
+  // vacías, no solo el detalle cuando venía vacío, y el aviso salía
+  // apelmazado: la cabecera pegada a «Qué mirar».
+  const m = mensaje('caido', { duracionMs: 6 * MIN, detalle: 'HTTP 502' })
+  assert.match(m, /responder \(desde hace 6 minutos\)\.\n\nQué mirar/, 'falta el párrafo en blanco')
+  // Sin detalle no se cuelga una línea vacía al final.
+  const sinDetalle = mensaje('caido', { duracionMs: 6 * MIN })
+  assert.doesNotMatch(sinDetalle, /Detalle técnico/)
+  assert.ok(!sinDetalle.endsWith('\n'), 'no acaba en una línea suelta')
+  // Y el separador sigue estando también en el recordatorio.
+  assert.match(mensaje('sigue-caido', { duracionMs: 9 * 24 * 3600_000 }), /9 días\)\.\n\nQué mirar/)
+})
+
+test('si el recordatorio no se puede enviar, se reintenta — no espera 6 h más', () => {
+  let e = INICIO
+  for (const t of [1, 2, 3]) e = decidir(e, false, t * MIN).estado
+  const anterior = e
+  const r = decidir(e, false, 3 * MIN + 6 * 3600_000)
+  assert.equal(r.accion, 'sigue-caido')
+
+  // El Gateway falla al enviar. `ultimoAviso` ya se había puesto a AHORA, así
+  // que sin deshacerlo el recordatorio se perdía otras SEIS HORAS — justo en
+  // un apagón largo, que es cuando más falta hace.
+  const tras = deshacerAviso(r.accion, r.estado, anterior)
+  assert.equal(tras.ultimoAviso, anterior.ultimoAviso, 'vuelve al aviso anterior')
+  assert.equal(decidir(tras, false, 3 * MIN + 6 * 3600_000 + 2 * MIN).accion, 'sigue-caido', 'lo reintenta enseguida')
+
+  // Lo de la caída inicial, que ya se compensaba, sigue igual.
+  let c = INICIO
+  let rc
+  for (const t of [1, 2, 3]) { rc = decidir(c, false, t * MIN); c = rc.estado }
+  assert.equal(rc.accion, 'caido')
+  const trasC = deshacerAviso('caido', rc.estado, INICIO, 3)
+  assert.equal(trasC.avisado, false)
+  assert.equal(decidir(trasC, false, 4 * MIN).accion, 'caido', 'reintenta el aviso de caída')
+
+  // De un «recuperado» perdido no se deshace nada: no oculta ningún problema.
+  const rec = { fallos: 0, avisado: false, caidoDesde: null, ultimoAviso: null }
+  assert.deepEqual(deshacerAviso('recuperado', rec, anterior), rec)
 })

@@ -17,6 +17,7 @@ import { matchStateByName } from './states.service.js'
 import { DOSSIER } from './empresa.js'
 import { NOMBRES_PERMISO as NOMBRES_PERMISO_RULES } from './permisos.js'
 import { buscarSistema } from './sistemas.js'
+import { pistaDeTipo } from './plantillas.js'
 
 const WEEKDAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
 
@@ -676,7 +677,14 @@ function parseInLang(text, ctx, lang) {
   const contrato = cfg.contratoAdd ? t.match(cfg.contratoAdd) : null
   if (contrato) {
     const enCrudo = raw.match(/contrato\s+(?:de\s+(?:parking|garaje|plaza|aparcamiento|trastero|vivienda|piso|almacen|garagem|lugar)\s+)?(?:para|de|a)\s+(.+)$|vertrag\s+(?:fur|für|an)\s+(.+)$/i)
-    return { action: 'contrato_add', texto: (enCrudo?.[1] ?? enCrudo?.[2] ?? contrato[1]).trim() }
+    // El prefijo («contrato de parking para …») se va con el recorte, así que
+    // se guarda aparte: sin él, «Max Muster, A4, Nr. 3 EG, 130, pauschal 20»
+    // no tiene ninguna palabra de parking y salía el contrato Longstay.
+    return {
+      action: 'contrato_add',
+      texto: (enCrudo?.[1] ?? enCrudo?.[2] ?? contrato[1]).trim(),
+      tipoPista: pistaDeTipo(raw),
+    }
   }
 
   // La compra de la oficina. Va aquí arriba, con la basura: tampoco tiene

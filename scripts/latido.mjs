@@ -116,6 +116,27 @@ export function decidir(estado, vivo, ahora, opciones = {}) {
 }
 
 /**
+ * Deshace en el estado el aviso que NO se pudo enviar, para que se reintente
+ * en la vuelta siguiente.
+ *
+ * `decidir` ya dio el aviso por dado antes de saber si el Gateway lo aceptó.
+ * Si el envío falla y no se deshace nada, el aviso se pierde:
+ *  - 'caido': `avisado` quedaba en true y no se volvía a avisar NUNCA de esa
+ *    caída (esto ya se compensaba).
+ *  - 'sigue-caido': `ultimoAviso` quedaba en AHORA, así que el recordatorio
+ *    se perdía otras SEIS HORAS. Justo el apagón de nueve días es el caso en
+ *    que más falta hacen los recordatorios.
+ * De 'recuperado' no se deshace nada: al estar vivo, la vuelta siguiente no
+ * tiene nada que anunciar y un aviso de recuperación perdido no oculta ningún
+ * problema.
+ */
+export function deshacerAviso(accion, estado, anterior, umbral = 3) {
+  if (accion === 'caido') return { ...estado, avisado: false, fallos: umbral }
+  if (accion === 'sigue-caido') return { ...estado, ultimoAviso: anterior?.ultimoAviso ?? null }
+  return estado
+}
+
+/**
  * El texto del aviso. Escrito para Cris, que no es técnico y probablemente lo
  * lee en el móvil: qué pasa, desde cuándo, y los DOS sitios donde mirar —
  * porque los dos apagones conocidos se parecen desde fuera pero se curan
@@ -128,7 +149,11 @@ export function mensaje(accion, { duracionMs = 0, detalle = '' } = {}) {
   const cabecera = accion === 'sigue-caido'
     ? `🔴 El asistente SIGUE sin responder (van ${duracion(duracionMs)}).`
     : `🔴 El asistente ha dejado de responder (desde hace ${duracion(duracionMs)}).`
-  return [
+  // Las líneas vacías de esta lista SEPARAN párrafos y tienen que quedarse:
+  // un `.filter((l) => l !== '')` al final se las llevaba todas y el aviso
+  // salía apelmazado, sin el respiro tras la cabecera. Lo único opcional es
+  // el detalle técnico, y por eso se quita él solo.
+  const lineas = [
     cabecera,
     '',
     'Qué mirar, por orden (en el NAS):',
@@ -140,8 +165,9 @@ export function mensaje(accion, { duracionMs = 0, detalle = '' } = {}) {
     '     Se devuelven al uid 70 (está escrito en el manual).',
     '2) Si el contenedor está «Up» pero no contesta, mira la base:',
     '   "docker logs --tail 20 amonn-db-1".',
-    detalle ? `\nDetalle técnico: ${detalle}` : '',
-  ].filter((l) => l !== '').join('\n')
+  ]
+  if (detalle) lineas.push(`\nDetalle técnico: ${detalle}`)
+  return lineas.join('\n')
 }
 
 /** De la lista del Gateway, la sesión utilizable. `ready` manda; si no, la primera. */
@@ -216,6 +242,7 @@ async function bucle() {
   let estado = { fallos: 0, avisado: false, caidoDesde: null, ultimoAviso: null }
   for (;;) {
     const { vivo, detalle } = await comprobar()
+    const anterior = estado
     const r = decidir(estado, vivo, Date.now(), { umbral: CONF.umbral, repetirCadaMs: CONF.repetirCadaMs })
     estado = r.estado
     if (r.accion !== 'nada') {
@@ -226,7 +253,7 @@ async function bucle() {
         await avisar(mensaje(r.accion, { duracionMs: r.duracionMs, detalle }))
       } catch (e) {
         console.error(`[latido] no pude enviar el aviso: ${e.message}`)
-        if (r.accion === 'caido') estado = { ...estado, avisado: false, fallos: CONF.umbral }
+        estado = deshacerAviso(r.accion, estado, anterior, CONF.umbral)
       }
     }
     await new Promise((r2) => setTimeout(r2, CONF.intervaloMs))

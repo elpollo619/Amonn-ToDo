@@ -6,7 +6,7 @@
 // es la forma más rápida de romper algo sin enterarse.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { PLANTILLAS, tipoDeDocumento, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
+import { PLANTILLAS, tipoDeDocumento, pistaDeTipo, unAnoMenosUnDia, partirNombre, suizo } from '../src/plantillas.js'
 import { parseContrato, parseBaja } from '../src/contratos.js'
 import { fechaSuiza } from '../src/edificios.js'
 import { parseWithRules } from '../src/assistant.js'
@@ -377,4 +377,51 @@ test('fechaSuiza no desplaza un dia las marcas de tiempo', () => {
   // toISOString() pasaba a UTC: las 00:00 en hora suiza caian al dia anterior.
   assert.equal(fechaSuiza(new Date('2026-01-01T00:00:00+01:00')), '01.01.2026')
   assert.equal(fechaSuiza('2026-12-01'), '01.12.2026')
+})
+
+test('«contrato de parking para …» no acaba siendo un Longstay', () => {
+  // El caso que lo destapó: «contrato de parking para Max Muster, A4,
+  // Nr. 3 EG, 130, pauschal 20, desde el 1 de marzo». El asistente recorta el
+  // prefijo «contrato de parking», así que el cuerpo que llegaba a
+  // tipoDeDocumento() («A4, Nr. 3 EG, …») ya no tenía ninguna palabra de
+  // parking y salía el Longstay: una plantilla que IGNORA el `pauschal`
+  // (total 130 en vez de 150) y escribe «Zimmer Nr. …» en un contrato de
+  // plaza de aparcamiento.
+  const orden = 'contrato de parking para Max Muster, A4, Nr. 3 EG, 130, pauschal 20, desde el 1 de marzo'
+  const r = parseWithRules(orden, ctx())
+  assert.equal(r.action, 'contrato_add')
+  assert.equal(r.tipoPista, 'garaje', 'la pista del prefijo tiene que sobrevivir al recorte')
+  assert.equal(tipoDeDocumento(r.texto), 'longstay', 'el cuerpo solo, sin pista, se lee mal')
+
+  // Con la pista, el contrato sale con la plantilla y el total correctos.
+  const tipo = r.tipoPista ?? tipoDeDocumento(r.texto)
+  const d = parseContrato(r.texto, HOY, 'es')
+  const h = PLANTILLAS[tipo].huecos({ ...d, habitacion: 'NR. 3 EG' }, HOY)
+  assert.equal(h['{{Total}}'], '150.00', '130 de alquiler + 20 de pauschal')
+  assert.match(h['{{Objekt}}'], /Parkplatz/, 'una plaza no es una «Zimmer»')
+})
+
+test('la pista del prefijo solo habla cuando la frase la dice', () => {
+  assert.equal(pistaDeTipo('contrato de vivienda para Max, I16, 1500'), 'vivienda')
+  assert.equal(pistaDeTipo('contrato de trastero para Bruno, A14, 550'), 'trastero')
+  assert.equal(pistaDeTipo('garagenvertrag für Hans, A4, Platz 12, 90'), 'garaje')
+  // Sin prefijo no se decide nada aquí: manda tipoDeDocumento() con su
+  // longstay por defecto, que es lo que el equipo escribe a diario.
+  assert.equal(pistaDeTipo('contrato para Max Muster, habitación 204, 850'), null)
+  assert.equal(pistaDeTipo('mietvertrag für Max, Zimmer 204, 850'), null)
+  assert.equal(parseWithRules('contrato para Max Muster, habitación 204, 850', ctx()).tipoPista, null)
+})
+
+test('un código de edificio delante del nombre no acaba firmando el contrato', () => {
+  // «contrato para A4, Max Muster, …»: el edificio va primero y el contrato
+  // salía a nombre de «A4», porque se tomaba el primer trozo sin clasificar.
+  const d = parseContrato('A4, Max Muster, habitación 3, 850, desde el 1 de octubre', HOY, 'es')
+  assert.equal(d.nombre, 'Max Muster')
+  assert.ok(!d.faltan.includes('nombre'))
+  // Si de verdad no hay ningún nombre, se pide. Inventarlo no se ve al firmar.
+  const sinNombre = parseContrato('A4, habitación 3, 850, desde el 1 de octubre', HOY, 'es')
+  assert.equal(sinNombre.nombre, null)
+  assert.ok(sinNombre.faltan.includes('nombre'), 'tiene que pedirlo, no inventarlo')
+  // Y lo de siempre sigue igual.
+  assert.equal(parseContrato('Max Muster, habitación 204, 850, desde el 1 de octubre', HOY, 'es').nombre, 'Max Muster')
 })

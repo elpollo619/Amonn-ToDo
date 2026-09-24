@@ -283,3 +283,33 @@ export function tipoDeDocumento(texto) {
   if (/\b(parking|park(?:platz)?|garaje|garage|plaza|platz|stellplatz|einstellhall\w*|abstellplatz|aparcamiento|aep|aap|ehp)\b/.test(t)) return 'garaje'
   return 'longstay'
 }
+
+/** La palabra del prefijo → la plantilla que anuncia. */
+const PISTAS_DE_TIPO = {
+  parking: 'garaje', garaje: 'garaje', garage: 'garaje', garagem: 'garaje', garagen: 'garaje',
+  parkplatz: 'garaje', plaza: 'garaje', aparcamiento: 'garaje', lugar: 'garaje',
+  trastero: 'trastero', almacen: 'trastero', lager: 'trastero',
+  vivienda: 'vivienda', piso: 'vivienda', apartamento: 'vivienda', wohnungs: 'vivienda',
+}
+
+/**
+ * El tipo que anuncia el PREFIJO de la orden, o null si la frase no lo dice.
+ *
+ * Existe porque el asistente recorta ese prefijo antes de guardar el cuerpo
+ * del mensaje: «contrato de parking para Max Muster, A4, Nr. 3 EG, 130,
+ * pauschal 20, desde el 1 de marzo» llegaba a tipoDeDocumento() ya sin la
+ * palabra «parking», y «Nr. 3 EG» no la lleva dentro. Salía el Longstay, que
+ * IGNORA el `pauschal` (total 130 en vez de 150) y escribe «Zimmer Nr. 3 EG»
+ * en un contrato de plaza de aparcamiento. Sin pista, no se decide nada aquí:
+ * manda tipoDeDocumento() con su longstay por defecto.
+ */
+export function pistaDeTipo(texto) {
+  const t = String(texto ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const es = t.match(/\bcontrato\s+de\s+([a-z]+)\s+(?:para|de|a)\b/)
+  if (es) return PISTAS_DE_TIPO[es[1]] ?? null
+  // En alemán el tipo va pegado a la palabra: «garagenvertrag für …».
+  // «mietvertrag» no dice nada: es el contrato de alquiler genérico.
+  const de = t.match(/\b(garagen|parkplatz|wohnungs)vertrag\b/)
+  if (de) return PISTAS_DE_TIPO[de[1]] ?? null
+  return null
+}

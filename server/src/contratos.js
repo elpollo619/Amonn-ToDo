@@ -209,7 +209,14 @@ export function parseContrato(texto, today = todayKey(), lang = 'es') {
     }
     sueltos.push(tr)
   }
-  if (!datos.nombre && sueltos.length) datos.nombre = sueltos[0]
+  // El nombre es el primer trozo suelto que PUEDA ser una persona. Los
+  // códigos de edificio («A4», «A12a», «B22», «I16», «S17», «H8b») también
+  // llegan sueltos, y quien escribe el edificio antes del nombre —«contrato
+  // para A4, Max Muster, habitación 3, 850, …»— firmaba un contrato a nombre
+  // de «A4». Si tras descartarlos no queda ninguno, el nombre se queda en
+  // null y se pide: un nombre inventado en un contrato no se ve al firmarlo.
+  const esCodigoEdificio = (tr) => /^[A-Z]{1,3}\d{1,3}[a-z]?$/i.test(tr)
+  if (!datos.nombre) datos.nombre = sueltos.find((tr) => !esCodigoEdificio(tr)) ?? null
   const faltan = []
   if (!datos.nombre) faltan.push('nombre')
   if (!datos.habitacion) faltan.push('habitacion')
