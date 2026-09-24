@@ -262,6 +262,22 @@ chat; no están en el repo).
    Para publicarla hizo falta rellenar Branding con las URLs reales de
    www.hansamonn.ch (inicio, datenschutz, agb) y el dominio autorizado.
 
+   **La finca se escribe sola (24.09.2026).** Las direcciones salen de los 222
+   contratos importados (`objgrp`/`objadr`/`objort`), no de una lista a mano
+   que envejecería. Módulo `server/src/edificios.js`.
+   ⚠️ **El número de habitación NO identifica el edificio**: la «1» existe en
+   DIEZ edificios y la «15» en tres. Por eso el asistente **pregunta** cuando
+   no se nombra el edificio, y también cuando el Excel le da dos direcciones
+   al mismo código (caso real: `A12` = Allmendstrasse 12 y 12a). Una dirección
+   solo se da por buena si dobla en contratos a la siguiente. Si aun así no
+   hay, el documento sale con «(A RELLENAR: dirección de la finca)» visible —
+   nunca un hueco en blanco, que se firma sin que nadie lo note.
+   Basta con nombrarlo: «contrato para X, **B22**, habitación 3, 800, desde…»
+   o «en Bernstrasse 22». También vale «¿qué edificios tenemos?».
+   **Aviso de habitación ocupada:** si esa habitación ya figura con inquilino,
+   lo dice con nombre y fecha. Es aviso, no bloqueo: los datos son una foto
+   del Excel y pueden estar viejos.
+
    Si un día falla: preguntar al asistente **«¿puedes hacer contratos?»** —
    comprueba la cadena eslabón a eslabón y dice qué arreglar. Las dos causas
    probables de un fallo nuevo son que se revoque el acceso a la app en la
