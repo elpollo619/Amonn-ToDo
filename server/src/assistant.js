@@ -211,7 +211,7 @@ const REGLAS = {
     contratoDiag: /^(?:(?:puedes|sabes)\s+(?:hacer|generar|crear)\s+contratos?|diagn[oó]stico\s+de\s+contratos?|comprueba\s+(?:los\s+)?contratos?|contratos?\s+(?:funciona|van|est[aá]n\s+listos))\b.*$/,
     // El «de parking/garaje/trastero» se deja FUERA del nombre: si no, el
     // inquilino acababa llamándose «parking para Max».
-    contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:de\s+(?:parking|garaje|plaza|aparcamiento|trastero|vivienda|piso)\s+)?(?:para|de|a)\s+(.+)$/,
+    contratoAdd: /^(?:(?:haz(?:me)?|crea(?:r)?|prepara(?:r)?|nuevo)\s+)?(?:un\s+|el\s+)?contrato\s+(?:de\s+(?:parking|garaje|plaza|aparcamiento|trastero|vivienda|piso|almacen|almac[eé]n)\s+)?(?:para|de|a)\s+(.+)$/,
     // "contrato de la 204" · "contrato de Koubaa" (consultar, no crear)
     vertragInfo: /^(?:contrato|mietvertrag|vertrag)\s+(?:de|del|de la|da|do)\s*(?:la\s+|el\s+)?(?:habitacion\s+|zimmer\s+|quarto\s+)?([\w.\-]+)\??$/,
     // "alquileres" · "alquileres de B22"
@@ -650,7 +650,7 @@ function parseInLang(text, ctx, lang) {
 
   const contrato = cfg.contratoAdd ? t.match(cfg.contratoAdd) : null
   if (contrato) {
-    const enCrudo = raw.match(/contrato\s+(?:de\s+(?:parking|garaje|plaza|aparcamiento|trastero|vivienda|piso|garagem|lugar)\s+)?(?:para|de|a)\s+(.+)$|vertrag\s+(?:fur|für|an)\s+(.+)$/i)
+    const enCrudo = raw.match(/contrato\s+(?:de\s+(?:parking|garaje|plaza|aparcamiento|trastero|vivienda|piso|almacen|garagem|lugar)\s+)?(?:para|de|a)\s+(.+)$|vertrag\s+(?:fur|für|an)\s+(.+)$/i)
     return { action: 'contrato_add', texto: (enCrudo?.[1] ?? enCrudo?.[2] ?? contrato[1]).trim() }
   }
 

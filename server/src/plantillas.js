@@ -94,6 +94,35 @@ export const PLANTILLAS = {
       }
     },
   },
+  // Trastero, cuarto de hobby o almacén. Casi igual que el garaje, con dos
+  // diferencias que vienen del contrato real: el preaviso es de SEIS meses
+  // (no uno) y la fianza es de un mes de alquiler (no 100 fijos).
+  trastero: {
+    clave: 'trastero',
+    etiqueta: 'Contrato de trastero / cuarto de hobby / almacén',
+    docEnDrive: '01 Maske MV Keller (Vorlage Assistent)',
+    nombreDoc: (d) => `MV Lagerraum ${d.nombre}`,
+    huecos: (d, hoy) => {
+      const { pila, apellido } = partirNombre(d.nombre)
+      const netto = Number(String(d.alquiler ?? '0').replace(/[’']/g, '').replace(',', '.'))
+      return {
+        '{{M1VName}}': pila,
+        '{{M1Name}}': apellido,
+        '{{MieterAdresse}}': d.mieterAdresse || aMano('dirección del inquilino'),
+        '{{MieterOrt}}': d.mieterOrt || aMano('CP y localidad'),
+        '{{Liegenschaft}}': d.direccion || aMano('dirección de la finca'),
+        '{{Objekt}}': d.objeto ?? `Lagerraum ${d.habitacion ?? ''}`.trim(),
+        '{{Mbeginn}}': fecha(d.desde),
+        '{{Kuendbar}}': d.kuendbar ? fecha(d.kuendbar) : (d.desde ? fecha(unAnoMenosUnDia(d.desde)) : aMano('primera fecha de rescisión')),
+        '{{Netto}}': suizo(netto),
+        '{{Total}}': suizo(netto),
+        '{{Depot}}': d.deposito ? suizo(Number(String(d.deposito).replace(/[’']/g, ''))) : suizo(netto),
+        '{{Bemerkungen}}': d.bemerkungen ?? '',
+        '{{Datum}}': fecha(hoy),
+      }
+    },
+  },
+
   // Vivienda (modelo HEV). El contrato largo de la casa.
   //
   // ⚠️ Aquí el ARRENDADOR también cambia: no siempre es Hans Amonn AG, sino
@@ -104,7 +133,10 @@ export const PLANTILLAS = {
     clave: 'vivienda',
     etiqueta: 'Contrato de vivienda (Wohnung)',
     docEnDrive: '01 Maske MV Whg (Vorlage Assistent)',
-    nombreDoc: (d) => `MV ${d.nombre}`,
+    // «MV Whg», no «MV» a secas: con el nombre del Longstay coincidían y en el
+    // Drive quedaban dos documentos idénticos de nombre sin saber cuál era
+    // cuál. Lo cazó una prueba antes de llegar a producción.
+    nombreDoc: (d) => `MV Whg ${d.nombre}`,
     huecos: (d, hoy) => {
       const { pila, apellido } = partirNombre(d.nombre)
       const netto = Number(String(d.alquiler ?? '0').replace(/[’']/g, '').replace(',', '.'))
@@ -172,6 +204,7 @@ export function tipoDeDocumento(texto) {
   // como una habitación y salía el contrato equivocado.
   // La vivienda va PRIMERO: «contrato de vivienda … con plaza de garaje» es
   // un contrato de vivienda que menciona una plaza, no al revés.
+  if (/\b(trastero|keller|kellerraum|bastelraum|lagerraum|lager|almacen|almacén|bodega)\b/.test(t)) return 'trastero'
   if (/\b(vivienda|wohnung|whg|piso|apartamento|zimmerwohnung|\d\s*½?\s*-?\s*zimmer)\b/.test(t)) return 'vivienda'
   if (/\b(parking|park(?:platz)?|garaje|garage|plaza|platz|stellplatz|einstellhall\w*|abstellplatz|aparcamiento|aep|aap|ehp)\b/.test(t)) return 'garaje'
   return 'longstay'

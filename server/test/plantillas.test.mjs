@@ -158,3 +158,25 @@ test('el propietario NO se supone: se marca para rellenar', () => {
   assert.match(h['{{VermieterName}}'], /A RELLENAR/)
   assert.match(h['{{Nebenraeume}}'], /A RELLENAR/)
 })
+
+// ── Trastero / almacen ─────────────────────────────────────────────────────
+
+test('reconoce un contrato de trastero', () => {
+  for (const f of ['Gino Test, A14, Lagerraum Lager 1, 550', 'Eva, trastero 5, 200', 'Ana, Kellerraum 2, 150', 'Otto, Bastelraum 1, 120']) {
+    assert.equal(tipoDeDocumento(f), 'trastero', `no detecto trastero en: ${f}`)
+  }
+})
+
+test('en el trastero la fianza por defecto es un mes', () => {
+  const h = PLANTILLAS.trastero.huecos({ nombre: 'Gino Test', habitacion: 'Lager 1', alquiler: '550', desde: '2026-03-01' }, HOY)
+  assert.equal(h['{{Netto}}'], '550.00')
+  assert.equal(h['{{Total}}'], '550.00')
+  assert.equal(h['{{Depot}}'], '550.00', 'un mes de alquiler')
+  assert.equal(h['{{Objekt}}'], 'Lagerraum Lager 1')
+})
+
+test('cada tipo se nombra distinto, para no confundir documentos en el Drive', () => {
+  const d = { nombre: 'Max Muster' }
+  const nombres = Object.values(PLANTILLAS).map((p) => p.nombreDoc(d))
+  assert.equal(new Set(nombres).size, nombres.length, `hay nombres repetidos: ${nombres.join(' / ')}`)
+})
