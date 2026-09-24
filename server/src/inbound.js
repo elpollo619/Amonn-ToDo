@@ -34,6 +34,7 @@ import { addContact, buscarContactos, formatContacto, listByCompany } from './co
 import { addDecision, listDecisions, formatDecision } from './decisiones.js'
 import { addFact, listFacts, forgetFact, factsParaDossier, formatFact } from './conocimiento.js'
 import { SISTEMAS, formatSistema, formatListaSistemas } from './sistemas.js'
+import { resolverEdificio, habitacionOcupada, listarEdificios, formatDireccion } from './edificios.js'
 import { addAveria, listAverias, findAveriaByHint, resolverAveria, formatAveria } from './averias.js'
 import { addReporte, listReportes, formatReporte } from './bautagebuch.js'
 import { addGasto, cerrarMes, gastosAbiertos, saldos, chf, vorsteuerTrimestre, addKilometraje, kmResumen, kmRappen, gastoPorComercio } from './gastos.js'
@@ -1622,14 +1623,44 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       }
       const datos = parseContrato(intent.texto, today, lang)
       if (datos.faltan.length) return t(lang, 'contract_need', { faltan: datos.faltan.join(', ') })
+
+      // ── La finca ───────────────────────────────────────────────────────
+      // Se pregunta en vez de adivinar. El número de habitación NO identifica
+      // el edificio en esta empresa (la «1» existe en diez), así que deducirlo
+      // sería jugar a la lotería con un papel que se firma. Si el mensaje
+      // nombra el edificio («B22 habitación 3», «en Bernstrasse 22»), va solo.
+      const ed = await resolverEdificio(intent.texto).catch(() => null)
+      if (ed?.preguntar) {
+        const lista = (ed.opciones ?? []).slice(0, 14).map((o) => `   • ${o}`).join('\n')
+        return ed.motivo === 'ambiguo'
+          ? `🤔 ${ed.codigo} tiene más de una dirección en los contratos. ¿Cuál es?\n\n${lista}\n\n` +
+            `Repite la orden poniendo la dirección, por ejemplo:\n«contrato para ${datos.nombre}, ${ed.opciones?.[0] ?? ''}, habitación ${datos.habitacion}, ${datos.alquiler}, desde el ...»`
+          : `🏠 ¿De qué edificio es la habitación ${datos.habitacion}?\n\n${lista}\n\n` +
+            `Dímelo y lo pongo en el contrato. Por ejemplo:\n«contrato para ${datos.nombre}, B22, habitación ${datos.habitacion}, ${datos.alquiler}, desde el ...»`
+      }
+
       try {
-        const c = await generarContrato(datos, today)
-        return t(lang, 'contract_done', {
+        const c = await generarContrato({ ...datos, direccion: ed?.direccion ?? '' }, today)
+        const base = t(lang, 'contract_done', {
           nombre: datos.nombre, habitacion: datos.habitacion,
           alquiler: datos.alquiler,
           desde: String(datos.desde).split('-').reverse().join('.'),
           doc: c.docUrl, pdf: c.pdfUrl,
         })
+        const extra = []
+        if (ed?.direccion) extra.push(`🏠 Finca: ${ed.direccion}`)
+        // Aviso, no bloqueo: los datos son una foto del Excel y el inquilino
+        // anterior puede haberse ido ya. Pero alquilar dos veces la misma
+        // habitación es un error caro, y más vale verlo antes de imprimir.
+        const ocupada = await habitacionOcupada(ed?.codigo, datos.habitacion).catch(() => null)
+        if (ocupada) {
+          extra.push(
+            `⚠️ Ojo: según los contratos importados, esa habitación figura con ` +
+            `${ocupada.inquilino || 'un inquilino'}${ocupada.desde ? ` desde el ${String(ocupada.desde).slice(0, 10).split('-').reverse().join('.')}` : ''}. ` +
+            `Compruébalo antes de firmar (los datos son una copia del Excel, puede estar desactualizada).`,
+          )
+        }
+        return extra.length ? `${base}\n\n${extra.join('\n\n')}` : base
       } catch (err) {
         return t(lang, 'contract_error', { motivo: err.message.slice(0, 160) })
       }
@@ -1761,6 +1792,15 @@ async function procesarNuevo(phone, user, lang, text, users, today, aliases = []
       if (!(await tienePermiso(user.id, 'admin'))) return t(lang, 'fact_only_admin')
       const n = await forgetFact(intent.texto)
       return n > 0 ? t(lang, 'fact_forgotten', { n }) : t(lang, 'fact_forget_none', { que: intent.texto })
+    }
+
+    // Los edificios de la empresa, con su dirección. Sale de los contratos
+    // reales, así que es la verdad del Excel y no una lista que envejece.
+    case 'edificios_list': {
+      const eds = await listarEdificios()
+      if (eds.length === 0) return '🏠 Todavía no tengo contratos importados, así que no conozco los edificios.'
+      const lineas = eds.map((e) => `• *${e.codigo}* — ${e.adr}${e.ort ? `, ${e.ort}` : ''} (${e.n} contratos)`)
+      return [`*Edificios de la empresa*`, '', ...lineas].join('\n')
     }
 
     // Fichas de los sistemas de la empresa. A propósito SIN permiso: saber qué

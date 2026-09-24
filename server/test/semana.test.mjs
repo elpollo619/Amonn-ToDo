@@ -150,8 +150,10 @@ fsB.rmSync(dirB, { recursive: true, force: true })
 await query('delete from permissions')
 
 console.log('\n7. CONTRATOS SIN GOOGLE, LO DICE CLARO')
-check('explica qué falta', await processMessage(CRIS, 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'),
-  ['no está conectado a Google', 'GOOGLE_SA_KEY'])
+// Desde el 24.09.2026 no responde «no está conectado» a secas: devuelve el
+// diagnóstico eslabón a eslabón, que además nombra la variable que falta.
+check('explica qué falta, y dónde', await processMessage(CRIS, 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'),
+  ['comprobación', 'GOOGLE_SA_KEY'])
 
 await pool.end()
 console.log(fallos === 0 ? '\n✅ todas las pruebas de la semana pasan\n' : `\n❌ ${fallos} fallo(s)\n`)

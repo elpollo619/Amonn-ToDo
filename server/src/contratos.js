@@ -196,7 +196,7 @@ export function parseContrato(texto, today = todayKey(), lang = 'es') {
  * oficina la reconozca. La fianza sin decir es CHF 500 (su práctica en
  * Longstay: 300–500).
  */
-export function camposDePlantilla({ nombre, habitacion, alquiler, desde, deposito }, today = todayKey()) {
+export function camposDePlantilla({ nombre, habitacion, alquiler, desde, deposito, direccion }, today = todayKey()) {
   const f = (k) => String(k).slice(0, 10).split('-').reverse().join('.')
   const partes = String(nombre).trim().split(/\s+/)
   const apellido = partes.length > 1 ? partes[partes.length - 1] : ''
@@ -209,6 +209,10 @@ export function camposDePlantilla({ nombre, habitacion, alquiler, desde, deposit
     '{{Depot}}': deposito ?? '500',
     '{{Mbeginn}}': f(desde),
     '{{Datum}}': f(today),
+    // La finca. Si no se supo deducir se deja un aviso VISIBLE en el
+    // documento en vez de un hueco en blanco: un espacio vacío se firma sin
+    // que nadie lo note; un «(A RELLENAR…)» salta a la vista.
+    '{{Liegenschaft}}': direccion || '(A RELLENAR: dirección de la finca)',
   }
 }
 

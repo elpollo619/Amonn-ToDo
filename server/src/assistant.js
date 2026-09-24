@@ -156,6 +156,7 @@ const REGLAS = {
     conocimientoForget: /^(?:olvida(?:te)?)\s+(?:que\s+|lo\s+de\s+|de\s+)?(.+)$/,
     // Fichas de sistemas. "sistemaInfo" es deliberadamente amplia: la criba de
     // verdad no es la regex, es que el nombre corresponda a un sistema real.
+    edificiosList: /^(?:qu[eé]\s+(?:edificios|inmuebles|fincas|casas)|(?:lista\s+de\s+)?edificios|direcciones\s+de\s+(?:los\s+)?edificios)\b.*$/,
     sistemaList: /^(?:qu[eé]\s+(?:sistemas|programas|herramientas|aplicaciones)|(?:lista\s+de\s+)?sistemas|qu[eé]\s+(?:sistemas|programas)\s+(?:usamos|tenemos|hay))\b.*$/,
     sistemaInfo: /^(?:qu[eé]\s+es|para\s+qu[eé]\s+(?:sirve|es|usamos)|expl[ií]came|h[aá]blame\s+de|c[oó]mo\s+funciona|qu[eé]\s+hace|info(?:rmaci[oó]n)?\s+(?:de|sobre))\s+(?:el\s+|la\s+|los\s+|las\s+|lo\s+de\s+)?(.+?)\s*\??$/,
     // Dinero entrado (abonos ya importados de un camt).
@@ -307,6 +308,7 @@ const REGLAS = {
     conocimientoAddRaw: /(?:merk(?:e)? dir|notiere?|zur info|damit du es weisst)\s*[:,]?\s*(?:dass\s+)?([\s\S]+)$/i,
     conocimientoList: /^(?:was\s+hast\s+du\s+gelernt|was\s+weisst\s+du\s+auswendig|wissen)\b\??$/,
     conocimientoForget: /^(?:vergiss)\s+(?:dass\s+)?(.+)$/,
+    edificiosList: /^(?:welche\s+(?:geb[äa]ude|liegenschaften|objekte)|liegenschaften|geb[äa]ude)\b.*$/,
     sistemaList: /^(?:welche\s+(?:systeme|programme|tools|anwendungen)|systeme)\b.*$/,
     sistemaInfo: /^(?:was\s+ist|wof[üu]r\s+(?:ist|brauchen\s+wir|nutzen\s+wir)|erkl[äa]r(?:e)?\s+mir|wie\s+funktioniert|was\s+macht|info(?:rmationen)?\s+(?:zu|[üu]ber))\s+(?:der\s+|die\s+|das\s+)?(.+?)\s*\??$/,
     dineroBusca: /^(?:hat\s+(.+?)\s+bezahlt|zahlung(?:en)?\s+von\s+(.+?))\s*\??$/,
@@ -418,6 +420,7 @@ const REGLAS = {
     conocimientoForget: /^(?:esquece)\s+(?:que\s+)?(.+)$/,
     // En portugués la ficha se responde en español (ver sistemas.js): mejor una
     // respuesta cierta en otro idioma que ninguna.
+    edificiosList: /^(?:que\s+(?:edificios|predios|im[oó]veis)|edificios)\b.*$/,
     sistemaList: /^(?:que\s+(?:sistemas|programas|ferramentas)|sistemas)\b.*$/,
     sistemaInfo: /^(?:o\s+que\s+[eé]|para\s+que\s+(?:serve|usamos)|explica(?:-me)?|como\s+funciona|o\s+que\s+faz|info(?:rma[cç][aã]o)?\s+(?:de|sobre))\s+(?:o\s+|a\s+|os\s+|as\s+)?(.+?)\s*\??$/,
     dineroBusca: /^(?:(.+?)\s+pagou|pagamento\s+de\s+(.+?)|entrou\s+algo\s+de\s+(.+?))\s*\??$/,
@@ -1141,6 +1144,9 @@ function parseInLang(text, ctx, lang) {
 
   // El índice de sistemas ("¿qué sistemas usamos?"). Va abajo, con las
   // consultas generales: no compite con nada.
+  // Los edificios. Va antes que los sistemas: son dos listas distintas y
+  // «edificios» no debe caer en «sistemas».
+  if (cfg.edificiosList && cfg.edificiosList.test(t)) return { action: 'edificios_list' }
   if (cfg.sistemaList && cfg.sistemaList.test(t)) return { action: 'sistema_list' }
 
   // Búsqueda global (Fase 1). Va la ÚLTIMA de las reglas, después de todas las
