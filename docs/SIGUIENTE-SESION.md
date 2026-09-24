@@ -341,7 +341,33 @@ chat; no están en el repo).
    aumento general de costes 0,5 %/año = variación total %). Eso es
    aritmética propensa a errores a mano y se puede automatizar sin riesgo
    legal, dejando que la notificación siga yendo en el formulario oficial.
-   Antes de programar nada: preguntar a Cris qué formulario usan hoy.
+   **Lo que dice la ley (investigado el 24.09.2026; verificar antes de usar):**
+   - **Subida:** el art. 269d al.1 CO EXIGE un formulario aprobado por el
+     cantón. Sin él la subida es **NULA** (art. 269d al.2), no solo
+     impugnable, y la nulidad se puede invocar sin plazo. Lo mismo para
+     cualquier cambio en perjuicio del inquilino.
+   - **Plazo:** notificar al menos **10 días antes del inicio del plazo de
+     rescisión**, con efecto en el siguiente Kündigungstermin del contrato.
+     Con preaviso de 3 meses ⇒ unos 3 meses y 10 días de antelación.
+   - **Contenido obligatorio:** partes y representante, objeto, alquiler
+     anterior y nuevo (neto y gastos por separado), fecha de efecto,
+     **motivación desglosada por concepto**, y la vía de recurso:
+     impugnación en **30 días** ante la Schlichtungsbehörde del lugar del
+     inmueble (para Muri b. Bern: Bern-Mittelland). El Referenzzinssatz no es
+     un campo del formulario: va dentro de la motivación.
+   - **Formulario oficial de Berna:** zsg.justice.be.ch (Obergericht).
+     ⚠️ Comprobar la versión vigente antes de usarlo.
+   - **Bajada:** al no ser en perjuicio del inquilino, en la práctica basta
+     una carta normal. ⚠️ Esto es deducción del texto legal, NO una fuente
+     que lo diga literalmente. Y si la bajada lleva reserva (Vorbehalt), hay
+     que repetirla en cada una o se pierde — ahí sí conviene el formulario.
+
+   **Conclusión: automatizable, con condiciones.** Para subidas hay que
+   producir el PDF oficial bernés vigente (no una plantilla propia), con el
+   cálculo desglosado y las fechas calculadas desde el Kündigungstermin del
+   contrato concreto; la firma y el envío certificado los hace una persona.
+   Antes de programar nada: preguntar a Cris qué formulario usan hoy y pasar
+   las plantillas por una revisión jurídica.
 
    🔴 **`Maske Rechnung` (facturas): DESCARTADA a propósito.** El asistente ya
    emite QR-Rechnung suiza de verdad (`cobros.js`) con referencia QRR, que es
