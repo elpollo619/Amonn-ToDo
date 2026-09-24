@@ -226,17 +226,46 @@ chat; no están en el repo).
    exportados. Sin mes dicho, cierra el mes anterior. El enlace de descarga
    se construye con `APP_URL` (la misma variable que usan los avisos); si no
    está definida, el cierre se hace igual pero sin enlace.
-4. **Conectar el generador de contratos a Google** (sept 2026: el código está
-   escrito en `server/src/contratos.js`, con pruebas del parseo; solo falta la
-   credencial). Pasos con Cris: (a) console.cloud.google.com → proyecto →
-   habilitar las APIs de Drive y Docs → cuenta de servicio → clave JSON →
-   `GOOGLE_SA_KEY` (el JSON entero o en base64); (b) crear la plantilla en
-   Google Docs con los huecos `{{NAME}} {{ZIMMER}} {{MIETE}} {{BEGINN}}
-   {{DATUM}}` → su id a `GOOGLE_CONTRACT_TEMPLATE_ID` (opcional carpeta:
-   `GOOGLE_CONTRACTS_FOLDER_ID`); (c) **compartir** plantilla y carpeta con el
-   correo de la cuenta de servicio. ⚠️ Rutas según docs públicas, sin probar:
-   mira la respuesta cruda la primera vez. Pedir a Cris un contrato real de
-   ejemplo para copiar el formato en la plantilla.
+4. ~~Conectar el generador de contratos a Google~~ ✅ **HECHO Y PROBADO EN
+   PRODUCCIÓN el 24.09.2026.** «contrato para Max Muster, habitación 204, 850,
+   desde el 1 de octubre» devuelve el enlace al documento y al PDF.
+   Comprobado de verdad: el documento nace en la carpeta, con el nombre y los
+   datos dentro, y sin huecos sin rellenar.
+
+   Lo montado, por si hay que rehacerlo:
+   - Proyecto Google Cloud **`careful-plexus-470813-c8`** (era un «My First
+     Project» vacío: no se pudo crear uno nuevo, la cuenta está en su límite
+     de proyectos). APIs de **Drive** y **Docs** habilitadas.
+   - Carpeta **«Contratos generados»** (`1IV5vt5KpsDI-_ilyqtK4R355BXRSsJTR`) y
+     plantilla **«01 Maske MV Longstay (Vorlage Assistent)»**
+     (`1nT9SBKdYafjn2IGKZmVvslj_Lqf-WxCoQFD1FQjnNg8`), ambas en el Drive de
+     elpollotue@gmail.com.
+   - Variables en el compose del NAS: `GOOGLE_CLIENT_ID`,
+     `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
+     `GOOGLE_CONTRACT_TEMPLATE_ID`, `GOOGLE_CONTRACTS_FOLDER_ID` (y
+     `GOOGLE_SA_KEY`, que ya NO se usa pero se deja por si llega Workspace).
+     Copias: `docker-compose.yaml.bak-google-20260924` y `.bak-oauth-20260924`.
+
+   ⚠️ **La trampa que costó la tarde: una cuenta de servicio NO SIRVE aquí.**
+   Todo salió en verde y aun así crear el contrato moría con
+   «403 The user's Drive storage quota has been exceeded». No era el Drive de
+   Cris: una cuenta de servicio tiene `storageQuota.limit = "0"`, o sea CERO
+   espacio propio, y no puede ser dueña de la copia que crea. Desde 2022 eso
+   solo funciona contra una **unidad compartida de Google Workspace**, y la
+   empresa no tiene Workspace (su correo va por Hostinger/Hostpoint). Por eso
+   el asistente actúa **en nombre de una persona** (OAuth): los documentos son
+   suyos y gastan su espacio. `modoContratos()` elige solo.
+
+   ⚠️ **La app OAuth está publicada («In Produktion») a propósito.** En modo
+   «Test» Google **caduca el permiso a los siete días** y los contratos
+   dejarían de salir cada semana. Si alguien la devuelve a Test, eso se rompe.
+   Para publicarla hizo falta rellenar Branding con las URLs reales de
+   www.hansamonn.ch (inicio, datenschutz, agb) y el dominio autorizado.
+
+   Si un día falla: preguntar al asistente **«¿puedes hacer contratos?»** —
+   comprueba la cadena eslabón a eslabón y dice qué arreglar. Las dos causas
+   probables de un fallo nuevo son que se revoque el acceso a la app en la
+   cuenta de Google, o que la app vuelva a modo de prueba.
 5. ~~Rondas de control (Duschen-Kontrolle)~~ **descartado** por decisión de
    Cris (sept 2026). ⚠️ Sigue pendiente en la vida real: las habitaciones
    **206 y 207** llevan desde el 31.08.2026 con fuga de agua.
@@ -406,6 +435,11 @@ existen porque un cambio rompió algo silenciosamente.
 
 ## 6. Trampas que ya han mordido
 
+- **Una cuenta de servicio de Google no puede ser dueña de nada** en un Drive
+  normal: tiene `storageQuota.limit = "0"`. Copiar un fichero con ella da
+  «403 quota exceeded» aunque el Drive del usuario esté vacío, y el mensaje
+  engaña. Sin Google Workspace (unidad compartida), la única salida es actuar
+  en nombre de una persona con OAuth (24.09.2026).
 - **La regla del hotel se queda con casi cualquier frase.** `cfg.hotel` dispara
   con «apaleo», «reservas», «cuartos», «libres»… así que «¿qué es Apaleo?»
   acababa consultando el parte del día en vez de explicar qué es Apaleo. Las

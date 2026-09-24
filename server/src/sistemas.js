@@ -165,8 +165,8 @@ export const SISTEMAS = {
     es: {
       queEs: 'Yo. Un asistente de la empresa que trabaja por WhatsApp (+41 76 226 04 47) y guarda todo en un servidor propio, en la oficina.',
       usamos: 'Tareas del equipo, citas, contactos, compra de oficina, gastos y kilometraje, residuos, contratos de alquiler, impagos, recibos, meteo de obra, precios de Casa Reto y datos del hotel.',
-      estado: 'EN MARCHA. Desde el 24.09.2026 hay además un vigilante que avisa por WhatsApp si dejo de responder.',
-      puedesPreguntar: ['¿qué tengo hoy?', '¿qué sabes hacer?', '¿qué sistemas usamos?'],
+      estado: 'EN MARCHA. Desde el 24.09.2026 hay además un vigilante que avisa por WhatsApp si dejo de responder, y ya genero los contratos de alquiler en Google Docs.',
+      puedesPreguntar: ['¿qué tengo hoy?', '¿qué sabes hacer?', '¿qué sistemas usamos?', 'contrato para Max Muster, habitación 204, 850, desde el 1 de octubre'],
       ojo: 'Entiendo español, alemán y portugués, y también notas de voz. Las reglas van primero; solo cuando no entiendo pido ayuda a una IA externa, y a esa nunca le mando contraseñas ni números de cuenta.',
     },
     de: {
