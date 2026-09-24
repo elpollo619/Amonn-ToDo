@@ -355,6 +355,42 @@ necesita más código: se encienden solas cuando llegue el permiso.
    (nextcloud y HAAG modules, según su CLAUDE.md). Van todas juntas: hacerlo
    acompañado, no a ciegas.
 
+## 4e. El latido: el vigilante de vida (24.09.2026) ✅ ENCENDIDO
+
+Existe porque el asistente se ha muerto dos veces sin que nadie se enterara:
+9 días en septiembre (imagen amd64 en un NAS arm64) y 2 h el 08.09 (permisos
+de pgdata).
+
+- **Dónde:** contenedor `amonn-latido`, ya en el compose del NAS (copia previa
+  en `docker-compose.yaml.bak-latido-20260924`).
+- **Código:** `scripts/latido.mjs` en este repo, con 12 pruebas
+  (`server/test/latido.test.mjs`).
+- **Qué hace:** pregunta a `/api/version` cada 2 min; si falla 3 veces
+  seguidas manda un WhatsApp diciendo qué mirar (nombra las dos averías
+  conocidas), insiste cada 6 h mientras siga caído, y avisa al recuperarse
+  diciendo cuánto duró. Avisa a `LATIDO_TO` (hoy, el mismo número de
+  `MAIL_NOTIFY_TO`).
+- **Probado de verdad** el 24.09.2026 con una URL muerta: el mensaje llegó.
+
+⚠️ **Por qué usa `node:22-alpine` y NO la imagen de la app.** Si usara la
+imagen de Amonn, un build roto lo mataría a la vez que al servidor — que es
+justo el fallo que debe detectar. Por lo mismo **no lleva etiqueta de
+Watchtower**: nadie lo actualiza solo.
+
+⚠️ **El script NO se despliega solo al publicar.** Vive montado desde
+`/home/Cris/latido/latido.mjs`. Si lo cambias en el repo, cópialo otra vez
+(scp falla en este NAS, hay que canalizarlo):
+
+```bash
+cat scripts/latido.mjs | ssh -i ~/.ssh/id_ed25519_kali Cris@100.77.9.60 \
+  'cat > /home/Cris/latido/latido.mjs'
+ssh -i ~/.ssh/id_ed25519_kali Cris@100.77.9.60 'docker restart amonn-latido'
+```
+
+**Lo que NO cubre:** si se apaga el NAS entero o cae el Gateway, nadie avisa.
+Para eso haría falta un servicio externo (un «dead man's switch» tipo
+healthchecks.io). Queda pendiente y es barato.
+
 ## 5. Pruebas
 
 ```bash
