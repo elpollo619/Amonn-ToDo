@@ -162,12 +162,24 @@ async function llamar(url, opciones = {}) {
  */
 export function parseContrato(texto, today = todayKey(), lang = 'es') {
   const trozos = String(texto ?? '').split(',').map((x) => x.trim()).filter(Boolean)
-  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null, pauschal: null }
+  const datos = { nombre: null, habitacion: null, alquiler: null, desde: null, deposito: null, pauschal: null, objeto: null }
   const sueltos = []
   for (const tr of trozos) {
     // La unidad alquilada: habitación, o plaza de aparcamiento. Siempre con su
     // palabra delante, para no confundirla con el importe: en «204, 850» los
     // dos números son igual de válidos y adivinar sería jugársela.
+    // Una vivienda se describe entera («3½-Zimmerwohnung EG», «4½-Zimmer­
+    // wohnung 1.OG links»): el trozo ES el objeto y no hay que despiezarlo.
+    // Sin esto, el patrón de «zimmer» cortaba por en medio y el contrato
+    // salía con el objeto «WOHNUNG EG».
+    // Lo mismo para trasteros y almacenes: «Lagerraum Lager 1» o
+    // «Kellerraum UG» se escriben de una pieza y así deben entrar.
+    const vivienda = tr.match(/^(\d\s*[½¼¾]?\s*-?\s*zimmer\w*.*|wohnung\b.*|lagerraum\b.*|kellerraum\b.*|bastelraum\b.*)$/i)
+    if (vivienda && !datos.objeto) {
+      datos.objeto = tr
+      if (!datos.habitacion) datos.habitacion = tr
+      continue
+    }
     // Se toma TODO lo que sigue a la palabra, no solo la palabra siguiente:
     // las plazas se llaman «AEP 15» o «Nr. 3 EG», y quedarse con el primer
     // trozo daba una plaza «AEP» sin número. El texto ya viene partido por

@@ -180,3 +180,28 @@ test('cada tipo se nombra distinto, para no confundir documentos en el Drive', (
   const nombres = Object.values(PLANTILLAS).map((p) => p.nombreDoc(d))
   assert.equal(new Set(nombres).size, nombres.length, `hay nombres repetidos: ${nombres.join(' / ')}`)
 })
+
+// ── El objeto alquilado se escribe de una pieza ────────────────────────────
+//
+// Nace de un fallo visto en produccion: «3½-Zimmerwohnung EG» salia en el
+// contrato como «WOHNUNG EG», porque el patron de «zimmer» cortaba por el
+// medio. Una vivienda o un trastero se describen enteros.
+
+test('una vivienda entra entera, sin despiezar', () => {
+  const d = parseContrato('Sara Test, I16, 3-Zimmerwohnung EG, 1500, pauschal 230', HOY, 'es')
+  assert.equal(d.objeto, '3-Zimmerwohnung EG')
+  assert.equal(d.nombre, 'Sara Test')
+  assert.equal(d.alquiler, '1500')
+})
+
+test('un trastero tambien entra entero', () => {
+  const d = parseContrato('Bruno Test, A14, Lagerraum Lager 1, 550, desde el 1 de marzo', HOY, 'es')
+  assert.equal(d.objeto, 'Lagerraum Lager 1')
+  assert.equal(d.alquiler, '550')
+})
+
+test('y esto NO cambia como se leen habitaciones y plazas', () => {
+  assert.equal(parseContrato('Max, B22, habitacion 3, 800', HOY, 'es').habitacion, '3')
+  assert.equal(parseContrato('Otto, A4, plaza AEP 15, 130', HOY, 'es').habitacion, 'AEP 15')
+  assert.equal(parseContrato('Max, B22, habitacion 3, 800', HOY, 'es').objeto, null)
+})
