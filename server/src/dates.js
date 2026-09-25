@@ -285,8 +285,11 @@ export function parseRange(text, today = todayKey(), lang = 'es') {
   return { start: primera.key, end, matches: [primera.match, segunda.match] }
 }
 
-// "3 días", "3 Tage", "3 dias" — cuánto TRABAJO lleva, no cuándo vence.
-const DURACION = /\b(\d{1,2}(?:[.,]5)?)\s*(dias?|tagen?|tage|jornadas?)\b/
+// "3 días de trabajo", "3 Tage Arbeit", "3 dias de trabalho", "3 jornadas de
+// obra" — cuánto TRABAJO lleva, no cuándo vence. La coletilla («de trabajo»,
+// «Arbeit»…) va dentro del match: si no, se quedaba huérfana en el título
+// («Pintar la nave, , de trabajo»).
+const DURACION = /\b(\d{1,2}(?:[.,]5)?)\s*(dias?|tagen?|tage|jornadas?)(?:\s+(?:de\s+|da\s+)?(?:trabajo|obra|trabalho|arbeit))?\b/
 
 /** Días de trabajo mencionados en el texto, o null. */
 export function parseWorkDays(text) {
