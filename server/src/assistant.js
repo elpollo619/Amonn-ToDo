@@ -1271,6 +1271,7 @@ function cleanTitle(s, lang = 'es') {
   let t = String(s ?? '').replace(/^[\s,;:.-]+/, '')
   for (const re of cfg.inicio) t = t.replace(re, '')
   t = t
+    .replace(/\s*[,;]\s*(?=[,;])/g, '') // «nave, , para» → «nave, para»: huecos de lo ya extraído
     .replace(cfg.final, '')
     .replace(/[\s,;:.-]+$/, '')
     .replace(/\s+/g, ' ')

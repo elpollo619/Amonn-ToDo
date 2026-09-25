@@ -601,11 +601,23 @@ existen porque un cambio rompió algo silenciosamente.
   —la del propio README— es «suci**os**»: nunca entraba. Si una prueba
   depende de una guarda temprana, hace falta otra que recorra el camino
   entero (`hotel_permisos.test.mjs`).
-- **⚠️ FALLO PENDIENTE, ajeno a lo anterior:** `test/plazos.test.mjs` da
-  **4 fallos** desde antes de esta sesión (comprobado en el árbol limpio).
-  Los rangos de fecha se parsean mal: «del … al jueves» deja el inicio vacío
-  («Revisar la caldera, del al jueves») y el plazo se va a la semana
-  siguiente. Parece dependiente de la fecha del día. Merece una sesión.
+- **~~FALLO PENDIENTE en `test/plazos.test.mjs`~~ → CERRADO el 25.09.2026.**
+  Se buscó el «inicio vacío» de «del … al jueves» en 365 «hoy» seguidos,
+  por `parseRange` directo y por la ruta completa de reglas, y también sobre
+  el commit anterior a la sesión del 24.09: **no se reproduce en ninguno**.
+  Lo único que depende del día es de diseño: «del lunes al jueves» dicho UN
+  LUNES apunta al lunes que viene (`dates.js`, «el viernes dicho un viernes
+  = el que viene»). Ahora la prueba recorre siete «hoy» (lun→dom) en es/de/pt
+  para que no vuelva a depender del calendario real.
+  Lo que SÍ estaba roto y la prueba no veía (comparaba con `includes`): la
+  duración dejaba restos en el título — «Pintar la nave, , de trabajo». La
+  regex `DURACION` se lleva ahora su coletilla («de trabajo», «Arbeit», «de
+  obra», «de trabalho») y `cleanTitle` colapsa «, ,». La prueba compara el
+  título exacto en los tres idiomas y con la duración al final o en medio.
+- **⚠️ La suite con base se ejecuta con `WA_ENABLED=false`** (está en la
+  sección 5, pero se olvida): sin ella, `dialogo`, `avisos` y `semana` fallan
+  con «obtenido: 0» porque los WhatsApp intentan salir de verdad. No es un
+  fallo del código.
 
 ## 7. Decisiones tomadas (no volver a discutirlas)
 
